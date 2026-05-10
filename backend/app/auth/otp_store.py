@@ -1,0 +1,65 @@
+"""
+In-memory OTP store with expiry and attempt limiting.
+Each entry lives for OTP_EXPIRY_MINUTES then is discarded.
+"""
+from __future__ import annotations
+
+import random
+from datetime import datetime, timedelta
+
+OTP_EXPIRY_MINUTES = 10
+MAX_ATTEMPTS       = 5
+
+# { email: { otp, expires_at, verified, attempts } }
+_store: dict[str, dict] = {}
+
+
+def generate(email: str) -> str:
+    """Create a new 5-digit OTP for *email* and return it."""
+    otp = f"{random.randint(10000, 99999)}"
+    _store[email] = {
+        "otp":        otp,
+        "expires_at": datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES),
+        "verified":   False,
+        "attempts":   0,
+    }
+    return otp
+
+
+def verify(email: str, otp: str) -> tuple[bool, str]:
+    """
+    Verify *otp* for *email*.
+    Returns (True, '') on success or (False, error_message) on failure.
+    """
+    entry = _store.get(email)
+
+    if not entry:
+        return False, "No OTP found for this email. Please request a new one."
+
+    if datetime.utcnow() > entry["expires_at"]:
+        _store.pop(email, None)
+        return False, "OTP has expired. Please request a new one."
+
+    if entry["attempts"] >= MAX_ATTEMPTS:
+        _store.pop(email, None)
+        return False, "Too many failed attempts. Please request a new OTP."
+
+    entry["attempts"] += 1
+
+    if entry["otp"] != otp.strip():
+        remaining = MAX_ATTEMPTS - entry["attempts"]
+        return False, f"Incorrect code. {remaining} attempt(s) remaining."
+
+    entry["verified"] = True
+    return True, ""
+
+
+def is_verified(email: str) -> bool:
+    """Return True if the email's OTP was successfully verified."""
+    entry = _store.get(email)
+    return bool(entry and entry.get("verified"))
+
+
+def clear(email: str) -> None:
+    """Remove the OTP entry after successful registration."""
+    _store.pop(email, None)

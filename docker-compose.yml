@@ -1,0 +1,42 @@
+services:
+
+  # ── Module 1 & 8 Backend (FastAPI + NumPy simulation kernel) ──────────────
+  backend:
+    build: ./backend
+    container_name: qaibridge-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    networks:
+      - qaibridge-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── React Frontend ───────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: qaibridge-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000
+      - BACKEND_HOST=backend
+    networks:
+      - qaibridge-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  qaibridge-net:
+    driver: bridge

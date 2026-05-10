@@ -1,0 +1,523 @@
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, User, Zap, Eye, EyeOff, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+// ── Password helpers ──────────────────────────────────────────────────────────
+
+const UPPER   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const LOWER   = 'abcdefghjkmnpqrstuvwxyz';
+const DIGITS  = '23456789';
+const SPECIAL = '!@#$%&*';
+
+function generateStrongPassword(): string {
+  const all = UPPER + LOWER + DIGITS + SPECIAL;
+  let pwd = UPPER[Math.floor(Math.random() * UPPER.length)]
+           + LOWER[Math.floor(Math.random() * LOWER.length)]
+           + DIGITS[Math.floor(Math.random() * DIGITS.length)]
+           + SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
+  for (let i = 0; i < 8; i++) pwd += all[Math.floor(Math.random() * all.length)];
+  return pwd.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+interface StrengthInfo {
+  score: number;      // 0-5
+  label: string;
+  color: string;
+  bg:    string;
+}
+
+function getStrength(pwd: string): StrengthInfo {
+  let score = 0;
+  if (pwd.length >= 8)                    score++;
+  if (pwd.length >= 12)                   score++;
+  if (/[A-Z]/.test(pwd))                  score++;
+  if (/[a-z]/.test(pwd))                  score++;
+  if (/\d/.test(pwd))                     score++;
+  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd)) score++;
+
+  if (score <= 2) return { score, label: 'Weak',      color: '#ef4444', bg: '#ef444430' };
+  if (score === 3) return { score, label: 'Fair',      color: '#f97316', bg: '#f9731630' };
+  if (score === 4) return { score, label: 'Good',      color: '#3b82f6', bg: '#3b82f630' };
+  return             { score, label: 'Strong',    color: '#00ffcc', bg: '#00ffcc20' };
+}
+
+interface Requirement { label: string; met: boolean }
+
+function getRequirements(pwd: string): Requirement[] {
+  return [
+    { label: 'At least 8 characters',    met: pwd.length >= 8 },
+    { label: 'One uppercase letter (A-Z)', met: /[A-Z]/.test(pwd) },
+    { label: 'One lowercase letter (a-z)', met: /[a-z]/.test(pwd) },
+    { label: 'One digit (0-9)',            met: /\d/.test(pwd)    },
+  ];
+}
+
+// ── Step indicator ────────────────────────────────────────────────────────────
+
+function Steps({ current }: { current: number }) {
+  const steps = ['Email', 'Verify OTP', 'Set Password'];
+  return (
+    <div className="flex items-center justify-center gap-2 mb-8">
+      {steps.map((label, i) => {
+        const idx     = i + 1;
+        const done    = idx < current;
+        const active  = idx === current;
+        return (
+          <div key={label} className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
+                style={
+                  done   ? { background: '#00ffcc',  color: '#000' } :
+                  active ? { background: '#cc44ff',  color: '#fff' } :
+                           { background: '#1f2937', color: '#6b7280' }
+                }
+              >
+                {done ? '✓' : idx}
+              </div>
+              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-white' : done ? 'text-quantum-neon' : 'text-gray-600'}`}>
+                {label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="w-8 h-px" style={{ background: done ? '#00ffcc40' : '#1f2937' }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function RegisterPage() {
+  const { login }  = useAuth();
+  const navigate   = useNavigate();
+
+  const [step,     setStep]     = useState<1 | 2 | 3>(1);
+  const [email,    setEmail]    = useState('');
+  const [otp,      setOtp]      = useState(['', '', '', '', '']);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm,  setConfirm]  = useState('');
+  const [showPwd,  setShowPwd]  = useState(false);
+  const [showCfm,  setShowCfm]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [resendIn, setResendIn] = useState(0);   // countdown seconds
+
+  const otpRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  // Countdown timer for resend OTP
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  const strength = getStrength(password);
+  const reqs     = getRequirements(password);
+  const allReqsMet = reqs.every(r => r.met);
+
+  // ── Step 1: Send OTP ────────────────────────────────────────────────────────
+
+  const sendOtp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'Failed to send OTP');
+      setStep(2);
+      setResendIn(60);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 2: Verify OTP ──────────────────────────────────────────────────────
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const next = [...otp];
+    next[index] = value.slice(-1);
+    setOtp(next);
+    setError('');
+    if (value && index < 4) otpRefs[index + 1].current?.focus();
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 5);
+    if (pasted.length === 5) {
+      setOtp(pasted.split(''));
+      otpRefs[4].current?.focus();
+    }
+  };
+
+  const verifyOtp = async () => {
+    const code = otp.join('');
+    if (code.length < 5) { setError('Please enter all 5 digits.'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'OTP verification failed');
+      setStep(3);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    if (resendIn > 0) return;
+    setOtp(['', '', '', '', '']);
+    setError('');
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'Failed to resend OTP');
+      setResendIn(60);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 3: Register ────────────────────────────────────────────────────────
+
+  const register = async () => {
+    if (!allReqsMet)             { setError('Password does not meet the requirements.'); return; }
+    if (password !== confirm)    { setError('Passwords do not match.'); return; }
+    if (username.length < 3)     { setError('Username must be at least 3 characters.'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'Registration failed');
+      login(data.access_token, data.user);
+      navigate('/app', { replace: true });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="absolute top-1/4 right-1/3 w-96 h-96 bg-quantum-purple opacity-8 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-teal-500 opacity-8 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative w-full max-w-md">
+        <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
+
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center mx-auto mb-4">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-white mb-1">Create your account</h1>
+            <p className="text-gray-500 text-sm">Start exploring quantum computing today</p>
+          </div>
+
+          <Steps current={step} />
+
+          {/* Error */}
+          {error && (
+            <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-5 flex items-center gap-2">
+              <XCircle className="w-4 h-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* ── STEP 1: Email ── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 font-medium mb-1.5">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && email && sendOtp()}
+                    placeholder="you@example.com"
+                    autoFocus
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                  />
+                </div>
+                <p className="text-xs text-gray-600 mt-1.5">
+                  A 5-digit verification code will be sent to this address.
+                </p>
+              </div>
+
+              <button
+                onClick={sendOtp}
+                disabled={loading || !email}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+              >
+                {loading ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Sending code…</>
+                ) : (
+                  <><Mail className="w-4 h-4" /> Send Verification Code</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 2: OTP ── */}
+          {step === 2 && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">
+                  We sent a 5-digit code to
+                </p>
+                <p className="text-quantum-neon font-semibold text-sm mt-0.5">{email}</p>
+              </div>
+
+              {/* 5 OTP boxes */}
+              <div className="flex justify-center gap-3" onPaste={handleOtpPaste}>
+                {otp.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={otpRefs[i]}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={e => handleOtpChange(i, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(i, e)}
+                    className="w-12 h-14 text-center text-2xl font-bold text-white bg-quantum-900 border-2 rounded-xl focus:outline-none transition-all"
+                    style={{
+                      borderColor: digit ? '#00ffcc' : '#374151',
+                      boxShadow: digit ? '0 0 0 2px #00ffcc20' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={verifyOtp}
+                disabled={loading || otp.join('').length < 5}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+              >
+                {loading ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Verifying…</>
+                ) : (
+                  <><CheckCircle className="w-4 h-4" /> Verify Code</>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <button onClick={() => { setStep(1); setOtp(['','','','','']); setError(''); }}
+                  className="hover:text-gray-400 transition-colors">
+                  ← Change email
+                </button>
+                <button
+                  onClick={resendOtp}
+                  disabled={resendIn > 0 || loading}
+                  className="flex items-center gap-1 hover:text-gray-400 transition-colors disabled:opacity-40 disabled:cursor-default"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 3: Username + Password ── */}
+          {step === 3 && (
+            <div className="space-y-4">
+
+              {/* Email verified badge */}
+              <div className="flex items-center gap-2 bg-green-950/30 border border-green-800/50 rounded-xl px-3 py-2">
+                <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span className="text-green-400 text-xs font-medium">{email} — verified</span>
+              </div>
+
+              {/* Username */}
+              <div>
+                <label className="block text-xs text-gray-400 font-medium mb-1.5">Username</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => { setUsername(e.target.value); setError(''); }}
+                    placeholder="e.g. syed_taha"
+                    minLength={3}
+                    maxLength={50}
+                    autoFocus
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-gray-400 font-medium">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => { const p = generateStrongPassword(); setPassword(p); setConfirm(p); }}
+                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-quantum-neon transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Suggest strong password
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError(''); }}
+                    placeholder="Min. 8 chars with A-Z, a-z, 0-9"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors font-mono tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
+                  >
+                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Strength bar */}
+                {password && (
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1 flex-1 mr-3">
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
+                            style={{ background: i <= strength.score ? strength.color : '#1f2937' }} />
+                        ))}
+                      </div>
+                      <span className="text-xs font-semibold" style={{ color: strength.color }}>
+                        {strength.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {reqs.map(r => (
+                        <div key={r.label} className="flex items-center gap-1.5">
+                          {r.met
+                            ? <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />
+                            : <XCircle    className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                          }
+                          <span className={`text-[10px] ${r.met ? 'text-green-400' : 'text-gray-600'}`}>
+                            {r.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm password */}
+              <div>
+                <label className="block text-xs text-gray-400 font-medium mb-1.5">Confirm Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <input
+                    type={showCfm ? 'text' : 'password'}
+                    value={confirm}
+                    onChange={e => { setConfirm(e.target.value); setError(''); }}
+                    placeholder="Re-enter your password"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    style={{
+                      borderColor: confirm
+                        ? confirm === password ? '#22c55e60' : '#ef444460'
+                        : undefined
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCfm(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
+                  >
+                    {showCfm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {confirm && confirm !== password && (
+                  <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                )}
+              </div>
+
+              <button
+                onClick={register}
+                disabled={loading || !allReqsMet || password !== confirm || username.length < 3}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+              >
+                {loading ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Creating account…</>
+                ) : (
+                  <><CheckCircle className="w-4 h-4" /> Create Account</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Footer */}
+          <p className="text-center text-gray-600 text-sm mt-6">
+            Already have an account?{' '}
+            <Link to="/login" className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
+              Sign in
+            </Link>
+          </p>
+        </div>
+
+        <p className="text-center text-gray-700 text-xs mt-4">
+          <Link to="/" className="hover:text-gray-500 transition-colors">← Back to home</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
