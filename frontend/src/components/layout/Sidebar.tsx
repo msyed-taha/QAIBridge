@@ -1,17 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Cpu, BarChart2, BookOpen, Database, Code, Brain, GitBranch, Layers, Home } from 'lucide-react';
+import { Cpu, BookOpen, Database, Code, Brain, GitBranch, Layers, Home } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 
 const NAV_ITEMS = [
   { path: '/',          label: 'Home',                 icon: Home,       active: true  },
   { path: '/module1',   label: 'Simulation Kernel',     icon: Cpu,        active: true  },
-  { path: '/module2',   label: 'SFOD Suite',            icon: Layers,     active: false },
-  { path: '/module3',   label: 'Circuit Builder',       icon: BookOpen,   active: false },
-  { path: '/module4',   label: 'Arch Recommender',      icon: Database,   active: false },
-  { path: '/module5',   label: 'Logic Transformer',     icon: Code,       active: false },
-  { path: '/module6',   label: 'Neural Optimizer',      icon: Brain,      active: false },
-  { path: '/module7',   label: 'QNN Converter',         icon: GitBranch,  active: false },
-  { path: '/module8',   label: 'Performance Dashboard', icon: BarChart2,  active: true  },
+  { path: '/module2',   label: 'SFOD Suite',            icon: Layers,     active: true  },
+  { path: '/module3',   label: 'Circuit Builder',       icon: BookOpen,   active: true  },
+  { path: '/module4',   label: 'Arch Recommender',      icon: Database,   active: true  },
+  { path: '/module5',   label: 'Logic Transformer',     icon: Code,       active: true  },
+  { path: '/module6',   label: 'Neural Optimizer',      icon: Brain,      active: true  },
+  { path: '/module7',   label: 'QNN Converter',         icon: GitBranch,  active: true  },
 ];
 
 export function Sidebar() {

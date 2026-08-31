@@ -3,23 +3,35 @@ Module 5 – Quantum Code Transformer
 Users paste classical code → run it classically → transform to Qiskit quantum code → simulate.
 
 Routes:
-  POST /api/module5/run-classical   – Execute code in Python/JS/C++/Java/Go/Ruby/Rust
+  POST /api/module5/run-classical   – Execute Python code (auth required — see below)
   POST /api/module5/transform       – Detect pattern, return Qiskit quantum code + explanation
   POST /api/module5/run-quantum     – Numpy state-vector simulation of the quantum equivalent
   GET  /api/module5/examples        – Return built-in example code snippets
+
+Security note on /run-classical: this endpoint runs arbitrary user-submitted
+code via subprocess. The string-blocklist safety check below is defense in
+depth, not a real sandbox -- it cannot guarantee safety against a determined
+attacker. Two mitigations are in place: (1) it requires a logged-in user
+(Depends(get_current_user)), removing anonymous/drive-by access; (2) only
+Python execution is exposed -- the compiled-language runners (C++/Java/Go/
+Rust/...) that had *no* filtering at all have been removed entirely rather
+than left reachable. A real production deployment of this feature would need
+to run in an isolated, resource-capped, network-disabled sandbox (e.g. a
+locked-down container) rather than direct subprocess execution.
 """
 from __future__ import annotations
 
 import re
-import os
 import sys
 import math
 import time
-import tempfile
 import subprocess
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from ..models.user import User
+from ..routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/module5", tags=["Module 5 – Quantum Code Transformer"])
 
@@ -36,17 +48,6 @@ def _is_safe_python(code: str) -> tuple[bool, str]:
             return False, f"Blocked operation: '{bad}'"
     return True, ""
 
-def _which(cmd: str) -> bool:
-    """Check if a command is available on PATH."""
-    try:
-        subprocess.run(
-            ["where" if sys.platform == "win32" else "which", cmd],
-            capture_output=True, timeout=5
-        )
-        return True
-    except Exception:
-        return False
-
 def _run_proc(cmd: list, timeout: int = 15) -> tuple[str, str, bool, int]:
     """Run a subprocess, return (stdout, stderr, success, time_ms)."""
     start = time.time()
@@ -61,7 +62,7 @@ def _run_proc(cmd: list, timeout: int = 15) -> tuple[str, str, bool, int]:
     except Exception as e:
         return "", str(e), False, 0
 
-# ── Multi-language classical execution ───────────────────────────────────────
+# ── Classical execution (Python only — see module docstring) ──────────────────
 
 def _run_python(code: str) -> dict:
     safe, reason = _is_safe_python(code)
@@ -71,197 +72,36 @@ def _run_python(code: str) -> dict:
     return {"output": out, "error": err, "success": ok, "time_ms": ms}
 
 
-def _run_javascript(code: str) -> dict:
-    for exe in (["node"], ["nodejs"]):
-        try:
-            subprocess.run(exe + ["--version"], capture_output=True, timeout=5)
-            break
-        except Exception:
-            exe = None
-    if not exe:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": "Node.js not found. Install it from https://nodejs.org then restart the server.",
-        }
-    with tempfile.NamedTemporaryFile(suffix=".js", mode="w", delete=False, encoding="utf-8") as f:
-        f.write(code); fname = f.name
-    try:
-        out, err, ok, ms = _run_proc(exe + [fname])
-    finally:
-        try: os.unlink(fname)
-        except: pass
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_cpp(code: str) -> dict:
-    # Try g++ first, then clang++
-    compiler = None
-    for c in ["g++", "clang++"]:
-        try:
-            subprocess.run([c, "--version"], capture_output=True, timeout=5)
-            compiler = c; break
-        except Exception:
-            pass
-    if not compiler:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": (
-                "C++ compiler not found.\n"
-                "Windows: install MinGW-w64 → https://www.mingw-w64.org\n"
-                "Then add g++ to your PATH and restart the server."
-            ),
-        }
-    ext = ".exe" if sys.platform == "win32" else ""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src = os.path.join(tmpdir, "main.cpp")
-        out_bin = os.path.join(tmpdir, f"main{ext}")
-        with open(src, "w", encoding="utf-8") as f:
-            f.write(code)
-        # Compile
-        cout, cerr, cok, _ = _run_proc([compiler, src, "-o", out_bin, "-std=c++17"], timeout=30)
-        if not cok:
-            return {"output": "", "error": f"Compilation error:\n{cerr}", "success": False, "time_ms": 0}
-        # Run
-        out, err, ok, ms = _run_proc([out_bin])
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_java(code: str) -> dict:
-    for exe in ["javac", "java"]:
-        try:
-            subprocess.run([exe, "-version"], capture_output=True, timeout=5)
-        except Exception:
-            return {
-                "output": "", "success": False, "time_ms": 0,
-                "error": (
-                    f"Java ({exe}) not found.\n"
-                    "Install JDK from https://adoptium.net and add it to PATH."
-                ),
-            }
-    # Extract public class name (Java requires filename == class name)
-    m = re.search(r"public\s+class\s+(\w+)", code)
-    class_name = m.group(1) if m else "Main"
-    if not m:
-        code = f"public class Main {{\n    public static void main(String[] args) {{\n        {code}\n    }}\n}}"
-        class_name = "Main"
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src = os.path.join(tmpdir, f"{class_name}.java")
-        with open(src, "w", encoding="utf-8") as f:
-            f.write(code)
-        cout, cerr, cok, _ = _run_proc(["javac", src], timeout=30)
-        if not cok:
-            return {"output": "", "error": f"Compilation error:\n{cerr}", "success": False, "time_ms": 0}
-        out, err, ok, ms = _run_proc(["java", "-cp", tmpdir, class_name])
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_go(code: str) -> dict:
-    try:
-        subprocess.run(["go", "version"], capture_output=True, timeout=5)
-    except Exception:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": "Go not found. Install from https://go.dev/dl and restart the server.",
-        }
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src = os.path.join(tmpdir, "main.go")
-        with open(src, "w", encoding="utf-8") as f:
-            f.write(code)
-        out, err, ok, ms = _run_proc(["go", "run", src])
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_ruby(code: str) -> dict:
-    try:
-        subprocess.run(["ruby", "--version"], capture_output=True, timeout=5)
-    except Exception:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": "Ruby not found. Install from https://rubyinstaller.org (Windows) and restart.",
-        }
-    with tempfile.NamedTemporaryFile(suffix=".rb", mode="w", delete=False, encoding="utf-8") as f:
-        f.write(code); fname = f.name
-    try:
-        out, err, ok, ms = _run_proc(["ruby", fname])
-    finally:
-        try: os.unlink(fname)
-        except: pass
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_rust(code: str) -> dict:
-    try:
-        subprocess.run(["rustc", "--version"], capture_output=True, timeout=5)
-    except Exception:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": "Rust not found. Install from https://rustup.rs and restart.",
-        }
-    ext = ".exe" if sys.platform == "win32" else ""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src = os.path.join(tmpdir, "main.rs")
-        out_bin = os.path.join(tmpdir, f"main{ext}")
-        with open(src, "w", encoding="utf-8") as f:
-            f.write(code)
-        cout, cerr, cok, _ = _run_proc(["rustc", src, "-o", out_bin], timeout=60)
-        if not cok:
-            return {"output": "", "error": f"Compilation error:\n{cerr}", "success": False, "time_ms": 0}
-        out, err, ok, ms = _run_proc([out_bin])
-    return {"output": out, "error": err, "success": ok, "time_ms": ms}
-
-
-def _run_typescript(code: str) -> dict:
-    # Try ts-node first (most convenient), fall back to tsc + node
-    try:
-        subprocess.run(["ts-node", "--version"], capture_output=True, timeout=5)
-        with tempfile.NamedTemporaryFile(suffix=".ts", mode="w", delete=False, encoding="utf-8") as f:
-            f.write(code); fname = f.name
-        try:
-            out, err, ok, ms = _run_proc(["ts-node", fname])
-        finally:
-            try: os.unlink(fname)
-            except: pass
-        return {"output": out, "error": err, "success": ok, "time_ms": ms}
-    except Exception:
-        return {
-            "output": "", "success": False, "time_ms": 0,
-            "error": (
-                "ts-node not found. Install with:\n"
-                "  npm install -g ts-node typescript\n"
-                "Then restart the server."
-            ),
-        }
-
-
 RUNNERS = {
-    "python":     _run_python,
-    "javascript": _run_javascript,
-    "js":         _run_javascript,
-    "typescript": _run_typescript,
-    "ts":         _run_typescript,
-    "c++":        _run_cpp,
-    "cpp":        _run_cpp,
-    "java":       _run_java,
-    "go":         _run_go,
-    "golang":     _run_go,
-    "ruby":       _run_ruby,
-    "rust":       _run_rust,
+    "python": _run_python,
 }
 
 # ── Pattern detection ─────────────────────────────────────────────────────────
 
+_PATTERN_KEYWORDS = {
+    "search":       ["linear_search", "binary_search", "arr[i]", "list[i]", "if item ==", "if arr[i]", "def search"],
+    "factoring":    ["factor", "prime", "% i == 0", "%i==0", "divisor", "find_factors", "is_prime", "n % "],
+    "sorting":      ["bubble_sort", "insertion_sort", "quick_sort", "merge_sort", "sort(", "sorted(", "swap", "arr[j] > arr[j"],
+    "matrix":       ["matrix", "numpy", "matmul", "dot(", "[[", "matrix_multiply", "np.array"],
+    "optimization": ["optimize", "minimize", "maximize", "knapsack", "budget", "cost", "min(", "max(", "best_value", "best_combo"],
+}
+# Tie-break order when two patterns score equally (keeps prior precedence as fallback).
+_PATTERN_PRIORITY = ["search", "factoring", "sorting", "matrix", "optimization"]
+
 def _detect_pattern(code: str) -> str:
+    """Score each pattern by keyword hit count (language-agnostic substring match —
+    works across Python/JS/Java/C++/Go/Rust/etc since it's just text scanning) and
+    return the strongest match. A single generic hit (e.g. one loosely-related word)
+    shouldn't beat a pattern with several specific hits, so this counts rather than
+    stopping at the first category that matches at all."""
     c = code.lower()
-    if any(kw in c for kw in ["linear_search", "binary_search", "for i in range", "arr[i]", "list[i]", "if item ==", "if arr[i]", "def search"]):
-        return "search"
-    if any(kw in c for kw in ["factor", "prime", "% i == 0", "%i==0", "divisor", "find_factors", "is_prime", "n % "]):
-        return "factoring"
-    if any(kw in c for kw in ["bubble_sort", "insertion_sort", "quick_sort", "merge_sort", "sort(", "sorted(", "swap", "arr[j] > arr[j"]):
-        return "sorting"
-    if any(kw in c for kw in ["matrix", "numpy", "matmul", "dot(", "[[", "matrix_multiply", "np.array"]):
-        return "matrix"
-    if any(kw in c for kw in ["optimize", "minimize", "maximize", "knapsack", "budget", "cost", "min(", "max(", "best_value", "best_combo"]):
-        return "optimization"
+    scores = {p: sum(1 for kw in kws if kw in c) for p, kws in _PATTERN_KEYWORDS.items()}
+    best = max(scores.values())
+    if best == 0:
+        return "general"
+    for p in _PATTERN_PRIORITY:
+        if scores[p] == best:
+            return p
     return "general"
 
 # ── Parameter extraction ──────────────────────────────────────────────────────
@@ -603,9 +443,10 @@ print(f"For N=1000: Classical ≈ 31,623 ops  Quantum ≈ 10 ops")
         return code, "HHL Algorithm (Quantum Matrix Solver)", steps
 
     elif pattern == "optimization":
-        items  = params.get("items", [("CPU",500,9),("GPU",800,10),("RAM",150,7),("SSD",200,8)])
-        budget = params.get("budget", 1000)
-        n_vars = len(items)
+        items    = params.get("items", [("CPU",500,9),("GPU",800,10),("RAM",150,7),("SSD",200,8)])
+        budget   = params.get("budget", 1000)
+        n_vars   = len(items)
+        p_layers = 3
         code = f'''\
 from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -665,7 +506,7 @@ for bitstring, freq in counts.items():
         best_sol = bitstring
 
 selected = [items[i] for i, b in enumerate(reversed(best_sol)) if b == "1"] if best_sol else []
-print(f"QAOA — {N} items, budget ${budget}")
+print(f"QAOA — {{N}} items, budget ${budget}")
 print(f"Layers (p): {p_layers}")
 print(f"Best solution bitstring: {{best_sol}}")
 print(f"Selected: {{[x[0] for x in selected]}}")
@@ -895,7 +736,7 @@ class QuantumRunRequest(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/run-classical")
-def run_classical(req: ClassicalRequest):
+def run_classical(req: ClassicalRequest, current_user: User = Depends(get_current_user)):
     lang = req.language.lower().strip()
     runner = RUNNERS.get(lang)
     if not runner:

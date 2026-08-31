@@ -30,13 +30,13 @@ export function StateVectorChart({ amplitudes }: Props) {
     plot_bgcolor: 'transparent',
     font: { color: '#ccc', family: 'Inter, sans-serif', size: 11 },
     xaxis: {
-      title: 'Basis State',
+      title: { text: 'Basis State' },
       tickfont: { color: '#888', size: 9, family: 'Fira Code, monospace' },
       gridcolor: '#1a1a3e',
       tickangle: -45,
     },
     yaxis: {
-      title: 'Probability',
+      title: { text: 'Probability' },
       gridcolor: '#252560',
       tickfont: { color: '#888' },
       range: [0, 1.05],

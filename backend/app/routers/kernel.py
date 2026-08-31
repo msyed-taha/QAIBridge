@@ -24,6 +24,7 @@ from ..modules.module1_kernel import (
     ram_table,
     SINGLE_QUBIT_GATES,
     TWO_QUBIT_GATES,
+    MAX_QUBITS,
 )
 from ..websocket_manager import manager
 
@@ -42,7 +43,7 @@ class GateOperation(BaseModel):
 
 
 class SimulateRequest(BaseModel):
-    n_qubits:   int = Field(..., ge=1, le=28, description="Number of qubits (1–28, up to ~4.3 GB)")
+    n_qubits:   int = Field(..., ge=1, le=MAX_QUBITS, description=f"Number of qubits (1–{MAX_QUBITS}, up to ~4.3 GB)")
     operations: List[GateOperation] = Field(default_factory=list)
     shots:      int = Field(default=1024, ge=1, le=10000)
     name:       str = Field(default="Custom Circuit")
@@ -50,7 +51,7 @@ class SimulateRequest(BaseModel):
 
 class PresetCircuitRequest(BaseModel):
     preset:   str = Field(..., description="One of: bell, ghz, grover, qft, ansatz")
-    n_qubits: int = Field(default=2, ge=2, le=28)
+    n_qubits: int = Field(default=2, ge=2, le=MAX_QUBITS)
     shots:    int = Field(default=1024)
     layers:   int = Field(default=2, ge=1, le=5)
 
@@ -118,8 +119,10 @@ async def run_preset_circuit(req: PresetCircuitRequest) -> Dict:
         raise
     except MemoryError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except (ValueError, IndexError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Simulation error: {e}")
 
 
 @router.get("/memory")

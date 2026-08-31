@@ -1,5 +1,5 @@
 """
-Custom Problem Solver — Module 8
+Custom Problem Solver
 Runs user-supplied data through Classical OR Quantum algorithms for each SFOD type.
 """
 

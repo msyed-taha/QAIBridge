@@ -1,11 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Loader2, Zap, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, Loader2, Zap, CheckCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { detailToMessage, friendlyError } from '../api/client';
 
 type Step = 'email' | 'otp' | 'password' | 'success';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const isAdmin  = params.get('as') === 'admin';
+  const loginPath = isAdmin ? '/login?as=admin' : '/login';
+  const accent = isAdmin
+    ? 'linear-gradient(90deg,#f59e0b,#f97316)'
+    : 'linear-gradient(90deg, #00ffcc, #00ccaa)';
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -44,11 +51,11 @@ export function ForgotPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to send OTP');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Failed to send OTP'));
       setStep('otp');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
@@ -64,11 +71,11 @@ export function ForgotPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to verify OTP');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Failed to verify OTP'));
       setStep('password');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
@@ -100,11 +107,11 @@ export function ForgotPasswordPage() {
           confirm_new_password: confirmPassword,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to reset password');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Failed to reset password'));
       setStep('success');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
@@ -121,14 +128,16 @@ export function ForgotPasswordPage() {
         <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-400 flex items-center justify-center mx-auto mb-4">
-              <Zap className="w-6 h-6 text-white" />
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gradient-to-br ${isAdmin ? 'from-amber-500 to-orange-400' : 'from-teal-500 to-cyan-400'}`}>
+              {isAdmin ? <ShieldCheck className="w-6 h-6 text-white" /> : <Zap className="w-6 h-6 text-white" />}
             </div>
             {step !== 'success' && (
               <>
-                <h1 className="text-2xl font-extrabold text-white mb-1">Reset Password</h1>
+                <h1 className="text-2xl font-extrabold text-white mb-1">
+                  {isAdmin ? 'Reset administrator password' : 'Reset Password'}
+                </h1>
                 <p className="text-gray-500 text-sm">
-                  {step === 'email' && 'Enter your email to receive an OTP'}
+                  {step === 'email' && (isAdmin ? "Enter the admin account's email to receive an OTP" : 'Enter your email to receive an OTP')}
                   {step === 'otp' && 'Enter the 5-digit OTP sent to your email'}
                   {step === 'password' && 'Create a new password'}
                 </p>
@@ -180,7 +189,7 @@ export function ForgotPasswordPage() {
                 type="submit"
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+                style={{ background: accent }}
               >
                 {loading ? (
                   <>
@@ -221,7 +230,7 @@ export function ForgotPasswordPage() {
                 type="submit"
                 disabled={loading || otp.length !== 5}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+                style={{ background: accent }}
               >
                 {loading ? (
                   <>
@@ -303,7 +312,7 @@ export function ForgotPasswordPage() {
                 type="submit"
                 disabled={loading || !isPasswordValid || !passwordsMatch}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+                style={{ background: accent }}
               >
                 {loading ? (
                   <>
@@ -325,11 +334,11 @@ export function ForgotPasswordPage() {
                 Your password has been successfully updated. You can now log in with your new password.
               </p>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(loginPath)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01]"
-                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+                style={{ background: accent }}
               >
-                Back to Login
+                Back to {isAdmin ? 'Admin ' : ''}Login
               </button>
             </div>
           )}
@@ -340,7 +349,7 @@ export function ForgotPasswordPage() {
               onClick={() => {
                 if (step === 'otp') setStep('email');
                 else if (step === 'password') setStep('otp');
-                else navigate('/login');
+                else navigate(loginPath);
               }}
               className="w-full mt-4 flex items-center justify-center gap-2 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-quantum-700 transition-all"
             >
@@ -353,7 +362,7 @@ export function ForgotPasswordPage() {
         {/* Footer link */}
         {step !== 'success' && (
           <p className="text-center text-gray-700 text-xs mt-4">
-            <Link to="/login" className="hover:text-gray-500 transition-colors">
+            <Link to={loginPath} className="hover:text-gray-500 transition-colors">
               ← Back to Login
             </Link>
           </p>

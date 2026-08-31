@@ -1,0 +1,34 @@
+{
+  // Click a localhost link (terminal, Ports view, etc.) -> open it in the real
+  // external browser, NOT VS Code's embedded browser or the "Live Preview" pane.
+
+  // VS Code 1.92+ hijacks localhost / 127.0.0.1 / 0.0.0.0 links into the built-in
+  // "integrated browser" BEFORE externalUriOpeners runs. This is the setting that
+  // actually stops the embedded browser tab from opening.
+  "workbench.browser.openLocalhostLinks": false,
+
+  // Pick the browser used for external http/https links. "chrome" | "edge" |
+  // "firefox" | absolute path to the executable.
+  "workbench.externalBrowser": "chrome",
+
+  // Simple Browser extension: don't let its command use the integrated view either.
+  "simpleBrowser.useIntegratedBrowser": false,
+
+  // Legacy fallback for older VS Code builds.
+  "workbench.externalUriOpeners": {
+    "localhost": "default",
+    "127.0.0.1": "default",
+    "0.0.0.0": "default"
+  },
+
+  // Don't auto-open / nag when the dev servers start; just forward the port quietly.
+  "remote.autoForwardPortsSource": "hybrid",
+  "portsAttributes": {
+    "3000": { "label": "Vite dev server", "onAutoForward": "silent" },
+    "5173": { "label": "Vite dev server (fallback)", "onAutoForward": "silent" },
+    "8000": { "label": "FastAPI backend", "onAutoForward": "silent" }
+  },
+
+  // The Microsoft "Live Preview" extension: keep it out of the link-opening path.
+  "livePreview.openPreviewTarget": "External Browser"
+}

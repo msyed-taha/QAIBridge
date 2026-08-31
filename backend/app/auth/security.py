@@ -13,7 +13,12 @@ from jose import JWTError, jwt
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-SECRET_KEY  = os.getenv("JWT_SECRET_KEY", "qaibridge-super-secret-key-change-in-production-2025")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is not set. Refusing to start with a guessable default — "
+        "set it in backend/.env (see .env.example) to a long random string."
+    )
 ALGORITHM   = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 

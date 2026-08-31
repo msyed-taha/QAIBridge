@@ -291,6 +291,104 @@ CATEGORY_KEYWORDS = {
         'hash', 'password', 'secure communication', 'digital signature'],
 }
 
+# ── Input validation: reject gibberish / off-topic text before classifying ────
+# Without this gate, meaningless input (e.g. "adfg") hits zero category keywords,
+# _extract_features_from_text silently falls back to category 0 ("Search") with
+# a default data_size of 1,000,000 — a fake "large search problem" profile that
+# the classifier then confidently (and wrongly) recommends Quantum for. We catch
+# that here, before any feature extraction happens.
+
+VOWELS = set("aeiouy")
+
+_COMMON_WORDS = frozenset("""
+a an the i you he she it we they is am are was were be been being have has had do does did
+will would shall should can could may might must to of in on at for with by from up about
+into over after before between and or but if because as until while this that these those
+my your his her its our their not no yes so then than too very just also when where why how
+what which who whom all each every some any few more most other such only own same
+need needs want wants use uses used find finds finding get gets make makes take takes
+give go come see know think look find search retrieve locate detect discover lookup
+file files data dataset datasets record records row rows entry entries item items element elements
+number numbers large small big huge many much million billion thousand hundred new old good bad
+problem problems solve solving solution algorithm algorithms compute computes computation calculate
+calculating calculation fast slow speed speedup time system program code test check help please
+one two three four five ten hundred set list array table database query queries sort sorting
+search searching factor factoring factorise factorize integer prime primes cryptography encrypt
+decrypt secure security password key keys hash optimise optimize optimization optimisation
+minimise minimize maximise maximize route routes routing shortest path graph network node edge
+vertex vertices schedule scheduling portfolio allocation simulate simulation molecule molecular
+chemistry energy protein drug material quantum classical machine learning neural deep model
+training cluster clustering classify classification regression matrix vector equation function
+input output result results value values size scale performance accuracy speed efficient
+efficiently large-scale process processing task tasks job jobs
+""".split())
+
+
+def _looks_like_a_word(w: str) -> bool:
+    """A loose 'is this plausibly an English/technical word' check — not a dictionary
+    lookup, just enough to reject keyboard-mashing gibberish (e.g. 'adfg', 'kjhsdf')
+    while accepting real words and domain acronyms (RSA, QAOA, VQE, TSP…)."""
+    if len(w) <= 2:
+        return True
+    if w in _COMMON_WORDS:
+        return True
+    if not any(c in VOWELS for c in w):
+        return False
+    consonant_run = 0
+    for c in w:
+        if c in VOWELS:
+            consonant_run = 0
+        else:
+            consonant_run += 1
+            if consonant_run >= 4:
+                return False
+    return True
+
+
+_GENERIC_PROBLEM_CUES = [
+    'algorithm', 'data', 'dataset', 'record', 'database', 'number', 'compute', 'calculat',
+    'search', 'sort', 'optimi', 'simulat', 'encrypt', 'graph', 'network', 'process', 'solve',
+    'problem', 'factor', 'query', 'molecule', 'schedule', 'route', 'pattern', 'matrix', 'vector',
+]
+
+
+def _validate_problem_text(text: str) -> Optional[str]:
+    """Return an error message if `text` doesn't read as a genuine problem description
+    to analyse, or None if it passes. Runs three gates: enough substance, plausible
+    words (not random characters), and at least some computing/problem relevance."""
+    cleaned = text.strip()
+    words = re.findall(r"[A-Za-z]+", cleaned)
+
+    if len(cleaned) < 15 or len(words) < 4:
+        return (
+            "That description is too short to classify reliably. Please describe the "
+            "problem in a full sentence — what task you're solving and its scale "
+            "(e.g. \"search 10 million unsorted records for a match\")."
+        )
+
+    checkable = [w.lower() for w in words if len(w) >= 3]
+    if checkable:
+        plausible = [w for w in checkable if _looks_like_a_word(w)]
+        if len(plausible) / len(checkable) < 0.6:
+            return (
+                "This doesn't read as a real problem description — it looks like random "
+                "characters. Please describe an actual computational problem in plain English."
+            )
+
+    t = cleaned.lower()
+    has_category_hit = any(kw in t for kws in CATEGORY_KEYWORDS.values() for kw in kws)
+    has_generic_cue = any(c in t for c in _GENERIC_PROBLEM_CUES)
+    has_digit = bool(re.search(r'\d', t))
+    if not (has_category_hit or has_generic_cue or has_digit):
+        return (
+            "We couldn't identify a computational problem in that description. Please "
+            "describe a task such as searching data, factoring numbers, optimisation/"
+            "routing, database queries, or quantum simulation — including roughly how "
+            "large the problem is."
+        )
+
+    return None
+
 def _extract_features_from_text(text: str) -> dict:
     """Map free-text problem description to a feature vector for the RF classifier."""
     t = text.lower()
@@ -633,6 +731,9 @@ def advise_text(req: AdviseTextRequest):
     """Analyse a free-text problem description and recommend the best approach."""
     if not req.problem_text.strip():
         raise HTTPException(400, "problem_text cannot be empty.")
+    validation_error = _validate_problem_text(req.problem_text)
+    if validation_error:
+        raise HTTPException(422, validation_error)
     features = _extract_features_from_text(req.problem_text)
     result   = _run_classifier(features)
     result["source"] = "text"
@@ -649,6 +750,9 @@ async def advise_file(file: UploadFile = File(...)):
     extracted = await _extract_text(file)
     if not extracted.strip():
         raise HTTPException(400, "Could not extract any text from the uploaded file.")
+    validation_error = _validate_problem_text(extracted)
+    if validation_error:
+        raise HTTPException(422, validation_error)
     features = _extract_features_from_text(extracted)
     result   = _run_classifier(features)
     result["source"]        = "file"

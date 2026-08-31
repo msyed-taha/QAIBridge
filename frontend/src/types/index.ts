@@ -61,49 +61,130 @@ export interface RamTableRow {
   required_gb: number;
 }
 
-// ── Module 8 – Dashboard Types ───────────────────────────────────────────────
+// ── Module 6 – Neural Angle Optimizer Types ──────────────────────────────────
 
-export type SFODAlgorithm = 'search' | 'factoring' | 'optimization' | 'database';
-
-export interface BenchmarkReport {
-  algorithm: string;
-  problem_size: number;
-  quantum_result: Record<string, unknown>;
-  classical_result: Record<string, unknown>;
-  speedup: number;
-  theoretical: {
-    algorithm: string;
-    n: number;
-    classical_complexity: string;
-    quantum_complexity: string;
-    speedup_type: string;
-    theoretical_speedup: number | string;
-    classical_ops: number;
-    quantum_ops: number;
-  };
-  accuracy: Record<string, unknown>;
-  chart_data: {
-    labels: string[];
-    classical_times: number[];
-    quantum_times: number[];
-    speedups: number[];
-  };
-  meta: Record<string, unknown>;
+export interface BarrenPlateauData {
+  qubits: number[];
+  random_init_variance: number[];
+  small_angle_init_variance: number[];
 }
 
-export interface SuiteResult {
-  search?: SuiteSummary;
-  factoring?: SuiteSummary;
-  optimization?: SuiteSummary;
-  database?: SuiteSummary;
+export interface PlateauEvent {
+  iteration: number;
+  grad_norm: number;
+  grad_window_variance: number;
+  mitigation: string;
 }
 
-export interface SuiteSummary {
-  speedup: number;
-  quantum_ms: number;
-  classical_ms: number;
-  algorithm: string;
-  theoretical_speedup: number | string;
+export interface LiveMonitorSummary {
+  plateau_detected: boolean;
+  num_events: number;
+  events: PlateauEvent[];
+}
+
+export interface OptimizationReport {
+  n_qubits: number;
+  layers: number;
+  iterations: number;
+  classical_loss_curve: number[];
+  neural_loss_curve: number[];
+  classical_accuracy: number;
+  neural_accuracy: number;
+  classical_iters_to_converge: number;
+  neural_iters_to_converge: number;
+  speedup_iterations: number;
+  barren_plateau: BarrenPlateauData;
+  classical_grad_norm_curve: number[];
+  neural_grad_norm_curve: number[];
+  live_barren_plateau_monitor: {
+    classical: LiveMonitorSummary;
+    neural: LiveMonitorSummary;
+  };
+}
+
+// ── Module 7 – QNN Converter Types ───────────────────────────────────────────
+
+export type LayerType = 'dense' | 'dropout';
+
+export interface LayerSpec {
+  type: LayerType;
+  units?: number;
+  activation?: 'relu' | 'tanh' | 'sigmoid';
+}
+
+export interface ParsedArchitecture {
+  input_dim: number;
+  output_dim: number;
+  layers: { type: LayerType; units: number | null; activation: string | null }[];
+  dense_layer_count: number;
+  warnings: string[];
+}
+
+export interface QNNSpec {
+  n_qubits: number;
+  n_layers: number;
+  trainable_angles: number;
+  circuit_depth: number;
+  encoding: string;
+  gate_sequence: string[];
+}
+
+export interface ComparisonRow {
+  metric: string;
+  classical: string | number;
+  quantum: string | number;
+}
+
+export interface ConversionReport {
+  classical_layer_sizes: number[];
+  classical_neurons: number;
+  classical_params: number;
+  classical_depth: number;
+  qnn: QNNSpec;
+  mapping_steps: string[];
+  comparison_rows: ComparisonRow[];
+  approximation_notes: string[];
+}
+
+export interface TrainCompareReport {
+  conversion: ConversionReport;
+  classical_loss_curve: number[];
+  quantum_loss_curve: number[];
+  quantum_warm_loss_curve: number[];
+  classical_accuracy: number;
+  quantum_accuracy: number;
+  quantum_warm_accuracy: number;
+}
+
+export interface SimulateResult {
+  predictions: number[];
+  labels: number[];
+  accuracy: number;
+  angles_used: number[];
+}
+
+// ── Admin actor ──────────────────────────────────────────────────────────────
+
+export type Role = 'user' | 'admin';
+
+export interface AdminUser {
+  id:            number;
+  username:      string;
+  email:         string;
+  role:          Role;
+  is_active:     boolean;
+  created_at:    string | null;
+  last_login_at: string | null;
+}
+
+export interface AdminStats {
+  total_users:           number;
+  active_users:          number;
+  inactive_users:        number;
+  admins:                number;
+  new_last_7_days:       number;
+  logged_in_last_7_days: number;
+  recent_signups:        AdminUser[];
 }
 
 // ── Shared ───────────────────────────────────────────────────────────────────
@@ -114,18 +195,3 @@ export interface ApiResponse<T> {
   report?: T;
   detail?: string;
 }
-
-export type ProgressEvent = {
-  type: 'progress';
-  step: string;
-  percent: number;
-  detail?: string;
-};
-
-export type WsEvent =
-  | ProgressEvent
-  | { type: 'result'; result: SimulationResult }
-  | { type: 'result'; report: BenchmarkReport }
-  | { type: 'suite_result'; suite: SuiteResult }
-  | { type: 'pong' }
-  | { type: 'error'; detail: string };

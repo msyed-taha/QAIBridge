@@ -1,48 +1,33 @@
 """
-Module 8 – Interactive Performance Dashboard  (FastAPI Router)
+Solve API  (FastAPI Router)
+Backs the standalone "Solve" page — runs a user-supplied problem through a
+classical OR quantum algorithm, and extracts text from uploaded files to
+populate its input fields.
 Routes:
-  POST  /api/dashboard/benchmark          – Run a specific SFOD benchmark
-  GET   /api/dashboard/benchmark/suite    – Run all 4 SFOD benchmarks
-  GET   /api/dashboard/theoretical/{alg}  – Theoretical complexity for size n
-  WS    /ws/dashboard/{session_id}        – Real-time benchmark progress stream
+  POST  /api/dashboard/solve         – Solve a user-supplied problem
+  POST  /api/dashboard/extract-file  – Extract text from an uploaded file
 """
-
 from __future__ import annotations
 
 import asyncio
-from typing import Dict
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, File as FastAPIFile, HTTPException, UploadFile
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
-from ..modules.module8_dashboard import (
-    benchmark_search,
-    benchmark_factoring,
-    benchmark_optimization,
-    benchmark_database,
-    run_full_benchmark_suite,
-    theoretical_speedup,
-)
 from ..modules.module8_dashboard.custom_solver import (
     solve_search_classical,    solve_search_quantum,
     solve_factoring_classical, solve_factoring_quantum,
     solve_optimization_classical, solve_optimization_quantum,
     solve_database_classical,  solve_database_quantum,
 )
-from ..websocket_manager import manager
 
-router = APIRouter(prefix="/api/dashboard", tags=["Module 8 – Performance Dashboard"])
+router = APIRouter(prefix="/api/dashboard", tags=["Solve"])
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Request Models
 # ──────────────────────────────────────────────────────────────────────────────
-
-class BenchmarkRequest(BaseModel):
-    algorithm:    str  = Field(..., description="search | factoring | optimization | database")
-    problem_size: int  = Field(default=16, ge=2, le=512)
-
 
 class SolveRequest(BaseModel):
     problem_type: str  = Field(..., description="search | factoring | optimization | database")
@@ -62,57 +47,6 @@ class SolveRequest(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # REST Endpoints
 # ──────────────────────────────────────────────────────────────────────────────
-
-@router.post("/benchmark")
-async def run_benchmark(req: BenchmarkRequest) -> Dict:
-    """
-    Run a single Quantum vs Classical benchmark for the specified SFOD algorithm.
-
-    Returns side-by-side timing, speedup factor, accuracy comparison,
-    and chart data for Plotly visualisation.
-    """
-    alg = req.algorithm.lower()
-    n   = req.problem_size
-
-    dispatch = {
-        "search":       benchmark_search,
-        "factoring":    benchmark_factoring,
-        "optimization": benchmark_optimization,
-        "database":     benchmark_database,
-    }
-
-    if alg not in dispatch:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown algorithm '{alg}'. Choose from: {list(dispatch.keys())}"
-        )
-
-    try:
-        report = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: dispatch[alg](n)
-        )
-        return {"status": "ok", "report": report.to_dict()}
-
-    except MemoryError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/benchmark/suite")
-async def run_suite() -> Dict:
-    """
-    Run all four SFOD benchmarks and return a combined summary.
-    Used by the dashboard overview panel.
-    """
-    try:
-        results = await asyncio.get_event_loop().run_in_executor(
-            None, run_full_benchmark_suite
-        )
-        return {"status": "ok", "suite": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/solve")
 async def solve_user_problem(req: SolveRequest) -> Dict:
@@ -161,117 +95,7 @@ async def solve_user_problem(req: SolveRequest) -> Dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/theoretical/{algorithm}")
-async def get_theoretical_speedup(
-    algorithm: str,
-    n: int = Query(default=16, ge=2, le=10000)
-) -> Dict:
-    """
-    Return the theoretical complexity and expected speedup for a given
-    algorithm at problem size n.  Used by the complexity panels.
-    """
-    result = theoretical_speedup(algorithm, n)
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# WebSocket — real-time benchmark progress stream
-# ──────────────────────────────────────────────────────────────────────────────
-
-@router.websocket("/ws/{session_id}")
-async def dashboard_websocket(websocket: WebSocket, session_id: str):
-    """
-    WebSocket for streaming benchmark progress to the dashboard.
-    Clients send {action: 'benchmark', payload: {algorithm, problem_size}}
-    and receive a stream of progress events followed by the final result.
-    """
-    channel = f"dashboard_{session_id}"
-    await manager.connect(websocket, channel)
-    try:
-        while True:
-            data = await websocket.receive_json()
-            action = data.get("action")
-
-            if action == "benchmark":
-                await _ws_benchmark(websocket, channel, data)
-            elif action == "suite":
-                await _ws_suite(websocket, channel)
-            elif action == "ping":
-                await manager.send_to(websocket, {"type": "pong"})
-            else:
-                await manager.send_to(websocket, {
-                    "type": "error",
-                    "detail": f"Unknown action: {action}"
-                })
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, channel)
-
-
-async def _ws_benchmark(websocket: WebSocket, channel: str, data: dict):
-    """Stream a single benchmark run over WebSocket."""
-    try:
-        req     = BenchmarkRequest(**data.get("payload", {}))
-        alg     = req.algorithm.lower()
-        n       = req.problem_size
-        dispatch = {
-            "search":       benchmark_search,
-            "factoring":    benchmark_factoring,
-            "optimization": benchmark_optimization,
-            "database":     benchmark_database,
-        }
-        if alg not in dispatch:
-            await manager.send_to(websocket, {
-                "type": "error",
-                "detail": f"Unknown algorithm '{alg}'."
-            })
-            return
-
-        await manager.broadcast_progress(channel, "Running quantum simulation", 20)
-        await asyncio.sleep(0)
-
-        report = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: dispatch[alg](n)
-        )
-
-        await manager.broadcast_progress(channel, "Running classical baseline", 60)
-        await asyncio.sleep(0)
-
-        await manager.broadcast_progress(channel, "Computing metrics", 85)
-        await asyncio.sleep(0)
-
-        await manager.send_to(websocket, {
-            "type":   "result",
-            "report": report.to_dict(),
-        })
-
-        await manager.broadcast_progress(channel, "Complete", 100)
-
-    except Exception as e:
-        await manager.send_to(websocket, {"type": "error", "detail": str(e)})
-
-
-async def _ws_suite(websocket: WebSocket, channel: str):
-    """Stream the full SFOD benchmark suite."""
-    try:
-        await manager.broadcast_progress(channel, "Running SFOD suite", 10)
-        results = await asyncio.get_event_loop().run_in_executor(
-            None, run_full_benchmark_suite
-        )
-        await manager.send_to(websocket, {
-            "type":  "suite_result",
-            "suite": results,
-        })
-        await manager.broadcast_progress(channel, "Suite complete", 100)
-    except Exception as e:
-        await manager.send_to(websocket, {"type": "error", "detail": str(e)})
-
-
 # ── File extraction endpoint for Solve page ───────────────────────────────────
-
-from fastapi import UploadFile, File as FastAPIFile
 
 ALLOWED_EXTENSIONS = {
     "pdf", "docx", "doc", "csv", "txt", "md", "json",

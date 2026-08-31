@@ -14,6 +14,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text      import MIMEText
 
+# Without a timeout, a blocked/slow SMTP host hangs the request forever and the
+# browser eventually shows a bare "Failed to fetch". Cap it so the caller gets a
+# real error instead.
+SMTP_TIMEOUT_SECONDS = 15
+
 
 def send_otp(to_email: str, otp: str) -> None:
     """
@@ -99,7 +104,7 @@ def send_otp(to_email: str, otp: str) -> None:
 
     msg.attach(MIMEText(html, "html"))
 
-    with smtplib.SMTP(host, port) as server:
+    with smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SECONDS) as server:
         server.ehlo()
         server.starttls()
         server.ehlo()

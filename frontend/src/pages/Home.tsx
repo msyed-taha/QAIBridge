@@ -117,6 +117,16 @@ export function Home() {
           <p className="text-gray-700 text-xs mt-5">
             Free to use. No credit card required. No QPU hardware needed.
           </p>
+
+          <p className="text-gray-600 text-xs mt-3">
+            Platform administrator?{' '}
+            <Link
+              to="/login?as=admin"
+              className="text-amber-300/90 hover:text-amber-300 font-medium transition-colors"
+            >
+              Sign in to the admin area →
+            </Link>
+          </p>
         </div>
       </section>
 
@@ -205,7 +215,7 @@ export function Home() {
           </h2>
           <p className="text-gray-500 text-base mb-8 leading-relaxed">
             Create your free account and get instant access to the simulation kernel,
-            performance dashboard, problem solver, and everything QAIbridge has to offer.
+            problem solver, and everything QAIbridge has to offer.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link

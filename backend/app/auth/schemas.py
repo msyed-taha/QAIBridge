@@ -49,6 +49,32 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AdminCreateUserRequest(BaseModel):
+    """An admin creating an account directly from the dashboard (no email OTP)."""
+    username:  str      = Field(..., min_length=3, max_length=50)
+    email:     EmailStr
+    password:  str      = Field(..., min_length=8)
+    role:      str      = Field(default="user", pattern=r"^(user|admin)$")
+    is_active: bool      = True
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        return _validate_password(v)
+
+
+class AdminSetupRequest(BaseModel):
+    """One-time creation of the very first administrator (only works when none exist)."""
+    username: str      = Field(..., min_length=3, max_length=50)
+    email:    EmailStr
+    password: str      = Field(..., min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        return _validate_password(v)
+
+
 class ForgotPasswordSendOtpRequest(BaseModel):
     email: EmailStr
 
@@ -76,6 +102,7 @@ class UserOut(BaseModel):
     id:       int
     username: str
     email:    str
+    role:     str = "user"
 
     class Config:
         from_attributes = True

@@ -1,5 +1,7 @@
 # Environment
 .env
+.env.*
+!.env.example
 *.env.local
 
 # Python
@@ -8,15 +10,26 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
 
 # Node
 node_modules/
 dist/
 .vite/
 
+# Databases (local dev only — real DB is PostgreSQL)
+*.db
+*.sqlite
+*.sqlite3
+
 # Docker
 .docker/
+
+# IDE / editor
+.idea/
 
 # OS
 .DS_Store
 Thumbs.db
+._*

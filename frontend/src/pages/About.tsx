@@ -9,7 +9,6 @@ const MODULES = [
   { id: '05', title: 'ML Performance Predictor',     icon: Brain,    color: 'from-blue-500 to-indigo-400',  status: 'live',  desc: 'Gradient Boosting Regressor that predicts speedup, qubit count, circuit depth, and success probability.' },
   { id: '06', title: 'Neural Optimizer',             icon: Zap,      color: 'from-red-500 to-rose-400',    status: 'soon',  desc: 'Deep RL agent that autonomously tunes quantum gate angles to escape the Barren Plateau problem.' },
   { id: '07', title: 'QNN Converter',                icon: Shield,   color: 'from-pink-500 to-fuchsia-400', status: 'soon', desc: 'Translates classical neural network architectures into equivalent quantum neural networks.' },
-  { id: '08', title: 'Performance Dashboard',        icon: BarChart2, color: 'from-blue-500 to-cyan-400',  status: 'live',  desc: 'Real-time benchmarking dashboard comparing Quantum vs Classical algorithms with Plotly charts.' },
 ];
 
 const TECH_STACK = [
@@ -87,7 +86,7 @@ export function About() {
       <section className="py-14 px-6">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Platform Modules</h2>
-          <p className="text-gray-500 text-sm mb-8">Eight integrated modules covering simulation, AI optimization, education, and benchmarking.</p>
+          <p className="text-gray-500 text-sm mb-8">Seven integrated modules covering simulation, AI optimization, education, and benchmarking.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {MODULES.map(m => {
@@ -136,7 +135,7 @@ export function About() {
       <section className="py-16 px-6 text-center">
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl font-bold text-white mb-3">Ready to explore quantum computing?</h2>
-          <p className="text-gray-400 text-sm mb-8">Start with the Simulation Kernel or check the Performance Dashboard to see quantum advantage in action.</p>
+          <p className="text-gray-400 text-sm mb-8">Start with the Simulation Kernel to see quantum advantage in action.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link
               to="/simulator"
@@ -146,13 +145,6 @@ export function About() {
               <Cpu className="w-4 h-4" />
               Launch Simulator
               <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/dashboard"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-purple transition-all hover:scale-105"
-            >
-              <BarChart2 className="w-4 h-4" />
-              View Dashboard
             </Link>
           </div>
         </div>

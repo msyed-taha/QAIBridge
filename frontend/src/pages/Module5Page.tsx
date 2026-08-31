@@ -4,6 +4,7 @@ import {
   AlertCircle, Clock, Cpu, Layers, TrendingUp,
   BookOpen, FlaskConical, RotateCcw, Info
 } from 'lucide-react';
+import apiClient, { getApiErrorMessage } from '../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,9 @@ const PATTERN_INFO: Record<string, { label: string; color: string; icon: string 
   general:      { label: 'General',      color: '#9ca3af', icon: '💡' },
 };
 
+// Transform/pattern-detection works language-agnostically (it's static keyword
+// matching, not execution), so all of these stay selectable for that. Only
+// "Run Classical" actually executes code server-side, and that's Python-only.
 const LANGUAGES = ['python', 'javascript', 'typescript', 'c++', 'java', 'go', 'ruby', 'rust'];
 
 // ── Code editor with line numbers ─────────────────────────────────────────────
@@ -344,7 +348,7 @@ function QuantumResult({ data }: { data: QuantumSimResult }) {
       )}
 
       {/* Speedup callout */}
-      {r.speedup && (
+      {Boolean(r.speedup) && (
         <div className="flex items-center gap-3 bg-quantum-800 border border-quantum-700 rounded-2xl px-4 py-3">
           <TrendingUp className="w-5 h-5 text-quantum-neon flex-shrink-0" />
           <div>
@@ -386,9 +390,8 @@ export function Module5Page() {
 
   // Load examples on mount
   useEffect(() => {
-    fetch('/api/module5/examples')
-      .then(r => r.json())
-      .then(d => setExamples(d.examples || []))
+    apiClient.get('/api/module5/examples')
+      .then(({ data }) => setExamples(data.examples || []))
       .catch(() => {});
   }, []);
 
@@ -403,15 +406,13 @@ export function Module5Page() {
 
   const runClassical = async () => {
     if (!code.trim()) { setErrorMsg('Please enter some code first.'); return; }
+    if (language !== 'python') { setErrorMsg('Classical execution currently supports Python only.'); return; }
     setLoadingC(true); setErrorMsg(''); setClassicalResult(null); setActiveTab('classical');
     try {
-      const res = await fetch('/api/module5/run-classical', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
-      });
-      setClassicalResult(await res.json());
+      const { data } = await apiClient.post<ClassicalResult>('/api/module5/run-classical', { code, language });
+      setClassicalResult(data);
     } catch (e: unknown) {
-      setErrorMsg((e as Error).message || 'Backend not running?');
+      setErrorMsg(getApiErrorMessage(e, 'Backend not running?'));
     } finally { setLoadingC(false); }
   };
 
@@ -419,13 +420,10 @@ export function Module5Page() {
     if (!code.trim()) { setErrorMsg('Please enter some code first.'); return; }
     setLoadingT(true); setErrorMsg(''); setTransformResult(null); setActiveTab('transform');
     try {
-      const res = await fetch('/api/module5/transform', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
-      });
-      setTransformResult(await res.json());
+      const { data } = await apiClient.post<TransformResult>('/api/module5/transform', { code, language });
+      setTransformResult(data);
     } catch (e: unknown) {
-      setErrorMsg((e as Error).message || 'Backend not running?');
+      setErrorMsg(getApiErrorMessage(e, 'Backend not running?'));
     } finally { setLoadingT(false); }
   };
 
@@ -433,16 +431,13 @@ export function Module5Page() {
     if (!code.trim()) { setErrorMsg('Please enter some code first.'); return; }
     setLoadingQ(true); setErrorMsg(''); setQuantumResult(null); setActiveTab('quantum');
     try {
-      const res = await fetch('/api/module5/run-quantum', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code, language,
-          pattern: transformResult?.pattern ?? null,
-        }),
+      const { data } = await apiClient.post<QuantumSimResult>('/api/module5/run-quantum', {
+        code, language,
+        pattern: transformResult?.pattern ?? null,
       });
-      setQuantumResult(await res.json());
+      setQuantumResult(data);
     } catch (e: unknown) {
-      setErrorMsg((e as Error).message || 'Backend not running?');
+      setErrorMsg(getApiErrorMessage(e, 'Backend not running?'));
     } finally { setLoadingQ(false); }
   };
 
@@ -583,6 +578,7 @@ export function Module5Page() {
           <div className="grid grid-cols-3 gap-3">
             {/* Run Classical */}
             <button onClick={runClassical} disabled={loadingC}
+              title={language !== 'python' ? 'Classical execution is Python-only' : undefined}
               className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl font-semibold text-xs transition-all hover:scale-[1.02] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 border"
               style={{ background: '#22c55e15', borderColor: '#22c55e40', color: '#22c55e' }}>
               {loadingC

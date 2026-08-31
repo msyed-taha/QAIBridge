@@ -1,19 +1,23 @@
 """
-SQLite database setup using SQLAlchemy.
-Database file: qaibridge.db (created automatically in /app/ when running in Docker,
-or in backend/ when running directly).
+PostgreSQL database setup using SQLAlchemy.
+Connection string is read from the DATABASE_URL environment variable
+(set in .env), so the same code works locally, in Docker, and in CI.
 """
+
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "sqlite:///./qaibridge.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Refusing to start against a guessable default "
+        "local database — set it in backend/.env (see .env.example)."
+    )
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # needed for SQLite
-)
+engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -1,31 +1,42 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Cpu, LogOut, User, LogIn } from 'lucide-react';
+import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 
-// Public nav (not logged in)
+// Public nav (not logged in) — landing pages only. All modules require login.
 const PUBLIC_NAV = [
   { path: '/',      label: 'Home',  active: true },
   { path: '/about', label: 'About', active: true },
 ];
 
-// Authenticated nav (logged in)
+// Authenticated nav (logged in as a normal user)
 const AUTH_NAV = [
   { path: '/app',       label: 'Home',        active: true },
   { path: '/solve',     label: 'Solve',       active: true },
   { path: '/simulator', label: 'Simulator',   active: true },
+  { path: '/module2',   label: 'SFOD Suite',  active: true },
+  { path: '/module3',   label: 'Circuit Builder', active: true },
   { path: '/module4',   label: 'AI Advisor',  active: true },
+  { path: '/module5',   label: 'Logic Transformer', active: true },
+  { path: '/module6',   label: 'Neural Optimizer', active: true },
+  { path: '/module7',   label: 'QNN Converter', active: true },
+];
+
+// Admin nav (logged in as an administrator) — a different view of the site
+const ADMIN_NAV = [
+  { path: '/admin',       label: 'Dashboard', active: true },
+  { path: '/admin/users', label: 'Users',     active: true },
 ];
 
 export function Navbar() {
   const { pathname }               = useLocation();
   const navigate                   = useNavigate();
-  const { user, isAuthed, logout } = useAuth();
+  const { user, isAuthed, isAdmin, logout } = useAuth();
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const NAV_LINKS = isAuthed ? AUTH_NAV : PUBLIC_NAV;
+  const NAV_LINKS = !isAuthed ? PUBLIC_NAV : isAdmin ? ADMIN_NAV : AUTH_NAV;
 
   const handleLogout = () => {
     logout();
@@ -39,7 +50,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
 
         {/* ── Logo ── */}
-        <Link to={isAuthed ? '/app' : '/'} className="flex-shrink-0">
+        <Link to={!isAuthed ? '/' : isAdmin ? '/admin' : '/app'} className="flex-shrink-0">
           <QAIBridgeLogo size={34} showText={true} />
         </Link>
 
@@ -115,8 +126,15 @@ export function Navbar() {
               )}
             </div>
           ) : (
-            /* ── Not logged in: Login + Register ── */
+            /* ── Not logged in: Admin + Login + Register ── */
             <>
+              <Link
+                to="/login?as=admin"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                Admin
+              </Link>
               <Link
                 to="/login"
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-quantum-800 transition-all"
@@ -192,7 +210,11 @@ export function Navbar() {
               <>
                 <Link to="/login" onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 bg-quantum-800 border border-quantum-700">
-                  <LogIn className="w-4 h-4" /> Sign In
+                  <LogIn className="w-4 h-4" /> Sign In as User
+                </Link>
+                <Link to="/login?as=admin" onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30">
+                  <ShieldCheck className="w-4 h-4" /> Sign In as Admin
                 </Link>
                 <Link to="/register" onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-black"

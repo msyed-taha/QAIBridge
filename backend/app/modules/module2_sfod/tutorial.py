@@ -185,9 +185,9 @@ def generate_factoring_tutorial(n: int) -> TutorialSession:
     steps.append(AlgorithmStep(
         step_number=2,
         phase="processing",
-        classical_action=f"Test: {n} % 2 = {n % 2} (not divisible)",
+        classical_action=f"Test: {n} % 2 = {n % 2} ({'divisible!' if n % 2 == 0 else 'not divisible'})",
         classical_state=f"Testing divisor 2...",
-        classical_explanation=f"Check if 2 divides {n}. No match.",
+        classical_explanation=(f"2 divides {n} evenly." if n % 2 == 0 else f"Check if 2 divides {n}. No match."),
         quantum_action="Create superposition of all possible factors",
         quantum_state="√(superposition of candidates)",
         quantum_explanation="Quantum state superimposes all possible divisors simultaneously.",

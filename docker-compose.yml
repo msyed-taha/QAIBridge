@@ -1,6 +1,10 @@
 services:
 
   # ── Module 1 & 8 Backend (FastAPI + NumPy simulation kernel) ──────────────
+  # NOTE: DATABASE_URL is set in backend/.env. If PostgreSQL runs on the host
+  # machine (not as its own container in this compose file), the host in that
+  # URL must be "host.docker.internal", not "localhost", or the backend
+  # container won't be able to reach it.
   backend:
     build: ./backend
     container_name: qaibridge-backend

@@ -5,7 +5,6 @@ import { Github, Mail, ExternalLink } from 'lucide-react';
 const QUICK_LINKS = [
   { label: 'Home',        to: '/' },
   { label: 'Simulator',   to: '/simulator' },
-  { label: 'Dashboard',   to: '/dashboard' },
   { label: 'Circuit Lab', to: '/circuit' },
   { label: 'About',       to: '/about' },
 ];

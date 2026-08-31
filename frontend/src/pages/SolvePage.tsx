@@ -1159,7 +1159,7 @@ function ResultDisplay({ result }: { result: SolveResult }) {
             {r.found ? `Found "${String(r.value)}"` : `"${String(r.target)}" not in dataset`}
           </span>
         </div>
-        {r.found && (
+        {Boolean(r.found) && (
           <p className="text-gray-500 text-xs pl-6">
             at index <span className="text-white font-mono">{String(r.index)}</span>
           </p>
@@ -1175,7 +1175,7 @@ function ResultDisplay({ result }: { result: SolveResult }) {
           {String(r.number)} ={' '}
           <span className="text-quantum-neon">{String(r.factored_form)}</span>
         </p>
-        {r.is_prime && <p className="text-xs text-yellow-400">⚠ This is a prime number</p>}
+        {Boolean(r.is_prime) && <p className="text-xs text-yellow-400">⚠ This is a prime number</p>}
         <div className="flex flex-wrap gap-1.5 mt-1">
           {(r.factors as number[]).map((f, i) => (
             <span key={i} className="bg-quantum-700 text-quantum-neon font-mono text-xs px-2 py-1 rounded-lg border border-quantum-600">
@@ -1183,7 +1183,7 @@ function ResultDisplay({ result }: { result: SolveResult }) {
             </span>
           ))}
         </div>
-        {r.qubits_needed && (
+        {Boolean(r.qubits_needed) && (
           <p className="text-xs text-gray-600">
             Qubits needed: <span className="text-gray-400 font-mono">{String(r.qubits_needed)}</span>
           </p>

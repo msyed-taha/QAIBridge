@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './client';
 import type {
   GateOperation, SimulationResult,
   MemoryCheckResponse, RamTableRow, ApiResponse,
@@ -14,7 +14,7 @@ export const kernelApi = {
     shots = 1024,
     name = 'Custom Circuit',
   ): Promise<SimulationResult> => {
-    const { data } = await axios.post<ApiResponse<SimulationResult>>(`${BASE}/simulate`, {
+    const { data } = await apiClient.post<ApiResponse<SimulationResult>>(`${BASE}/simulate`, {
       n_qubits, operations, shots, name,
     });
     if (!data.result) throw new Error('No result returned');
@@ -28,7 +28,7 @@ export const kernelApi = {
     shots = 1024,
     layers = 2,
   ): Promise<SimulationResult> => {
-    const { data } = await axios.post<{ status: string; result: SimulationResult }>(
+    const { data } = await apiClient.post<{ status: string; result: SimulationResult }>(
       `${BASE}/preset`,
       { preset, n_qubits, shots, layers },
     );
@@ -37,7 +37,7 @@ export const kernelApi = {
 
   /** Check RAM for n_qubits */
   memoryCheck: async (n_qubits: number): Promise<MemoryCheckResponse> => {
-    const { data } = await axios.get<MemoryCheckResponse>(`${BASE}/memory`, {
+    const { data } = await apiClient.get<MemoryCheckResponse>(`${BASE}/memory`, {
       params: { n_qubits },
     });
     return data;
@@ -45,13 +45,13 @@ export const kernelApi = {
 
   /** Full RAM table (1–20 qubits) */
   ramTable: async (): Promise<RamTableRow[]> => {
-    const { data } = await axios.get<{ table: RamTableRow[] }>(`${BASE}/ram-table`);
+    const { data } = await apiClient.get<{ table: RamTableRow[] }>(`${BASE}/ram-table`);
     return data.table;
   },
 
   /** Supported gate names */
   gates: async (): Promise<{ single_qubit: string[]; two_qubit: string[] }> => {
-    const { data } = await axios.get(`${BASE}/gates`);
+    const { data } = await apiClient.get(`${BASE}/gates`);
     return data;
   },
 };

@@ -403,7 +403,7 @@ export function Module2Page() {
 
       {/* ── Tutorial Modal ─────────────────────────────────────────────── */}
       {showTutorial && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-6xl my-8">
             <TutorialWalkthrough
               algorithm={selected}

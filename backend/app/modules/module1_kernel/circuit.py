@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 
 from .state_vector import QuantumStateVector
-from .memory_manager import check_memory
+from .memory_manager import check_memory, MAX_QUBITS
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -83,8 +83,11 @@ class QuantumCircuit:
     MAX_GATES = 500  # Safety limit to prevent runaway circuits
 
     def __init__(self, n_qubits: int, name: str = ""):
-        if n_qubits < 1 or n_qubits > 20:
-            raise ValueError(f"n_qubits must be between 1 and 20, got {n_qubits}.")
+        # This is a static sanity bound only -- the real, RAM-aware safety
+        # check runs in run() via check_memory() (dynamic: depends on actual
+        # available system memory at request time, not just qubit count).
+        if n_qubits < 1 or n_qubits > MAX_QUBITS:
+            raise ValueError(f"n_qubits must be between 1 and {MAX_QUBITS}, got {n_qubits}.")
         self.n_qubits = n_qubits
         self.name = name or f"{n_qubits}-qubit circuit"
         self._ops: List[Operation] = []
