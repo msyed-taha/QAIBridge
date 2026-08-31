@@ -44,7 +44,7 @@ The learner / researcher. Signs in, uses the modules, keeps their own work.
 |---|---|
 | `built` | Register → email-OTP verification → login (JWT) → forgot / reset password |
 | `built` | Public landing & About pages; protected app area |
-| `add` | Profile page — change password, delete my own account |
+| `built` | **Account settings** (`/account`) — edit username, change password, sign out, and delete-my-account with an emailed OTP confirmation. Same page for users and admins (`/api/account/*`). |
 | `add` | Resend OTP; graceful session-expiry handling |
 
 ### The modules
@@ -169,6 +169,7 @@ Keeps the platform healthy. Never runs a simulation. One seeded account to start
 
 **Backend**
 - `app/config.py` — `ADMIN_EMAILS` allowlist parsing + `is_admin_email()` (startup fails if unset)
+- `app/routers/account.py` — self-service `/api/account/*`: profile edit, change password, OTP-confirmed account deletion (last-admin guarded)
 - `app/models/user.py` — `role`, `last_login_at`, `is_admin` property, `ROLE_*` constants
 - `migrations/versions/b1a2c3d4e5f6_add_user_role_and_last_login.py`
 - `app/routers/auth.py` — `get_current_admin`; `role` in the JWT; `last_login_at` on login
