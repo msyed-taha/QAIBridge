@@ -20,9 +20,16 @@ from email.mime.text      import MIMEText
 SMTP_TIMEOUT_SECONDS = 15
 
 
-def send_otp(to_email: str, otp: str) -> None:
+def send_otp(
+    to_email: str,
+    otp: str,
+    *,
+    heading: str = "Verify your email",
+    subtext: str = "Enter this code in QAIbridge to complete registration",
+) -> None:
     """
-    Send a 5-digit OTP to *to_email*.
+    Send a 5-digit OTP to *to_email*. `heading` / `subtext` tailor the email to
+    the action (registration, password reset, account deletion, ...).
     Raises ValueError if credentials are missing, or smtplib.SMTPException on send failure.
     """
     host     = os.getenv("EMAIL_HOST",     "smtp.gmail.com")
@@ -61,14 +68,14 @@ def send_otp(to_email: str, otp: str) -> None:
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <h1 style="color:#ffffff;font-size:22px;margin:0;font-weight:800;">
-                Verify your email
+                {heading}
               </h1>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding-bottom:32px;">
               <p style="color:#9ca3af;font-size:14px;margin:0;">
-                Enter this code in QAIbridge to complete registration
+                {subtext}
               </p>
             </td>
           </tr>

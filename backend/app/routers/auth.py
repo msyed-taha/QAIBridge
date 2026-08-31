@@ -219,7 +219,11 @@ def forgot_password_send_otp(req: ForgotPasswordSendOtpRequest, db: Session = De
     if user:
         otp = otp_store.generate(f"forgot-password:{req.email}")
         try:
-            send_otp(str(req.email), otp)
+            send_otp(
+                str(req.email), otp,
+                heading="Reset your password",
+                subtext="Enter this code in QAIbridge to reset your password",
+            )
         except ValueError as e:
             raise HTTPException(503, str(e))
         except Exception as e:

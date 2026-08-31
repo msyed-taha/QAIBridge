@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck } from 'lucide-react';
+import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck, Settings } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 
@@ -115,9 +115,17 @@ export function Navbar() {
                     <p className="text-white text-sm font-semibold truncate">{user?.username}</p>
                     <p className="text-gray-500 text-xs truncate">{user?.email}</p>
                   </div>
+                  <Link
+                    to="/account"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-quantum-700 hover:text-white transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Account settings
+                  </Link>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-950/30 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-950/30 transition-colors border-t border-quantum-700"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -199,6 +207,13 @@ export function Navbar() {
                     <p className="text-gray-600 text-xs">{user?.email}</p>
                   </div>
                 </div>
+                <Link
+                  to="/account"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-quantum-800 hover:text-white transition-colors"
+                >
+                  <Settings className="w-4 h-4" /> Account settings
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/20 transition-colors"

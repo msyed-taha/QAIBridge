@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
@@ -75,6 +78,30 @@ class AdminSetupRequest(BaseModel):
         return _validate_password(v)
 
 
+# ── Account self-service (signed-in user or admin) ────────────────────────────
+
+class UpdateProfileRequest(BaseModel):
+    """Change your own display name."""
+    username: str = Field(..., min_length=3, max_length=50)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change your own password — the current one must be supplied."""
+    current_password:     str
+    new_password:         str = Field(..., min_length=8)
+    confirm_new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        return _validate_password(v)
+
+
+class DeleteAccountVerifyRequest(BaseModel):
+    """Confirm permanent account deletion with the emailed OTP."""
+    otp: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
+
+
 class ForgotPasswordSendOtpRequest(BaseModel):
     email: EmailStr
 
@@ -103,6 +130,7 @@ class UserOut(BaseModel):
     username: str
     email:    str
     role:     str = "user"
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

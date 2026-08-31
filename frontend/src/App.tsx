@@ -19,6 +19,7 @@ import { Module5Page }     from './pages/Module5Page';
 import { Module6Page }     from './pages/Module6Page';
 import { Module7Page }     from './pages/Module7Page';
 import { AppHome }         from './pages/AppHome';
+import { AccountPage }     from './pages/AccountPage';
 import { AdminDashboard }  from './pages/admin/AdminDashboard';
 import { AdminUsers }      from './pages/admin/AdminUsers';
 import { useAuth }         from './context/AuthContext';
@@ -74,6 +75,7 @@ export default function App() {
 
                 {/* ── Protected ── */}
                 <Route path="/app"       element={<ProtectedRoute><AppHome /></ProtectedRoute>} />
+                <Route path="/account"   element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
                 <Route path="/simulator" element={<ProtectedRoute><Module1Page /></ProtectedRoute>} />
                 <Route path="/circuit"   element={<ProtectedRoute><Module3Page /></ProtectedRoute>} />
                 <Route path="/solve"     element={<ProtectedRoute><SolvePage /></ProtectedRoute>} />

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Load environment variables from .env file
 load_dotenv()
 
-from app.routers import kernel, dashboard, sfod, education, recommender, transformer, optimizer, qnn, auth, admin
+from app.routers import kernel, dashboard, sfod, education, recommender, transformer, optimizer, qnn, auth, admin, account
 
 # Schema is managed by Alembic migrations (backend/migrations/) — run
 # `alembic upgrade head` before starting the server instead of relying
@@ -40,6 +40,7 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router)         # Authentication
+app.include_router(account.router)      # Self-service profile (edit / password / delete)
 app.include_router(admin.router)        # Admin actor (user management, stats)
 app.include_router(kernel.router)       # Module 1
 app.include_router(sfod.router)         # Module 2
@@ -58,6 +59,7 @@ async def root():
         "version": "1.0.0",
         "modules": {
             "auth":  "Authentication → /api/auth",
+            "account": "Self-service profile — edit / change password / delete → /api/account",
             "admin": "Admin — user management + stats → /api/admin (admin role required)",
             "1":    "Custom Simulation Kernel        → /api/kernel",
             "2":    "SFOD Model Comparison Suite      → /api/module2",

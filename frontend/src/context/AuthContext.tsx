@@ -7,16 +7,18 @@ interface User {
   username: string;
   email:    string;
   role:     Role;
+  created_at?: string | null;
 }
 
 interface AuthContextType {
-  user:     User | null;
-  token:    string | null;
-  loading:  boolean;
-  login:    (token: string, user: User) => void;
-  logout:   () => void;
-  isAuthed: boolean;
-  isAdmin:  boolean;
+  user:       User | null;
+  token:      string | null;
+  loading:    boolean;
+  login:      (token: string, user: User) => void;
+  logout:     () => void;
+  updateUser: (patch: Partial<User>) => void;
+  isAuthed:   boolean;
+  isAdmin:    boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -56,9 +58,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('qai_user');
   };
 
+  // Merge fresh fields (e.g. a changed username) into the session without a re-login.
+  const updateUser = (patch: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem('qai_user', JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
     <AuthContext.Provider value={{
-      user, token, loading, login, logout,
+      user, token, loading, login, logout, updateUser,
       isAuthed: !!user,
       isAdmin: user?.role === 'admin',
     }}>
