@@ -129,6 +129,12 @@ Keeps the platform healthy. Never runs a simulation. One seeded account to start
   self-disables once an admin exists), `backend/scripts/make_admin.py` (create or
   promote; `--list` / `--demote`), or the API directly. More admins after that:
   **Admin → Users → New account** (`POST /api/admin/users`).
+- `[x]` **2b. Admin allowlist.** `ADMIN_EMAILS` in `backend/.env` (`app/config.py`)
+  is the closed list of addresses allowed to be admin — exact addresses or
+  `@domain`. Every grant path checks it, and `get_current_admin` re-checks on
+  every request, so a `role='admin'` set straight in the DB is *not* honoured
+  unless the email is listed. To add someone: append their email, restart the
+  backend, then promote them.
 - `[x]` **3. Backend auth plumbing.** `role` in the JWT; `get_current_admin` in
   `auth.py`; `role` on `UserOut`; `last_login_at` set on login.
 - `[ ]` **4. Usage logging.** `usage_events` table + a `log_event()` helper or
@@ -162,6 +168,7 @@ Keeps the platform healthy. Never runs a simulation. One seeded account to start
 ## 6. What was added (reference)
 
 **Backend**
+- `app/config.py` — `ADMIN_EMAILS` allowlist parsing + `is_admin_email()` (startup fails if unset)
 - `app/models/user.py` — `role`, `last_login_at`, `is_admin` property, `ROLE_*` constants
 - `migrations/versions/b1a2c3d4e5f6_add_user_role_and_last_login.py`
 - `app/routers/auth.py` — `get_current_admin`; `role` in the JWT; `last_login_at` on login
@@ -187,7 +194,8 @@ Keeps the platform healthy. Never runs a simulation. One seeded account to start
 ```python
 # app/routers/auth.py
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != ROLE_ADMIN:
+    # role AND allowlisted email — a DB-only role flip is not enough
+    if current_user.role != ROLE_ADMIN or not is_admin_email(current_user.email):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required.")
     return current_user
 ```
