@@ -28,11 +28,11 @@ def client():
     return TestClient(app)
 
 
-def _mk_user(role: str = ROLE_USER, active: bool = True) -> tuple[User, str, str]:
+def _mk_user(role: str = ROLE_USER, active: bool = True, email: str | None = None) -> tuple[User, str, str]:
     """Create a throwaway account directly in the DB. Returns (user, email, password)."""
     db = SessionLocal()
     tag = uuid.uuid4().hex[:10]
-    email = f"test_{tag}@example.com"
+    email = email or f"test_{tag}@example.com"
     password = "TestPass123"
     user = User(
         username=f"test_{tag}",
@@ -228,3 +228,50 @@ def test_admin_cannot_demote_deactivate_or_delete_self(client):
         assert client.delete(f"/api/admin/users/{admin.id}", headers=h).status_code == 400
     finally:
         _cleanup(admin.id)
+
+
+# ── 5. Admin allowlist (ADMIN_EMAILS) ───────────────────────────────────────
+
+def test_role_admin_in_db_is_not_enough_without_allowlisted_email(client):
+    """A row flipped to role='admin' straight in the DB must still be denied."""
+    outsider, email, pw = _mk_user(role=ROLE_ADMIN, email=f"outsider_{uuid.uuid4().hex[:8]}@outsider-not-admin.com")
+    try:
+        tok = _token(client, email, pw)
+        h = {"Authorization": f"Bearer {tok}"}
+        assert client.get("/api/admin/stats", headers=h).status_code == 403
+        assert client.get("/api/admin/users", headers=h).status_code == 403
+    finally:
+        _cleanup(outsider.id)
+
+
+def test_cannot_create_admin_with_non_allowlisted_email(client):
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        tag = uuid.uuid4().hex[:8]
+        r = client.post("/api/admin/users", headers=h, json={
+            "username": f"out_{tag}", "email": f"out_{tag}@outsider-not-admin.com",
+            "password": "MadePass123", "role": "admin",
+        })
+        assert r.status_code == 403, r.text
+        # same email as a plain user is fine
+        r = client.post("/api/admin/users", headers=h, json={
+            "username": f"out_{tag}", "email": f"out_{tag}@outsider-not-admin.com",
+            "password": "MadePass123", "role": "user",
+        })
+        assert r.status_code == 201, r.text
+        _cleanup(r.json()["id"])
+    finally:
+        _cleanup(admin.id)
+
+
+def test_cannot_promote_user_to_admin_outside_allowlist(client):
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    target, _, _ = _mk_user(role=ROLE_USER, email=f"out_{uuid.uuid4().hex[:8]}@outsider-not-admin.com")
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        r = client.patch(f"/api/admin/users/{target.id}", json={"role": "admin"}, headers=h)
+        assert r.status_code == 403, r.text
+        assert client.patch(f"/api/admin/users/{target.id}", json={"is_active": False}, headers=h).status_code == 200
+    finally:
+        _cleanup(admin.id, target.id)

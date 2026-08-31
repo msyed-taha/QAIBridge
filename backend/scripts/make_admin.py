@@ -32,6 +32,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.database import SessionLocal  # noqa: E402
+from app.config import is_admin_email, ADMIN_EMAILS  # noqa: E402
 from app.models.user import User, ROLE_ADMIN, ROLE_USER  # noqa: E402
 from app.auth.security import hash_password  # noqa: E402
 
@@ -70,6 +71,12 @@ def main() -> int:
 
         if not args.email:
             parser.error("--email is required (unless using --list or --demote)")
+
+        if not is_admin_email(args.email):
+            print(f"Refusing: {args.email!r} is not on the administrator allowlist.")
+            print(f"Allowlist (ADMIN_EMAILS in backend/.env): {', '.join(sorted(ADMIN_EMAILS)) or '(empty)'}")
+            print("Add the address to that line, restart nothing (scripts re-read .env), and run again.")
+            return 1
 
         user = db.query(User).filter(User.email == args.email).first()
 

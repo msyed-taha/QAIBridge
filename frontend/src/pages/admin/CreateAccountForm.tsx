@@ -110,6 +110,11 @@ export function CreateAccountForm({ onCreated, onClose }: Props) {
             <option value="user">User</option>
             <option value="admin">Admin</option>
           </select>
+          {role === 'admin' && (
+            <p className="text-[11px] text-amber-300/80 mt-1.5 leading-snug">
+              The email must be on the server's admin allowlist (<span className="text-gray-400">ADMIN_EMAILS</span> in <span className="text-gray-400">backend/.env</span>), otherwise this is rejected.
+            </p>
+          )}
         </div>
         <div className="flex items-end">
           <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pb-2">

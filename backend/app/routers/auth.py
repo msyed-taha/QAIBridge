@@ -15,6 +15,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..config import is_admin_email
 from ..models.user import User, ROLE_ADMIN
 from ..auth.security      import hash_password, verify_password, create_access_token, decode_access_token
 from ..auth.schemas       import (
@@ -53,8 +54,12 @@ def get_current_user(
 
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency for admin-only routes. Reuses get_current_user, then checks the role."""
-    if current_user.role != ROLE_ADMIN:
+    """
+    Dependency for admin-only routes. The account must BOTH carry the admin
+    role AND have an allowlisted email (backend/.env ADMIN_EMAILS). The second
+    check means a role flipped straight in the database is not enough.
+    """
+    if current_user.role != ROLE_ADMIN or not is_admin_email(current_user.email):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required.")
     return current_user
 
@@ -176,6 +181,9 @@ def admin_setup(req: AdminSetupRequest, db: Session = Depends(get_db)):
     """Create the first administrator account. 403 once any admin exists."""
     if db.query(User).filter(User.role == ROLE_ADMIN).count() > 0:
         raise HTTPException(403, "An administrator already exists. Ask them to create more from the dashboard.")
+
+    if not is_admin_email(req.email):
+        raise HTTPException(403, "This email address is not on the administrator allowlist (backend/.env ADMIN_EMAILS).")
 
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(400, "An account with this email already exists.")

@@ -24,6 +24,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..config import is_admin_email
 from ..models.user import User, ROLE_ADMIN, VALID_ROLES
 from ..auth.security import hash_password
 from ..auth.schemas import AdminCreateUserRequest
@@ -118,6 +119,12 @@ def create_user(req: AdminCreateUserRequest, db: Session = Depends(get_db)):
         raise HTTPException(400, "An account with this email already exists.")
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(400, "This username is already taken.")
+    if req.role == ROLE_ADMIN and not is_admin_email(req.email):
+        raise HTTPException(
+            403,
+            "That email is not on the administrator allowlist. Add it to "
+            "ADMIN_EMAILS in backend/.env and restart the backend to create an admin with it.",
+        )
 
     user = User(
         username=req.username,
@@ -148,6 +155,12 @@ def update_user(
     if req.role is not None:
         if req.role not in VALID_ROLES:
             raise HTTPException(400, f"role must be one of {sorted(VALID_ROLES)}.")
+        if req.role == ROLE_ADMIN and not is_admin_email(target.email):
+            raise HTTPException(
+                403,
+                "That account's email is not on the administrator allowlist. Add it to "
+                "ADMIN_EMAILS in backend/.env and restart the backend before promoting it.",
+            )
         if target.id == me.id and req.role != ROLE_ADMIN:
             raise HTTPException(400, "You cannot remove your own admin role.")
         if target.role == ROLE_ADMIN and req.role != ROLE_ADMIN and _admin_count(db) <= 1:
