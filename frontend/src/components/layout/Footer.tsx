@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
-import { Github, Mail, ExternalLink } from 'lucide-react';
+import { Mail, ExternalLink } from 'lucide-react';
 
 const QUICK_LINKS = [
   { label: 'Home',        to: '/' },
@@ -46,15 +46,6 @@ export function Footer() {
             >
               <Mail className="w-4 h-4" />
             </Link>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noreferrer"
-              className="w-9 h-9 rounded-lg bg-quantum-800 border border-quantum-700 flex items-center justify-center text-gray-500 hover:text-quantum-neon hover:border-quantum-neon/50 transition-all"
-              title="GitHub"
-            >
-              <Github className="w-4 h-4" />
-            </a>
           </div>
         </div>
 
