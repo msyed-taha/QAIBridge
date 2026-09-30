@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle } from 'lucide-react';
+import { ArrowRight, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare } from 'lucide-react';
 import { QAIBridgeLogo } from '../components/layout/QAIBridgeLogo';
 
 const CAPABILITIES = [
@@ -54,6 +54,64 @@ const FEATURES = [
   'Classical & Quantum comparison for every problem',
   'AI agent solves the Barren Plateau automatically',
   'Full Docker support for easy deployment',
+];
+
+// Real screenshots of the app (public/showcase/), captured from actual runs.
+const SHOWCASE = [
+  {
+    icon: Brain,
+    tint: 'from-orange-500 to-pink-500',
+    label: 'AI Advisor',
+    title: 'Describe your problem in plain English',
+    body: 'Tell QAIbridge what you are trying to solve, or upload a PDF, Word or CSV file. It works out whether quantum computing would actually help, and which algorithm fits.',
+    quote: 'I run a delivery company in Lahore. Each morning a van must visit 5 shops and come back. Which route is shortest?',
+    code: null,
+    points: [
+      'Quantum or classical, with a confidence score',
+      'Every quantum algorithm ranked for your problem',
+      'One click to run it on your own data',
+    ],
+    image: {
+      src: '/showcase/advisor.jpg', width: 1356, height: 766,
+      alt: 'QAIbridge recommending the quantum approach with 99% confidence, and QAOA as the best algorithm, for a delivery-route question',
+    },
+  },
+  {
+    icon: Code2,
+    tint: 'from-blue-500 to-indigo-400',
+    label: 'Code Transformer',
+    title: 'Turn ordinary code into a quantum circuit',
+    body: 'Paste a Python program. QAIbridge works out what it computes, rewrites it as a problem a quantum computer can solve, runs the circuit and checks the answer against your original code.',
+    quote: null,
+    code: 'stocks = ["ENGRO", "HBL", "LUCK",\n          "OGDC", "PSO", "SYS"]\nk = 3   # pick the best 3 of 6',
+    points: [
+      'Search, routing, budgeting, finance and logic problems',
+      'Every quantum answer verified against the classical one',
+      'Export the exact circuit as Qiskit code',
+    ],
+    image: {
+      src: '/showcase/transformer.jpg', width: 1740, height: 1110,
+      alt: 'QAIbridge confirming the quantum portfolio answer (ENGRO, LUCK, SYS) matches the classical one, with the QUBO matrix and QAOA training chart',
+    },
+  },
+  {
+    icon: BarChart2,
+    tint: 'from-teal-500 to-cyan-400',
+    label: 'Quantum vs Classical',
+    title: 'Watch quantum and classical solve the same problem',
+    body: "Run Grover's search, Shor's factoring and QAOA next to the best classical method on the same input. Both really run, both answers are checked, and the charts show how each one scales.",
+    quote: null,
+    code: null,
+    points: [
+      "Real quantum circuits on QAIbridge's own simulator",
+      'Steps, timings and qubit counts for both sides',
+      'Plain-language notes on what each result means',
+    ],
+    image: {
+      src: '/showcase/factoring.jpg', width: 1740, height: 1179,
+      alt: "Shor's algorithm and trial division both factoring 91 into 7 × 13, with the measured quantum distribution",
+    },
+  },
 ];
 
 export function Home() {
@@ -117,6 +175,85 @@ export function Home() {
           <p className="text-gray-700 text-xs mt-5">
             Free to use. No credit card required. No QPU hardware needed.
           </p>
+        </div>
+      </section>
+
+      {/* ── SEE IT IN ACTION ────────────────────────────────────────────── */}
+      <section className="py-20 px-6 border-t border-quantum-700">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">See it in action</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Real results, straight from the app</h2>
+            <p className="text-gray-500 text-sm max-w-xl mx-auto">
+              Every screenshot below is a real run on QAIbridge. Nothing is mocked up.
+            </p>
+          </div>
+
+          <div className="space-y-24">
+            {SHOWCASE.map((s, i) => {
+              const Icon = s.icon;
+              const flip = i % 2 === 1;
+              return (
+                <div key={s.label} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+                  <div className={`min-w-0 lg:col-span-5 ${flip ? 'lg:order-2' : ''}`}>
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${s.tint} flex items-center justify-center`}>
+                        <Icon className="w-4 h-4 text-white" />
+                      </span>
+                      <span className="text-gray-400 text-sm font-semibold">{s.label}</span>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4 leading-tight">{s.title}</h3>
+                    <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-5">{s.body}</p>
+
+                    {s.quote && (
+                      <div className="flex gap-3 items-start bg-quantum-900 border border-quantum-700 rounded-xl p-4 mb-5">
+                        <MessageSquare className="w-4 h-4 text-orange-300 mt-0.5 flex-shrink-0" />
+                        <p className="text-gray-300 text-sm italic leading-relaxed">“{s.quote}”</p>
+                      </div>
+                    )}
+                    {s.code && (
+                      <pre className="bg-quantum-900 border border-quantum-700 rounded-xl p-4 mb-5 text-xs text-gray-300 font-mono leading-relaxed overflow-x-auto">{s.code}</pre>
+                    )}
+
+                    <ul className="space-y-2.5 mb-6">
+                      {s.points.map(p => (
+                        <li key={p} className="flex items-start gap-2.5">
+                          <CheckCircle className="w-4 h-4 text-quantum-neon flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-300 text-sm">{p}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link to="/register" className="inline-flex items-center gap-1.5 text-quantum-neon text-sm font-semibold hover:text-teal-300 transition-colors">
+                      Try it free <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+
+                  <figure className={`min-w-0 lg:col-span-7 ${flip ? 'lg:order-1' : ''}`}>
+                    <div className="rounded-2xl border border-quantum-700 bg-quantum-800 overflow-hidden shadow-2xl shadow-black/40">
+                      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-quantum-700 bg-quantum-900/60">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
+                        <span className="ml-3 text-[11px] text-gray-500 font-mono truncate">QAIbridge · {s.label}</span>
+                      </div>
+                      <a href={s.image.src} target="_blank" rel="noreferrer" title="Open full size">
+                        <img
+                          src={s.image.src}
+                          width={s.image.width}
+                          height={s.image.height}
+                          alt={s.image.alt}
+                          loading="lazy"
+                          decoding="async"
+                          className="block w-full h-auto"
+                        />
+                      </a>
+                    </div>
+                  </figure>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
