@@ -1,10 +1,13 @@
 """
 In-memory OTP store with expiry and attempt limiting.
 Each entry lives for OTP_EXPIRY_MINUTES then is discarded.
+
+Codes come from the `secrets` module (a cryptographically secure generator,
+unlike `random`) and are compared in constant time.
 """
 from __future__ import annotations
 
-import random
+import secrets
 from datetime import datetime, timedelta
 
 OTP_EXPIRY_MINUTES = 10
@@ -16,7 +19,7 @@ _store: dict[str, dict] = {}
 
 def generate(email: str) -> str:
     """Create a new 5-digit OTP for *email* and return it."""
-    otp = f"{random.randint(10000, 99999)}"
+    otp = f"{10000 + secrets.randbelow(90000)}"
     _store[email] = {
         "otp":        otp,
         "expires_at": datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES),
@@ -46,7 +49,7 @@ def verify(email: str, otp: str) -> tuple[bool, str]:
 
     entry["attempts"] += 1
 
-    if entry["otp"] != otp.strip():
+    if not secrets.compare_digest(entry["otp"], otp.strip()):
         remaining = MAX_ATTEMPTS - entry["attempts"]
         return False, f"Incorrect code. {remaining} attempt(s) remaining."
 

@@ -54,10 +54,14 @@ def _token(client: TestClient, email: str, password: str) -> str:
 
 
 def _exists(uid: int) -> bool:
+    return _get(uid) is not None
+
+
+def _get(uid: int) -> User | None:
     db = SessionLocal()
-    found = db.query(User).filter(User.id == uid).first() is not None
+    u = db.query(User).filter(User.id == uid).first()
     db.close()
-    return found
+    return u
 
 
 # ── GET /me ─────────────────────────────────────────────────────────────────
@@ -149,6 +153,9 @@ def test_change_password_guards(client):
 @pytest.mark.parametrize("role", [ROLE_USER, ROLE_ADMIN])
 def test_delete_account_flow(client, role):
     uid, email, pw = _mk_user(role)
+    # An admin may only delete their account while another admin exists
+    # (the last-admin guard) — create one so the test doesn't depend on the DB contents.
+    other_admin = _mk_user(ROLE_ADMIN)[0] if role == ROLE_ADMIN else None
     try:
         h = {"Authorization": f"Bearer {_token(client, email, pw)}"}
 
@@ -156,13 +163,83 @@ def test_delete_account_flow(client, role):
         otp = otp_store.generate(f"delete-account:{email}")
         assert client.post("/api/account/delete/verify", headers=h, json={"otp": "00000"}).status_code == 400
 
-        # correct OTP → gone for good
+        # correct OTP → deactivated (soft delete): the row stays, marked deleted
         otp = otp_store.generate(f"delete-account:{email}")
         r = client.post("/api/account/delete/verify", headers=h, json={"otp": otp})
         assert r.status_code == 200, r.text
-        assert not _exists(uid)
+        u = _get(uid)
+        assert u is not None and not u.is_active and u.deleted_at is not None and u.role == ROLE_USER
         assert client.get("/api/account/me", headers=h).status_code == 401
+        # login answers exactly as for an email that never existed
+        r = client.post("/api/auth/login", json={"email": email, "password": pw})
+        never = client.post("/api/auth/login", json={"email": f"never_{uuid.uuid4().hex[:8]}@example.com", "password": pw})
+        assert (r.status_code, r.json()) == (never.status_code, never.json()) == (401, {"detail": "Invalid email or password."})
+    finally:
+        _cleanup(uid)
+        if other_admin:
+            _cleanup(other_admin)
+
+
+def _signup(client, monkeypatch, email: str, username: str, password: str):
+    """Run the real sign-up flow (send-otp → verify-otp → register) with email capture."""
+    sent = {}
+    monkeypatch.setattr("app.routers.auth.send_otp", lambda to, otp, **kw: sent.update(otp=otp))
+    r = client.post("/api/auth/send-otp", json={"email": email})
+    if r.status_code != 200:
+        return r
+    assert client.post("/api/auth/verify-otp", json={"email": email, "otp": sent["otp"]}).status_code == 200
+    return client.post("/api/auth/register", json={"username": username, "email": email, "password": password})
+
+
+def test_signing_up_again_restores_a_deleted_account(client, monkeypatch):
+    uid, email, pw = _mk_user()
+    try:
+        h = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+        otp = otp_store.generate(f"delete-account:{email}")
+        assert client.post("/api/account/delete/verify", headers=h, json={"otp": otp}).status_code == 200
+        # forgot-password doesn't bring a deleted account back — signing up does
+        mailed = []
+        monkeypatch.setattr("app.routers.auth.send_otp", lambda to, otp, **kw: mailed.append(to))
+        assert client.post("/api/auth/forgot-password/send-otp", json={"email": email}).status_code == 200
+        assert mailed == []
+
+        new_name = f"back_{uuid.uuid4().hex[:8]}"
+        r = _signup(client, monkeypatch, email, new_name, "ReturnPass123")
+        assert r.status_code == 201, r.text
+        assert r.json()["user"]["id"] == uid and r.json()["user"]["username"] == new_name
+
+        u = _get(uid)
+        assert u.is_active and u.deleted_at is None and u.username == new_name and u.role == ROLE_USER
         assert client.post("/api/auth/login", json={"email": email, "password": pw}).status_code == 401
+        assert client.post("/api/auth/login", json={"email": email, "password": "ReturnPass123"}).status_code == 200
+        # and it's an ordinary account again: a second sign-up is refused
+        assert _signup(client, monkeypatch, email, f"x_{uuid.uuid4().hex[:6]}", "ReturnPass123").status_code == 400
+    finally:
+        _cleanup(uid)
+
+
+def test_restored_account_may_keep_its_old_username(client, monkeypatch):
+    uid, email, pw = _mk_user()
+    try:
+        old_name = _get(uid).username
+        h = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+        otp = otp_store.generate(f"delete-account:{email}")
+        client.post("/api/account/delete/verify", headers=h, json={"otp": otp})
+        r = _signup(client, monkeypatch, email, old_name, "ReturnPass123")
+        assert r.status_code == 201, r.text
+    finally:
+        _cleanup(uid)
+
+
+def test_admin_deactivated_account_cannot_sign_up_again(client, monkeypatch):
+    uid, email, pw = _mk_user()
+    try:
+        db = SessionLocal()
+        db.get(User, uid).is_active = False
+        db.commit(); db.close()
+        r = _signup(client, monkeypatch, email, f"x_{uuid.uuid4().hex[:6]}", "ReturnPass123")
+        assert r.status_code == 400
+        assert client.post("/api/auth/login", json={"email": email, "password": pw}).json()["detail"] == "Account is disabled."
     finally:
         _cleanup(uid)
 

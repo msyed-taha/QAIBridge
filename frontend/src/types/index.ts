@@ -34,6 +34,9 @@ export interface SimulationResult {
     max_prob: number;
   };
   operations: GateOperation[];
+  depth?: number;
+  truncated?: boolean;
+  bloch?: { qubit: number; x: number; y: number; z: number; purity: number; length: number }[];
   memory_report: {
     n_qubits: number;
     required_gb: number;
@@ -173,8 +176,10 @@ export interface AdminUser {
   email:         string;
   role:          Role;
   is_active:     boolean;
+  is_owner:      boolean;
   created_at:    string | null;
   last_login_at: string | null;
+  deleted_at:    string | null;
 }
 
 export interface AdminStats {
@@ -185,6 +190,18 @@ export interface AdminStats {
   new_last_7_days:       number;
   logged_in_last_7_days: number;
   recent_signups:        AdminUser[];
+  unread_messages:       number;
+}
+
+export interface ContactMessage {
+  id:         number;
+  name:       string;
+  email:      string;
+  subject:    string | null;
+  message:    string;
+  user_id:    number | null;
+  is_read:    boolean;
+  created_at: string | null;
 }
 
 // ── Shared ───────────────────────────────────────────────────────────────────

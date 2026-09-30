@@ -206,6 +206,27 @@ def test_admin_toggles_active_and_role(client):
         _cleanup(admin.id, target.id)
 
 
+def test_admin_cannot_change_a_self_deleted_account(client):
+    from datetime import datetime, timezone
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    target, t_email, t_pw = _mk_user(role=ROLE_USER, active=False)
+    try:
+        with SessionLocal() as db:
+            db.get(User, target.id).deleted_at = datetime.now(timezone.utc)
+            db.commit()
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        row = next(u for u in client.get("/api/admin/users", headers=h).json() if u["id"] == target.id)
+        assert row["deleted_at"] and not row["is_active"]
+        for body in ({"is_active": True}, {"is_active": False}, {"role": "admin"}):
+            assert client.patch(f"/api/admin/users/{target.id}", json=body, headers=h).status_code == 403
+        with SessionLocal() as db:
+            u = db.get(User, target.id)
+            assert not u.is_active and u.deleted_at is not None
+        assert client.post("/api/auth/login", json={"email": t_email, "password": t_pw}).status_code == 401
+    finally:
+        _cleanup(admin.id, target.id)
+
+
 def test_admin_deletes_a_user(client):
     admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
     target, _, _ = _mk_user(role=ROLE_USER)
@@ -275,3 +296,77 @@ def test_cannot_promote_user_to_admin_outside_allowlist(client):
         assert client.patch(f"/api/admin/users/{target.id}", json={"is_active": False}, headers=h).status_code == 200
     finally:
         _cleanup(admin.id, target.id)
+
+
+# ── 6. Owner (OWNER_EMAIL) ──────────────────────────────────────────────────
+
+@pytest.fixture
+def owner(monkeypatch):
+    """A plain, disabled account set as OWNER_EMAIL — deliberately NOT on ADMIN_EMAILS."""
+    user, email, pw = _mk_user(role=ROLE_USER, active=False,
+                               email=f"owner_{uuid.uuid4().hex[:8]}@owner-not-listed.com")
+    monkeypatch.setattr("app.config.OWNER_EMAIL", email)
+    yield user, email, pw
+    _cleanup(user.id)
+
+
+def test_owner_is_made_an_active_admin(client, owner):
+    from app.routers.auth import sync_owner_account
+    o, email, pw = owner
+    with SessionLocal() as db:           # startup sync
+        sync_owner_account(db)
+        assert db.get(User, o.id).role == ROLE_ADMIN
+
+    with SessionLocal() as db:           # login re-fixes a row edited in the DB
+        u = db.get(User, o.id)
+        u.role, u.is_active = ROLE_USER, False
+        db.commit()
+    login = client.post("/api/auth/login", json={"email": email, "password": pw})
+    assert login.status_code == 200, login.text
+    assert login.json()["user"]["role"] == "admin" and login.json()["user"]["is_owner"] is True
+    h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    assert client.get("/api/admin/users", headers=h).status_code == 200
+
+
+def test_other_admins_cannot_change_or_delete_the_owner(client, owner):
+    o, o_email, o_pw = owner
+    _token(client, o_email, o_pw)
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        row = next(u for u in client.get("/api/admin/users", headers=h).json() if u["id"] == o.id)
+        assert row["is_owner"] and row["role"] == "admin"
+        for body in ({"role": "user"}, {"is_active": False}, {"role": "admin"}):
+            assert client.patch(f"/api/admin/users/{o.id}", json=body, headers=h).status_code == 403
+        assert client.delete(f"/api/admin/users/{o.id}", headers=h).status_code == 403
+        with SessionLocal() as db:
+            u = db.get(User, o.id)
+            assert u.role == ROLE_ADMIN and u.is_active
+    finally:
+        _cleanup(admin.id)
+
+
+def test_owner_cannot_delete_own_account(client, owner):
+    from app.auth import otp_store
+    o, email, pw = owner
+    h = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+    assert client.post("/api/account/delete/send-otp", headers=h).status_code == 403
+    otp = otp_store.generate(f"delete-account:{email}")   # even with a valid code
+    assert client.post("/api/account/delete/verify", headers=h, json={"otp": otp}).status_code == 403
+    with SessionLocal() as db:
+        assert db.get(User, o.id) is not None
+
+
+def test_admin_cannot_create_an_account_with_the_owner_email(client, monkeypatch):
+    email = f"owner_{uuid.uuid4().hex[:8]}@owner-not-listed.com"
+    monkeypatch.setattr("app.config.OWNER_EMAIL", email)
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        for role in ("user", "admin"):
+            r = client.post("/api/admin/users", headers=h, json={
+                "username": f"imp_{uuid.uuid4().hex[:6]}", "email": email, "password": "MadePass123", "role": role,
+            })
+            assert r.status_code == 403, r.text
+    finally:
+        _cleanup(admin.id)

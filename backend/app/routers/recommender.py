@@ -429,27 +429,37 @@ def _extract_features_from_text(text: str) -> dict:
     # ── Boolean characteristic detection ─────────────────────────────────────
     unstructured  = any(w in t for w in ['unstructured', 'unsorted', 'random order', 'no index', 'unordered', 'scattered'])
     exact         = not any(w in t for w in ['approximate', 'heuristic', 'near optimal', 'near-optimal', 'good enough', 'estimate', 'approximat'])
-    graph         = any(w in t for w in ['graph', 'network', 'node', 'edge', 'vertex', 'vertices', 'adjacen'])
+    graph         = any(w in t for w in ['graph', 'network', 'node', 'edge', 'vertex', 'vertices', 'adjacen',
+                                         'route', 'routing', 'city', 'cities', 'travelling', 'traveling', 'tsp', 'map'])
     security      = any(w in t for w in ['encrypt', 'decrypt', 'crypto', 'rsa', 'secure', 'password', 'key', 'cipher', 'hash'])
-    continuous    = any(w in t for w in ['continuous', 'real-valued', 'float', 'decimal', 'probability amplitude', 'wave', 'frequency', 'analog'])
-    periodic      = any(w in t for w in ['periodic', 'period', 'cycle', 'fourier', 'frequency', 'oscillat', 'repeating pattern'])
-    multi_sol     = any(w in t for w in ['multiple solution', 'many solution', 'several solution', 'all solution', 'satisf', 'any valid'])
+    continuous    = any(w in t for w in ['continuous', 'real-valued', 'float', 'decimal', 'probability amplitude', 'wave',
+                                         'frequency', 'analog', 'energy', 'hamiltonian', 'molecul', 'eigen'])
+    periodic      = any(w in t for w in ['periodic', 'period', 'cycle', 'fourier', 'frequency', 'oscillat', 'repeating pattern',
+                                         'eigenvalue', 'phase estimation', 'spectrum', 'spectral'])
+    multi_sol     = any(w in t for w in ['multiple solution', 'many solution', 'several solution', 'all solution', 'satisf',
+                                         'any valid', 'all records', 'matching', 'several conditions'])
+    # Combinatorial optimisation: many good candidate solutions, approximate answers are acceptable
+    if best_cat in (2, 6):
+        multi_sol = True
+        exact = exact and any(w in t for w in ['exact', 'guarantee', 'provably'])
 
     # ── Data size detection ───────────────────────────────────────────────────
-    # Look for explicit numbers, words like "billion", "million", "thousand", or row/record counts
-    data_size = 1_000_000  # default 1M
+    # Look for explicit numbers, words like "billion", "million", "thousand", or counted things
+    data_size = {2: 100, 4: 50, 6: 1_000}.get(best_cat, 1_000_000)  # category-aware default
     size_patterns = [
         (r'(\d[\d,]*)\s*billion', 1_000_000_000),
         (r'(\d[\d,]*)\s*million', 1_000_000),
         (r'(\d[\d,]*)\s*thousand', 1_000),
         (r'(\d[\d,]*)\s*(?:rows?|records?|entries|items?|elements?|samples?)', 1),
+        (r'(\d[\d,]*)\s*(?:cities|city|nodes?|locations?|stops?|stores?|trucks?|vehicles?|assets?|stocks?|projects?|'
+         r'tasks?|jobs?|users?|patients?|customers?|molecules?|atoms?|orbitals?|qubits?|variables?|hashes|keys?)', 1),
         (r'\bn\s*=\s*(\d[\d,]*)', 1),
     ]
     found_sizes = []
     for pattern, multiplier in size_patterns:
         for m in re.finditer(pattern, t):
             val = int(m.group(1).replace(',', '')) * multiplier
-            if val >= 10:
+            if val >= 2:
                 found_sizes.append(val)
     if not found_sizes:
         bare_numbers = [int(m.replace(',', '')) for m in re.findall(r'\b(\d[\d,]{2,})\b', t)]
@@ -561,16 +571,53 @@ REASON_TEMPLATES = {
     "hillclimbing":        "Hill Climbing quickly finds good (often near-optimal) solutions without the exponential blowup of exhaustive search. Trade optimality for speed.",
 }
 
-def _run_classifier(features: dict) -> dict:
+# Quantum algorithms that genuinely apply to each detected problem category.
+# The Random Forest ranks the algorithms; this domain-knowledge gate keeps the
+# final choice consistent with the problem (a hybrid rules + ML design), so e.g.
+# a route-planning problem can never be answered with a search algorithm.
+CATEGORY_ALLOWED = {
+    0: ["grovers", "amplitude_amp"],          # search
+    1: ["shors", "qpe"],                      # factoring
+    2: ["qaoa", "vqe"],                       # optimisation
+    3: ["amplitude_amp", "grovers"],          # database
+    4: ["vqe", "qpe"],                        # simulation
+    6: ["qaoa", "grovers"],                   # graph
+    7: ["shors", "grovers", "qpe"],           # cryptography
+}
+KEYWORD_PREFERENCE = {                        # strong phrases that single out one algorithm
+    "qpe": ["eigenvalue", "phase estimation", "spectrum", "spectral"],
+    "vqe": ["ground state", "molecul", "chemistry", "binding energy"],
+    "amplitude_amp": ["all records", "matching", "several conditions", "multiple matches"],
+}
+
+
+def _run_classifier(features: dict, text: str = "") -> dict:
     """Run RF classifier and return ranked recommendations, filtering by approach."""
     # ── Step 1: Get quantum algorithm rankings from RF classifier
     vec = _features_to_vector(features)
     proba = _clf.predict_proba(vec)[0]
     classes = list(_clf.classes_)
-    quantum_scored = sorted(
-        [(classes[i], round(float(p) * 100, 1)) for i, p in enumerate(proba)],
-        key=lambda x: x[1], reverse=True
-    )
+    rf_scores = {classes[i]: float(p) for i, p in enumerate(proba)}
+
+    # ── Step 1b: category gate + keyword preference, then renormalise the RF confidence
+    allowed = CATEGORY_ALLOWED.get(features["problem_category"], classes)
+    t = text.lower()
+    preferred = [a for a, kws in KEYWORD_PREFERENCE.items() if a in allowed and any(k in t for k in kws)]
+    allowed_mass = sum(rf_scores[a] for a in allowed) or 1e-9
+
+    def rank_key(algo: str):
+        return (algo in preferred, algo in allowed, rf_scores[algo])
+
+    ordered = sorted(classes, key=rank_key, reverse=True)
+    quantum_scored = []
+    for algo in ordered:
+        if algo in allowed:
+            conf = max(rf_scores[algo] / allowed_mass, 0.0) * 100
+            if algo == ordered[0]:
+                conf = max(conf, 60.0)                    # the gate itself is strong evidence
+        else:
+            conf = rf_scores[algo] * 100 * 0.5            # out-of-category algorithms are demoted
+        quantum_scored.append((algo, round(min(conf, 99.0), 1)))
 
     # ── Step 2: Decide approach based on TOP QUANTUM algorithm
     top_quantum_id   = quantum_scored[0][0]
@@ -735,7 +782,7 @@ def advise_text(req: AdviseTextRequest):
     if validation_error:
         raise HTTPException(422, validation_error)
     features = _extract_features_from_text(req.problem_text)
-    result   = _run_classifier(features)
+    result   = _run_classifier(features, req.problem_text)
     result["source"] = "text"
     result["input_preview"] = req.problem_text[:300]
     return result
@@ -754,7 +801,7 @@ async def advise_file(file: UploadFile = File(...)):
     if validation_error:
         raise HTTPException(422, validation_error)
     features = _extract_features_from_text(extracted)
-    result   = _run_classifier(features)
+    result   = _run_classifier(features, extracted)
     result["source"]        = "file"
     result["filename"]      = file.filename
     result["input_preview"] = extracted[:300]

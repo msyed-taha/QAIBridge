@@ -182,9 +182,20 @@ cd backend
 venv\Scripts\python -m pytest -q
 ```
 
-All 64 tests should pass — the quantum simulation kernel, the parameter‑shift
-gradient, the barren‑plateau study, every module API, and the admin actor
-(role guard, user management, self‑lockout guards).
+All 200+ tests should pass — the simulation kernel (every gate checked against
+an independent reference, QFT vs the DFT matrix), the SFOD algorithms (Grover,
+Shor, QAOA, amplitude amplification), the Module 5 bridge / Boolean logic /
+sandbox / LLM engine (mocked), the Module 8 dashboard and history, the
+parameter‑shift gradient and barren‑plateau study, and the admin actor.
+Tests create throw‑away `@example.com` users, so add `@example.com` to
+`ADMIN_EMAILS` (or run against a separate test database).
+
+Optional accuracy check against IBM Qiskit (skipped when Qiskit is absent):
+
+```powershell
+venv\Scripts\pip install "qiskit>=2.0" qiskit-aer
+venv\Scripts\python -m pytest tests/test_kernel_vs_qiskit.py -v
+```
 
 ---
 

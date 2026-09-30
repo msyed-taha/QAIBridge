@@ -12,6 +12,12 @@ Routes:
   POST   /api/admin/users            – create an account (user or admin), no email OTP
   PATCH  /api/admin/users/{user_id}  – change is_active and/or role
   DELETE /api/admin/users/{user_id}  – delete a user
+  GET    /api/admin/messages         – Contact-form messages, newest first
+  PATCH  /api/admin/messages/{id}    – mark a message read / unread
+  DELETE /api/admin/messages/{id}    – delete a message
+
+The owner account (OWNER_EMAIL in backend/.env) is locked: no admin can change
+its role or status, delete it, or create an account with its email.
 """
 from __future__ import annotations
 
@@ -19,12 +25,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..config import is_admin_email
+from ..config import is_admin_email, is_owner_email
+from ..models.contact import ContactMessage
 from ..models.user import User, ROLE_ADMIN, VALID_ROLES
 from ..auth.security import hash_password
 from ..auth.schemas import AdminCreateUserRequest
@@ -43,9 +50,18 @@ class AdminUserOut(BaseModel):
     is_active:     bool
     created_at:    Optional[datetime] = None
     last_login_at: Optional[datetime] = None
+    deleted_at:    Optional[datetime] = None   # set when the user deleted their own account
 
     class Config:
         from_attributes = True
+
+    @computed_field
+    @property
+    def is_owner(self) -> bool:
+        return is_owner_email(self.email)
+
+
+OWNER_LOCKED = "This is the owner account. Its role, status and account can't be changed."
 
 
 class AdminStats(BaseModel):
@@ -55,6 +71,7 @@ class AdminStats(BaseModel):
     admins:          int
     new_last_7_days: int
     logged_in_last_7_days: int
+    unread_messages: int
     recent_signups:  list[AdminUserOut]
 
 
@@ -82,6 +99,7 @@ def stats(db: Session = Depends(get_db)):
         admins=admins,
         new_last_7_days=new_7d,
         logged_in_last_7_days=seen_7d,
+        unread_messages=db.query(func.count(ContactMessage.id)).filter(ContactMessage.is_read.is_(False)).scalar() or 0,
         recent_signups=[AdminUserOut.model_validate(u) for u in recent],
     )
 
@@ -117,6 +135,9 @@ def create_user(req: AdminCreateUserRequest, db: Session = Depends(get_db)):
     """
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(400, "An account with this email already exists.")
+    if is_owner_email(req.email):
+        # Otherwise another admin could pick the owner's password and take the account over.
+        raise HTTPException(403, "This email is reserved for the owner, who must sign up themselves.")
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(400, "This username is already taken.")
     if req.role == ROLE_ADMIN and not is_admin_email(req.email):
@@ -151,6 +172,13 @@ def update_user(
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(404, "User not found.")
+    if is_owner_email(target.email):
+        raise HTTPException(403, OWNER_LOCKED)
+    if target.deleted_at is not None:
+        raise HTTPException(
+            403,
+            "This user deleted their account. Only they can restore it, by signing up again with the same email.",
+        )
 
     if req.role is not None:
         if req.role not in VALID_ROLES:
@@ -188,6 +216,8 @@ def delete_user(
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(404, "User not found.")
+    if is_owner_email(target.email):
+        raise HTTPException(403, OWNER_LOCKED)
     if target.id == me.id:
         raise HTTPException(400, "You cannot delete your own account.")
     if target.role == ROLE_ADMIN and _admin_count(db) <= 1:
@@ -199,3 +229,55 @@ def delete_user(
 
 def _admin_count(db: Session) -> int:
     return db.query(func.count(User.id)).filter(User.role == ROLE_ADMIN).scalar() or 0
+
+
+# ── Contact-form messages ─────────────────────────────────────────────────────
+
+class ContactMessageOut(BaseModel):
+    id:         int
+    name:       str
+    email:      str
+    subject:    Optional[str] = None
+    message:    str
+    user_id:    Optional[int] = None
+    is_read:    bool
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UpdateMessageRequest(BaseModel):
+    is_read: bool
+
+
+@router.get("/messages", response_model=list[ContactMessageOut])
+def list_messages(
+    db: Session = Depends(get_db),
+    unread: Optional[bool] = Query(None, description="Only unread (true) or only read (false)"),
+):
+    q = db.query(ContactMessage)
+    if unread is not None:
+        q = q.filter(ContactMessage.is_read.is_(not unread))
+    return [ContactMessageOut.model_validate(m) for m in q.order_by(ContactMessage.created_at.desc(), ContactMessage.id.desc()).all()]
+
+
+@router.patch("/messages/{message_id}", response_model=ContactMessageOut)
+def update_message(message_id: int, req: UpdateMessageRequest, db: Session = Depends(get_db)):
+    msg = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(404, "Message not found.")
+    msg.is_read = req.is_read
+    db.commit()
+    db.refresh(msg)
+    return ContactMessageOut.model_validate(msg)
+
+
+@router.delete("/messages/{message_id}", status_code=204)
+def delete_message(message_id: int, db: Session = Depends(get_db)):
+    msg = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(404, "Message not found.")
+    db.delete(msg)
+    db.commit()
+    return None

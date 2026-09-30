@@ -6,10 +6,11 @@ import { ConvergenceChart } from '../components/module6/ConvergenceChart';
 import { BarrenPlateauChart } from '../components/module6/BarrenPlateauChart';
 import { GradientMonitorChart } from '../components/module6/GradientMonitorChart';
 import { HowToUse } from '../components/shared/HowToUse';
+import { QaoaAnglePredictor } from '../components/module6/QaoaAnglePredictor';
 
 const GLOSSARY = [
   { term: 'Polar / azimuthal angle (θ, φ)', plain: 'The two numbers that orient a qubit\'s state on the Bloch sphere — set here by the RY(θ) and RZ(φ) gates.' },
-  { term: 'γ, β (QAOA notation)', plain: 'Alternate names for the same idea — the cost-encoding angle and the mixer angle in the QAOA family of circuits. Module 6 uses the general θ/φ rotation form.' },
+  { term: 'γ, β (QAOA angles)', plain: 'The cost-layer angle and the mixer angle of each QAOA layer. The predictor at the bottom of this page learns them directly from a graph\'s structure.' },
   { term: 'Barren plateau', plain: 'A region of the training landscape where gradients become vanishingly small as circuits grow, so gradient descent effectively stalls.' },
   { term: 'Small-angle initialisation', plain: 'Starting all rotation angles near zero (an almost-identity circuit) instead of fully random — a known, citable way to keep gradients alive at the start of training.' },
   { term: 'Hypernetwork', plain: 'A neural network whose output is not a prediction but the parameters (here: gate angles) of another model — the "Neural Angle Optimizer" itself.' },
@@ -209,6 +210,8 @@ export function Module6Page() {
           </div>
         </>
       )}
+
+      <QaoaAnglePredictor />
     </div>
   );
 }

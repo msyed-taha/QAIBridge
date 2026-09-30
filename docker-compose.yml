@@ -1,10 +1,28 @@
 services:
 
-  # ── Module 1 & 8 Backend (FastAPI + NumPy simulation kernel) ──────────────
-  # NOTE: DATABASE_URL is set in backend/.env. If PostgreSQL runs on the host
-  # machine (not as its own container in this compose file), the host in that
-  # URL must be "host.docker.internal", not "localhost", or the backend
-  # container won't be able to reach it.
+  # ── PostgreSQL (users + dashboard history) ─────────────────────────────────
+  db:
+    image: postgres:17-alpine
+    container_name: qaibridge-db
+    environment:
+      POSTGRES_USER: qaibridge_user
+      POSTGRES_PASSWORD: qaibridge_dev_pw
+      POSTGRES_DB: qaibridge
+    volumes:
+      - qaibridge-pgdata:/var/lib/postgresql/data
+    networks:
+      - qaibridge-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qaibridge_user -d qaibridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # ── Backend (FastAPI + NumPy simulation kernel, Modules 1–8) ──────────────
+  # Settings come from backend/.env (copy backend/.env.example). Inside Docker
+  # the database URL is overridden below to point at the "db" service, and
+  # migrations run automatically before the API starts.
   backend:
     build: ./backend
     container_name: qaibridge-backend
@@ -13,17 +31,24 @@ services:
     volumes:
       - ./backend:/app
     env_file:
-      - .env
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://qaibridge_user:qaibridge_dev_pw@db:5432/qaibridge
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - qaibridge-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # ── React Frontend ───────────────────────────────────────────────────────
+  # ── React Frontend (Vite dev server, proxies /api and WebSockets) ─────────
   frontend:
     build: ./frontend
     container_name: qaibridge-frontend
@@ -33,7 +58,6 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_BASE_URL=http://backend:8000
       - BACKEND_HOST=backend
     networks:
       - qaibridge-net
@@ -44,3 +68,6 @@ services:
 networks:
   qaibridge-net:
     driver: bridge
+
+volumes:
+  qaibridge-pgdata:

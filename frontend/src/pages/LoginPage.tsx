@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, LogIn, Loader2, Zap, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Mail, Lock, LogIn, Loader2, Zap, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { detailToMessage, friendlyError } from '../api/client';
 import { FirstAdminSetup } from './FirstAdminSetup';
@@ -13,11 +13,13 @@ export function LoginPage() {
   const location    = useLocation();
   const [params]    = useSearchParams();
 
+  // Admin sign-in isn't advertised: it's only reached at /login?as=admin, or by
+  // being sent here from an /admin page. Everyone else — admins included — uses
+  // the normal form and can switch to the portal from the navbar.
   const state       = location.state as { from?: string; as?: Mode } | null;
-  const initialMode: Mode = state?.as === 'admin' || params.get('as') === 'admin' ? 'admin' : 'user';
+  const mode: Mode  = state?.as === 'admin' || params.get('as') === 'admin' ? 'admin' : 'user';
   const redirectTo  = state?.from ?? '/app';
 
-  const [mode,     setMode]     = useState<Mode>(initialMode);
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState<string | null>(null);
@@ -26,7 +28,7 @@ export function LoginPage() {
 
   const isAdmin = mode === 'admin';
 
-  // Does any admin exist yet? If not, the Admin tab offers a one-time setup form.
+  // Does any admin exist yet? If not, the admin sign-in offers a one-time setup form.
   useEffect(() => {
     let cancelled = false;
     fetch('/api/auth/admin-setup-status')
@@ -52,15 +54,15 @@ export function LoginPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(detailToMessage(data.detail, 'Login failed'));
 
-      // The account's real role comes from the server, not the toggle. The
-      // toggle only decides where you land — and blocks a non-admin who picked
-      // the Admin tab, so the intent is explicit.
+      // The account's real role comes from the server. The mode only decides
+      // where you land (an admin on the normal form gets the app) — and blocks
+      // a non-admin on the admin sign-in.
       if (isAdmin && data.user?.role !== 'admin') {
         throw new Error('This account does not have administrator access.');
       }
 
       login(data.access_token, data.user);
-      navigate(data.user?.role === 'admin' ? '/admin' : redirectTo, { replace: true });
+      navigate(isAdmin ? '/admin' : redirectTo, { replace: true });
     } catch (e: unknown) {
       logout();
       setError(friendlyError(e));
@@ -76,27 +78,6 @@ export function LoginPage() {
 
       <div className="relative w-full max-w-md">
         <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
-
-          {/* Role toggle */}
-          <div className="grid grid-cols-2 gap-1 p-1 bg-quantum-900 border border-quantum-700 rounded-xl mb-6">
-            {(['user', 'admin'] as Mode[]).map(m => {
-              const active = mode === m;
-              const Icon = m === 'admin' ? ShieldCheck : UserIcon;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => { setMode(m); setError(null); }}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    active ? 'bg-quantum-700 text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {m === 'admin' ? 'Admin' : 'User'}
-                </button>
-              );
-            })}
-          </div>
 
           {showSetup ? (
             <FirstAdminSetup
@@ -190,6 +171,8 @@ export function LoginPage() {
             <p className="text-center text-gray-600 text-xs mt-6 leading-relaxed">
               Sign in with the admin account's <span className="text-gray-500">email address</span>.
               New admin accounts are created by an existing admin from <span className="text-gray-500">Admin → Users → New account</span>.
+              <br />
+              <Link to="/login" className="text-gray-500 hover:text-gray-300 transition-colors">Not an admin? Regular sign in</Link>
             </p>
           )}
           </>

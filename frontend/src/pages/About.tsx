@@ -1,21 +1,24 @@
-import { Cpu, Zap, BarChart2, Brain, BookOpen, Shield, ArrowRight } from 'lucide-react';
+import { Cpu, Zap, BarChart2, Brain, BookOpen, Shield, ArrowRight, Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const MODULES = [
-  { id: '01', title: 'Custom Simulation Kernel',     icon: Cpu,      color: 'from-teal-500 to-cyan-400',    status: 'live',  desc: 'Proprietary 15–20 qubit state-vector engine built with NumPy. No Qiskit. No QPU hardware.' },
-  { id: '02', title: 'SFOD Benchmark Suite',         icon: Zap,      color: 'from-purple-500 to-pink-400',  status: 'soon',  desc: 'Unified runner for Search, Factoring, Optimization, and Database problem types.' },
-  { id: '03', title: 'Circuit Builder',              icon: BookOpen, color: 'from-green-500 to-emerald-400', status: 'soon', desc: 'Drag-and-drop visual circuit canvas for learning quantum gate logic without any physics background.' },
-  { id: '04', title: 'AI Algorithm Advisor',         icon: Brain,    color: 'from-orange-500 to-yellow-400', status: 'live', desc: 'Random Forest Classifier that recommends the best quantum algorithm for any problem type with confidence scores.' },
-  { id: '05', title: 'ML Performance Predictor',     icon: Brain,    color: 'from-blue-500 to-indigo-400',  status: 'live',  desc: 'Gradient Boosting Regressor that predicts speedup, qubit count, circuit depth, and success probability.' },
-  { id: '06', title: 'Neural Optimizer',             icon: Zap,      color: 'from-red-500 to-rose-400',    status: 'soon',  desc: 'Deep RL agent that autonomously tunes quantum gate angles to escape the Barren Plateau problem.' },
-  { id: '07', title: 'QNN Converter',                icon: Shield,   color: 'from-pink-500 to-fuchsia-400', status: 'soon', desc: 'Translates classical neural network architectures into equivalent quantum neural networks.' },
+  { id: '01', title: 'Custom Simulation Kernel',     icon: Cpu,      color: 'from-teal-500 to-cyan-400',    status: 'live', desc: 'Proprietary NumPy state-vector engine: 20+ qubits (up to 28, RAM permitting), 30+ gates, memory guard, verified against IBM Qiskit.' },
+  { id: '02', title: 'SFOD Comparison Suite',        icon: Zap,      color: 'from-purple-500 to-pink-400',  status: 'live', desc: "Grover's search, Shor's factoring, QAOA optimisation and amplitude amplification — each run side by side with its classical baseline." },
+  { id: '03', title: 'Educational Circuit Builder',  icon: BookOpen, color: 'from-green-500 to-emerald-400', status: 'live', desc: 'Drag-and-drop circuit canvas with live Bloch spheres and gamified challenge levels — no physics background needed.' },
+  { id: '04', title: 'AI Architecture Advisor',      icon: Brain,    color: 'from-orange-500 to-yellow-400', status: 'live', desc: 'Random Forest classifier (with domain rules) that recommends quantum or classical and the best algorithm, then solves your data.' },
+  { id: '05', title: 'Classical → Quantum Transformer', icon: Code2, color: 'from-blue-500 to-indigo-400',  status: 'live', desc: 'Turns classical code into QUBO / Ising Hamiltonians or oracles (LLM or offline engine), runs the circuit and verifies the answer.' },
+  { id: '06', title: 'Neural Angle Optimizer',       icon: Zap,      color: 'from-red-500 to-rose-400',    status: 'live', desc: 'Deep learning tunes gate angles and QAOA γ/β, with a live barren-plateau monitor and mitigation.' },
+  { id: '07', title: 'QNN Converter',                icon: Shield,   color: 'from-pink-500 to-fuchsia-400', status: 'live', desc: 'Maps a classical neural network to a quantum neural network and compares their training and structure.' },
+  { id: '08', title: 'Performance Dashboard',        icon: BarChart2, color: 'from-amber-500 to-yellow-400', status: 'live', desc: 'Live quantum-vs-classical benchmarks streamed over WebSockets, run history and CSV export.' },
 ];
 
 const TECH_STACK = [
-  { layer: 'Simulation Engine', tech: 'Python · NumPy · SciPy' },
+  { layer: 'Simulation Engine', tech: 'Python · NumPy · SciPy (own kernel — Qiskit only as a benchmark)' },
+  { layer: 'AI / ML',           tech: 'scikit-learn · PyTorch · optional LLM (Claude / OpenAI-compatible)' },
   { layer: 'Backend API',       tech: 'FastAPI · Uvicorn · WebSockets' },
+  { layer: 'Data',              tech: 'PostgreSQL · SQLAlchemy · Alembic' },
   { layer: 'Frontend',          tech: 'React · TypeScript · Vite · Tailwind CSS' },
-  { layer: 'Visualisation',     tech: 'Plotly.js · Recharts' },
+  { layer: 'Visualisation',     tech: 'Plotly.js · SVG Bloch spheres' },
   { layer: 'Infrastructure',    tech: 'Docker · Docker Compose' },
 ];
 
@@ -62,7 +65,7 @@ export function About() {
                 <Cpu className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-white font-semibold mb-2">Simulate</h3>
-              <p>Run quantum circuits on up to 20 qubits using a custom-built state-vector engine. No Qiskit. No cloud QPU. Everything runs on local CPU.</p>
+              <p>Run quantum circuits on 20+ qubits (up to 28, RAM permitting) using a custom-built state-vector engine. No Qiskit inside. No cloud QPU. Everything runs on local CPU.</p>
             </div>
             <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center mb-3">

@@ -16,6 +16,8 @@ load_dotenv()
 
 from app.database import Base  # noqa: E402
 from app.models import user as _user_models  # noqa: E402,F401 — registers User on Base.metadata
+from app.models import benchmark as _benchmark_models  # noqa: E402,F401 — registers BenchmarkRun
+from app.models import contact as _contact_models  # noqa: E402,F401 — registers ContactMessage
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -5,6 +5,7 @@ scipy==1.13.1
 psutil==6.0.0
 websockets==12.0
 pydantic==2.7.4
+email-validator==2.2.0   # required by pydantic's EmailStr (auth schemas); backend won't start without it
 python-dotenv==1.0.1
 httpx==0.27.0
 sqlalchemy==2.0.36

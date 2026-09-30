@@ -7,6 +7,7 @@ const QUICK_LINKS = [
   { label: 'Simulator',   to: '/simulator' },
   { label: 'Circuit Lab', to: '/circuit' },
   { label: 'About',       to: '/about' },
+  { label: 'Contact',     to: '/contact' },
 ];
 
 const PROBLEM_LINKS = [
@@ -38,13 +39,13 @@ export function Footer() {
             Runs entirely on local CPU.
           </p>
           <div className="flex items-center gap-3 pt-1">
-            <a
-              href="mailto:smtahasyed@gmail.com"
+            <Link
+              to="/contact"
               className="w-9 h-9 rounded-lg bg-quantum-800 border border-quantum-700 flex items-center justify-center text-gray-500 hover:text-quantum-neon hover:border-quantum-neon/50 transition-all"
-              title="Contact"
+              title="Contact us"
             >
               <Mail className="w-4 h-4" />
-            </a>
+            </Link>
             <a
               href="https://github.com"
               target="_blank"

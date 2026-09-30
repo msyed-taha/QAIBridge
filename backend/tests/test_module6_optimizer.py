@@ -286,3 +286,15 @@ class TestAPI:
     def test_train_endpoint_rejects_out_of_range_qubits(self, client):
         resp = client.post("/api/module6/train", json={"n_qubits": 20, "layers": 1, "iterations": 10})
         assert resp.status_code == 422
+
+
+# ── QAOA angle predictor (γ, β) ────────────────────────────────────────────────
+
+def test_qaoa_angle_predictor_saves_circuit_evaluations():
+    from app.modules.module6_optimizer.qaoa_angles import train_and_evaluate
+    report = train_and_evaluate(train_graphs=20, test_graphs=4, p=1, seed=3, epochs=300)
+    s = report["summary"]
+    assert s["warm_evaluations"] < s["cold_evaluations"]
+    assert s["warm_ratio"] >= s["cold_ratio"] - 0.02          # same quality, far fewer circuit runs
+    assert 0.5 < s["neural_ratio"] <= 1.0
+    assert len(report["tests"]) == 4 and all(len(t["predicted"]) == 2 for t in report["tests"])

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck, Settings } from 'lucide-react';
+import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,19 +14,26 @@ const PUBLIC_NAV = [
 const AUTH_NAV = [
   { path: '/app',       label: 'Home',        active: true },
   { path: '/solve',     label: 'Solve',       active: true },
-  { path: '/simulator', label: 'Simulator',   active: true },
-  { path: '/module2',   label: 'SFOD Suite',  active: true },
-  { path: '/module3',   label: 'Circuit Builder', active: true },
-  { path: '/module4',   label: 'AI Advisor',  active: true },
-  { path: '/module5',   label: 'Logic Transformer', active: true },
-  { path: '/module6',   label: 'Neural Optimizer', active: true },
-  { path: '/module7',   label: 'QNN Converter', active: true },
+  { path: '/dashboard', label: 'Dashboard',   active: true },
+];
+
+// The eight scope modules, grouped under one "Modules" menu
+export const MODULES = [
+  { n: 1, path: '/simulator', label: 'Simulation Kernel',  desc: 'State-vector simulator, up to 28 qubits' },
+  { n: 2, path: '/module2',   label: 'SFOD Suite',         desc: "Grover, Shor, QAOA, database search" },
+  { n: 3, path: '/module3',   label: 'Circuit Builder',    desc: 'Drag-and-drop gates, challenges' },
+  { n: 4, path: '/module4',   label: 'AI Advisor',         desc: 'Quantum or classical? (Random Forest)' },
+  { n: 5, path: '/module5',   label: 'Logic Transformer',  desc: 'Classical code → Hamiltonian → circuit' },
+  { n: 6, path: '/module6',   label: 'Neural Optimizer',   desc: 'Learned gate angles, barren plateaus' },
+  { n: 7, path: '/module7',   label: 'QNN Converter',      desc: 'Classical network → quantum network' },
+  { n: 8, path: '/dashboard', label: 'Performance Dashboard', desc: 'Live quantum vs classical benchmarks' },
 ];
 
 // Admin nav (logged in as an administrator) — a different view of the site
 const ADMIN_NAV = [
   { path: '/admin',       label: 'Dashboard', active: true },
   { path: '/admin/users', label: 'Users',     active: true },
+  { path: '/admin/messages', label: 'Messages', active: true },
 ];
 
 export function Navbar() {
@@ -35,8 +42,25 @@ export function Navbar() {
   const { user, isAuthed, isAdmin, logout } = useAuth();
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [modulesOpen, setModulesOpen] = useState(false);
+  const modulesRef = useRef<HTMLDivElement>(null);
+  const onModulePage = MODULES.some(m => m.path === pathname) || pathname === '/circuit';
 
-  const NAV_LINKS = !isAuthed ? PUBLIC_NAV : isAdmin ? ADMIN_NAV : AUTH_NAV;
+  useEffect(() => { setModulesOpen(false); }, [pathname]);
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (modulesRef.current && !modulesRef.current.contains(e.target as Node)) setModulesOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  // Admins see the portal nav only inside /admin; everywhere else they get the normal app.
+  const inAdminView = isAdmin && pathname.startsWith('/admin');
+  const NAV_LINKS = !isAuthed ? PUBLIC_NAV : inAdminView ? ADMIN_NAV : AUTH_NAV;
+  const viewSwitch = inAdminView
+    ? { to: '/app',   label: 'Open the app', Icon: Cpu }
+    : { to: '/admin', label: 'Admin portal', Icon: ShieldCheck };
 
   const handleLogout = () => {
     logout();
@@ -50,7 +74,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
 
         {/* ── Logo ── */}
-        <Link to={!isAuthed ? '/' : isAdmin ? '/admin' : '/app'} className="flex-shrink-0">
+        <Link to={!isAuthed ? '/' : inAdminView ? '/admin' : '/app'} className="flex-shrink-0">
           <QAIBridgeLogo size={34} showText={true} />
         </Link>
 
@@ -90,10 +114,46 @@ export function Navbar() {
               </Link>
             );
           })}
+          {isAuthed && !inAdminView && (
+            <div className="relative" ref={modulesRef}>
+              <button
+                onClick={() => setModulesOpen(o => !o)}
+                className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  onModulePage ? 'text-white bg-quantum-800' : 'text-gray-400 hover:text-white hover:bg-quantum-800'}`}
+              >
+                Modules
+                <ChevronDown className={`w-4 h-4 transition-transform ${modulesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {modulesOpen && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[26rem] bg-quantum-800 border border-quantum-700 rounded-xl shadow-2xl p-2 grid grid-cols-2 gap-1 z-50">
+                  {MODULES.map(m => (
+                    <Link key={m.n} to={m.path}
+                      className={`flex gap-2.5 p-2.5 rounded-lg transition-colors ${pathname === m.path ? 'bg-quantum-700' : 'hover:bg-quantum-700/60'}`}>
+                      <span className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-black flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg,#00ffcc,#cc44ff)' }}>{m.n}</span>
+                      <span>
+                        <span className="block text-sm text-white font-medium leading-tight">{m.label}</span>
+                        <span className="block text-[11px] text-gray-400 leading-snug">{m.desc}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* ── Right side ── */}
         <div className="hidden md:flex items-center gap-3">
+          {isAdmin && (
+            <Link
+              to={viewSwitch.to}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
+            >
+              <viewSwitch.Icon className="w-4 h-4" />
+              {viewSwitch.label}
+            </Link>
+          )}
           {isAuthed ? (
             /* ── Logged in: avatar + dropdown ── */
             <div className="relative">
@@ -134,15 +194,8 @@ export function Navbar() {
               )}
             </div>
           ) : (
-            /* ── Not logged in: Admin + Login + Register ── */
+            /* ── Not logged in: Login + Register (admins sign in the same way) ── */
             <>
-              <Link
-                to="/login?as=admin"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                Admin
-              </Link>
               <Link
                 to="/login"
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-quantum-800 transition-all"
@@ -195,6 +248,18 @@ export function Navbar() {
             );
           })}
 
+          {isAuthed && !inAdminView && (
+            <div className="pt-2 mt-2 border-t border-quantum-800">
+              <p className="px-4 py-1 text-[10px] uppercase tracking-widest text-gray-600">Modules</p>
+              {MODULES.map(m => (
+                <Link key={m.n} to={m.path} onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${pathname === m.path ? 'bg-quantum-800 text-white' : 'text-gray-400 hover:bg-quantum-800 hover:text-white'}`}>
+                  <span className="text-[10px] font-mono text-quantum-neon w-4">{m.n}</span>{m.label}
+                </Link>
+              ))}
+            </div>
+          )}
+
           <div className="pt-2 pb-1 space-y-2 border-t border-quantum-800 mt-2">
             {isAuthed ? (
               <>
@@ -207,6 +272,15 @@ export function Navbar() {
                     <p className="text-gray-600 text-xs">{user?.email}</p>
                   </div>
                 </div>
+                {isAdmin && (
+                  <Link
+                    to={viewSwitch.to}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-amber-300 hover:bg-amber-500/10 transition-colors"
+                  >
+                    <viewSwitch.Icon className="w-4 h-4" /> {viewSwitch.label}
+                  </Link>
+                )}
                 <Link
                   to="/account"
                   onClick={() => setMobileOpen(false)}
@@ -225,11 +299,7 @@ export function Navbar() {
               <>
                 <Link to="/login" onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 bg-quantum-800 border border-quantum-700">
-                  <LogIn className="w-4 h-4" /> Sign In as User
-                </Link>
-                <Link to="/login?as=admin" onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30">
-                  <ShieldCheck className="w-4 h-4" /> Sign In as Admin
+                  <LogIn className="w-4 h-4" /> Sign In
                 </Link>
                 <Link to="/register" onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-black"

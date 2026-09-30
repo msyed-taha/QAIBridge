@@ -1,16 +1,27 @@
 """
-Custom Problem Solver
-Runs user-supplied data through Classical OR Quantum algorithms for each SFOD type.
+Custom Problem Solver (Solve page)
+Runs user-supplied data through a Classical OR a Quantum algorithm for each
+SFOD type. The quantum side executes real circuits on the Module 1 kernel
+through the Module 2 suite (Grover, Shor, QAOA, amplitude amplification).
 """
 
 from __future__ import annotations
 
 import math
 import time
-import itertools
-import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, List, Optional
+
+from ..module2_sfod import classical
+from ..module2_sfod.grover import optimal_iterations
+from ..module2_sfod.suite import (
+    MAX_TSP_CITIES, compare_database, compare_factoring, compare_optimization,
+    compare_search, parse_query,
+)
+from ..module2_sfod.shor import MAX_SHOR_N, qubits_needed
+from ..module5_transformer.bridge import distance_matrix_from_cities
+
+MAX_CLASSICAL_EXACT_TSP = 9
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -31,6 +42,7 @@ class SolveResult:
     explanation:       str
     success:           bool
     error:             Optional[str] = None
+    steps_label:       str = "steps"
 
     def to_dict(self) -> dict:
         return {
@@ -39,6 +51,7 @@ class SolveResult:
             "algorithm":         self.algorithm,
             "result":            self.result,
             "steps":             self.steps,
+            "steps_label":       self.steps_label,
             "elapsed_ms":        self.elapsed_ms,
             "complexity":        self.complexity,
             "theoretical_steps": self.theoretical_steps,
@@ -49,86 +62,71 @@ class SolveResult:
         }
 
 
+def _failed(problem_type: str, approach: str, algorithm: str, complexity: str,
+            input_size: int, message: str) -> SolveResult:
+    return SolveResult(problem_type, approach, algorithm, {}, 0, 0.0, complexity, 0, input_size,
+                       message, False, error=message)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SEARCH
 # ══════════════════════════════════════════════════════════════════════════════
 
 def solve_search_classical(dataset: List[str], target: str) -> SolveResult:
     """Linear Search — O(N)"""
-    start = time.perf_counter()
-    n = len(dataset)
-    found_index = None
-
-    for i, item in enumerate(dataset):
-        if str(item).strip().lower() == str(target).strip().lower():
-            found_index = i
-            break
-
-    steps = (found_index + 1) if found_index is not None else n
-    elapsed = (time.perf_counter() - start) * 1000
-
+    items = [str(x).strip() for x in dataset if str(x).strip()]
+    tnorm = str(target).strip().lower()
+    r = classical.linear_search(items, lambda s: s.lower() == tnorm)
+    idx = r["found_index"]
+    n = len(items)
     return SolveResult(
-        problem_type="search",
-        approach="classical",
-        algorithm="Linear Search",
-        result={
-            "found":   found_index is not None,
-            "index":   found_index,
-            "value":   dataset[found_index] if found_index is not None else None,
-            "target":  target,
-        },
-        steps=steps,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(N)",
-        theoretical_steps=n,
-        input_size=n,
+        problem_type="search", approach="classical", algorithm="Linear Search",
+        result={"found": idx is not None, "index": idx, "value": items[idx] if idx is not None else None,
+                "target": target},
+        steps=r["comparisons"], steps_label="comparisons", elapsed_ms=r["time_ms"], complexity="O(N)",
+        theoretical_steps=n, input_size=n,
         explanation=(
-            f"Scanned {steps} of {n} item(s) sequentially until the target was {'found' if found_index is not None else 'not found'}. "
-            f"In the worst case all {n} items must be checked. "
-            f"Classical linear search has no shortcut for unsorted data."
+            f"Scanned {r['comparisons']} of {n} item(s) one by one until the target was "
+            f"{'found' if idx is not None else 'ruled out'}. Unsorted data offers no shortcut: "
+            f"on average N/2 = {n / 2:g} comparisons, {n} in the worst case."
         ),
-        success=found_index is not None,
+        success=idx is not None,
     )
 
 
 def solve_search_quantum(dataset: List[str], target: str) -> SolveResult:
-    """Grover's Algorithm — O(√N)"""
-    start = time.perf_counter()
-    n = len(dataset)
-
-    found_index = None
-    for i, item in enumerate(dataset):
-        if str(item).strip().lower() == str(target).strip().lower():
-            found_index = i
-            break
-
-    grover_iters = max(1, math.ceil(math.pi / 4 * math.sqrt(n)))
-    elapsed = (time.perf_counter() - start) * 1000
-
+    """Grover's Algorithm — O(√N), executed on the state-vector kernel."""
+    items = [str(x).strip() for x in dataset if str(x).strip()]
+    try:
+        cmp = compare_search(items=items, target=target)
+    except (ValueError, MemoryError) as e:
+        return _failed("search", "quantum", "Grover's Algorithm", "O(√N)", len(items), str(e))
+    q = cmp["quantum"]
+    ans = q["answer"]
+    n = len(items)
+    found = ans["index"] is not None
+    hist = [{"label": items[h["index"]] if h["index"] < n else f"(padding {h['index']})",
+             "count": h["count"], "marked": h["marked"]} for h in q["histogram"][:8]]
     return SolveResult(
-        problem_type="search",
-        approach="quantum",
-        algorithm="Grover's Algorithm",
+        problem_type="search", approach="quantum", algorithm="Grover's Algorithm",
         result={
-            "found":           found_index is not None,
-            "index":           found_index,
-            "value":           dataset[found_index] if found_index is not None else None,
-            "target":          target,
-            "grover_iterations": grover_iters,
+            "found": found, "index": ans["index"], "value": ans["value"], "target": target,
+            "grover_iterations": q["iterations"], "success_probability": q["success_probability"],
+            "qubits": q["n_qubits"], "gates": q["circuit"]["gates"], "depth": q["circuit"]["depth"],
+            "shots": q["shots"], "measured_success_rate": q["measured_success_rate"],
+            "histogram": hist, "curve": q["curve"],
         },
-        steps=grover_iters,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(√N)",
-        theoretical_steps=grover_iters,
-        input_size=n,
+        steps=q["iterations"], steps_label="oracle queries", elapsed_ms=q["simulation_ms"],
+        complexity="O(√N)", theoretical_steps=max(1, optimal_iterations(2 ** q["n_qubits"], 1)), input_size=n,
         explanation=(
-            f"Grover's algorithm placed all {n} items into quantum superposition simultaneously. "
-            f"A phase oracle marked '{target}'; the Grover diffusion operator then amplified its "
-            f"probability amplitude. After {grover_iters} iterations (≈ π/4 × √{n}), "
-            f"a measurement {'returns the target with high probability' if found_index is not None else 'confirms the item is absent'}. "
-            f"This is {math.ceil(n / grover_iters)}× fewer operations than linear search."
+            f"Encoded {n} items into {q['n_qubits']} qubits ({2 ** q['n_qubits']} basis states) and put them in "
+            f"equal superposition. {q['iterations']} Grover iteration(s) (oracle + diffuser) raised the target's "
+            f"probability from {1 / 2 ** q['n_qubits']:.2%} to {q['success_probability']:.1%}; "
+            f"{q['measured_success_rate']:.0%} of {q['shots']} simulated measurements returned it. "
+            + ("A final oracle check verified the answer." if found else
+               "The measured item failed the final oracle check, so the target is reported as not present.")
         ),
-        success=found_index is not None,
+        success=found,
     )
 
 
@@ -136,227 +134,124 @@ def solve_search_quantum(dataset: List[str], target: str) -> SolveResult:
 # FACTORING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _trial_division(n: int):
-    """Return (factors, actual_steps). Steps = loop iterations (terminates early on small factors)."""
-    factors = []
-    d, steps = 2, 0
-    temp = n
-    while d * d <= temp:
-        steps += 1
-        while temp % d == 0:
-            factors.append(d)
-            temp //= d
-        d += 1
-    if temp > 1:
-        factors.append(temp)
-    return factors, steps
-
-
 def solve_factoring_classical(number: int) -> SolveResult:
-    """Trial Division — O(√N)
-    
-    Uses theoretical worst-case steps = ⌈√N⌉ for a fair complexity comparison.
-    Trial Division must test every divisor up to √N in the worst case (prime inputs).
-    """
-    start = time.perf_counter()
-    factors, actual_steps = _trial_division(number)
-    elapsed = (time.perf_counter() - start) * 1000
-
-    # Use THEORETICAL worst-case steps for a fair apples-to-apples comparison.
-    # Trial division tests divisors 2, 3, …, ⌈√N⌉ in the worst case (when N is prime).
-    theoretical = math.ceil(math.sqrt(number))
-
+    """Trial Division (Pollard's rho for very large N)."""
+    r = classical.trial_division(number) if number < 10 ** 12 else classical.pollard_rho(number)
+    factors = r["factors"]
+    steps = r.get("divisions", r.get("iterations", 0))
     return SolveResult(
-        problem_type="factoring",
-        approach="classical",
-        algorithm="Trial Division",
-        result={
-            "number":       number,
-            "factors":      factors,
-            "factored_form": " × ".join(map(str, factors)),
-            "is_prime":     len(factors) == 1 and factors[0] == number,
-        },
-        steps=theoretical,          # theoretical worst-case for fair comparison
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(√N)",
-        theoretical_steps=theoretical,
+        problem_type="factoring", approach="classical", algorithm=r["algorithm"],
+        result={"number": number, "factors": factors, "factored_form": " × ".join(map(str, factors)),
+                "is_prime": len(factors) == 1 and factors[0] == number},
+        steps=steps, steps_label="trial divisions" if "divisions" in r else "iterations",
+        elapsed_ms=r["time_ms"], complexity=r["complexity"], theoretical_steps=math.isqrt(number),
         input_size=number,
         explanation=(
-            f"Trial Division tests every integer from 2 up to √{number:,} ≈ {theoretical:,} in the worst case. "
-            f"(Your number factored after {actual_steps} actual divisions because it has small factors — "
-            f"a prime would require all {theoretical:,} tests.) "
-            f"Result: {number:,} = {' × '.join(map(str, factors))}. "
-            f"For cryptographic integers (hundreds of digits), this is computationally infeasible."
+            f"{r['algorithm']} factored {number:,} = {' × '.join(map(str, factors))} after {steps:,} steps. "
+            f"The worst case (a prime or a product of two large primes) needs ~√N = {math.isqrt(number):,} "
+            "trial divisions — infeasible for 600-digit RSA moduli."
         ),
         success=True,
     )
 
 
 def solve_factoring_quantum(number: int) -> SolveResult:
-    """Shor's Algorithm via QFT — O((log N)³)"""
-    start = time.perf_counter()
-    factors, _ = _trial_division(number)
-    elapsed = (time.perf_counter() - start) * 1000
-
-    log_n = max(1, int(math.log2(number + 1)))
-    quantum_steps = log_n ** 3
-    classical_theoretical = math.ceil(math.sqrt(number))
-    speedup = classical_theoretical / max(1, quantum_steps)
-
+    """Shor's Algorithm — quantum order finding + continued fractions."""
+    qn = qubits_needed(number)
+    try:
+        cmp = compare_factoring(number)
+    except (ValueError, MemoryError) as e:
+        msg = str(e)
+        return _failed("factoring", "quantum", "Shor's Algorithm (QFT)", "O((log N)³)", number,
+                       msg + f" (N = {number:,} would need {qn['total']} qubits.)" if "qubits" not in msg else msg)
+    q = cmp["quantum"]
+    factors = q["answer"]["factors"] or []
+    detail = q.get("detail") or {}
+    is_prime = q["status"] == "prime"
     return SolveResult(
-        problem_type="factoring",
-        approach="quantum",
-        algorithm="Shor's Algorithm (QFT)",
+        problem_type="factoring", approach="quantum", algorithm="Shor's Algorithm (QFT)",
         result={
-            "number":        number,
-            "factors":       factors,
-            "factored_form": " × ".join(map(str, factors)),
-            "is_prime":      len(factors) == 1 and factors[0] == number,
-            "qubits_needed": 2 * log_n + 3,
+            "number": number, "factors": factors, "factored_form": " × ".join(map(str, factors)),
+            "is_prime": is_prime, "qubits_needed": qn["total"], "status": q["status"],
+            "a": q.get("a"), "period": q.get("period"),
+            "qubits": detail.get("qubits"), "gates": detail.get("gates"), "depth": detail.get("depth"),
+            "measurements": detail.get("measurements", [])[:8],
+            "post_processing": detail.get("post_processing", [])[:4],
         },
-        steps=quantum_steps,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O((log N)³)",
-        theoretical_steps=quantum_steps,
-        input_size=number,
-        explanation=(
-            f"Shor's algorithm encodes {number:,} into a {2*log_n+3}-qubit register. "
-            f"The Quantum Fourier Transform (QFT) finds the period r of f(x)=aˣ mod {number:,} "
-            f"for a random base a. The period yields prime factors via GCD(a^(r/2)±1, N). "
-            f"Only {quantum_steps:,} quantum gate operations needed vs {classical_theoretical:,} classical trial divisions "
-            f"— a {speedup:.1f}× speedup. At RSA scale (2048-bit N) this becomes a {int(2**1024 / 2048**3):,}× advantage."
-        ),
-        success=True,
+        steps=q["steps"], steps_label="quantum circuit runs", elapsed_ms=q["time_ms"],
+        complexity="O((log N)³)", theoretical_steps=max(1, number.bit_length() ** 3), input_size=number,
+        explanation=q.get("message") or "",
+        success=bool(factors),
     )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# OPTIMIZATION  (Travelling Salesman Problem)
+# OPTIMIZATION  (Travelling Salesman Problem on real coordinates)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _build_distances(n: int, seed: int = 42) -> List[List[float]]:
-    rng = random.Random(seed)
-    dist = [[0.0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(i + 1, n):
-            d = round(rng.uniform(10.0, 100.0), 1)
-            dist[i][j] = d
-            dist[j][i] = d
-    return dist
-
-
-def _tour_distance(tour: List[int], dist: List[List[float]]) -> float:
-    return sum(dist[tour[i]][tour[(i + 1) % len(tour)]] for i in range(len(tour)))
-
-
 def solve_optimization_classical(cities: List[str]) -> SolveResult:
-    """Greedy Nearest Neighbour — O(N²)"""
-    start = time.perf_counter()
-    n = len(cities)
-    dist = _build_distances(n)
-
-    visited = [False] * n
-    tour = [0]
-    visited[0] = True
-    steps = 0
-    total = 0.0
-
-    for _ in range(n - 1):
-        cur = tour[-1]
-        best_d, best_j = float("inf"), -1
-        for j in range(n):
-            steps += 1
-            if not visited[j] and dist[cur][j] < best_d:
-                best_d, best_j = dist[cur][j], j
-        tour.append(best_j)
-        visited[best_j] = True
-        total += best_d
-
-    total += dist[tour[-1]][tour[0]]
-    tour.append(tour[0])
-    elapsed = (time.perf_counter() - start) * 1000
-
+    """Exhaustive search (≤ 9 cities) or Greedy Nearest Neighbour."""
+    geo = distance_matrix_from_cities(cities)
+    d, names = geo["dist"], geo["names"]
+    n = len(names)
+    if n <= MAX_CLASSICAL_EXACT_TSP:
+        r = classical.tsp_brute_force(d)
+        steps, label, optimal = r["tours_evaluated"], "tours evaluated", True
+    else:
+        r = classical.tsp_nearest_neighbour(d)
+        steps, label, optimal = r["comparisons"], "comparisons", False
+    tour = [names[c] for c in r["tour"]]
     return SolveResult(
-        problem_type="optimization",
-        approach="classical",
-        algorithm="Greedy Nearest Neighbour",
-        result={
-            "tour":           [cities[i] for i in tour],
-            "total_distance": round(total, 2),
-            "num_cities":     n,
-        },
-        steps=steps,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(N²)",
-        theoretical_steps=n * n,
-        input_size=n,
+        problem_type="optimization", approach="classical", algorithm=r["algorithm"],
+        result={"tour": tour, "total_distance": round(r["length"], 1), "unit": "km", "num_cities": n,
+                "is_optimal": optimal, "coords": geo["coords"], "sources": geo["sources"]},
+        steps=steps, steps_label=label, elapsed_ms=r["time_ms"], complexity=r["complexity"],
+        theoretical_steps=math.factorial(n - 1) if optimal else n * n, input_size=n,
         explanation=(
-            f"At each of the {n} stops, the algorithm picked the closest unvisited city, "
-            f"making {steps} comparisons total. "
-            f"Total route distance: {round(total, 2)} units. "
-            f"Greedy is fast but not optimal — it locks in locally good choices and "
-            f"can miss the true shortest tour by a significant margin."
+            f"{r['algorithm']} over real great-circle distances between the cities: "
+            + (f"checked all {steps:,} possible tours and kept the shortest ({r['length']:.1f} km)."
+               if optimal else f"picked the nearest unvisited city at each stop ({steps} comparisons). "
+                               "Fast, but not guaranteed optimal.")
         ),
         success=True,
     )
 
 
 def solve_optimization_quantum(cities: List[str]) -> SolveResult:
-    """QAOA — Quantum Approximate Optimization Algorithm — O(p·N)"""
-    start = time.perf_counter()
+    """QAOA — Travelling Salesman encoded as an Ising Hamiltonian."""
     n = len(cities)
-    dist = _build_distances(n)
-    p = 3  # QAOA circuit depth / layers
-
-    # For small N find exact optimum; for larger N approximate
-    if n <= 9:
-        best_tour_idx, best_d = None, float("inf")
-        for perm in itertools.permutations(range(1, n)):
-            t = [0] + list(perm)
-            d = _tour_distance(t, dist)
-            if d < best_d:
-                best_d, best_tour_idx = d, t
-        best_tour_idx = best_tour_idx + [best_tour_idx[0]]  # type: ignore[operator]
-    else:
-        # Greedy + 2-opt improvement to approximate QAOA quality
-        visited = [False] * n
-        best_tour_idx = [0]
-        visited[0] = True
-        for _ in range(n - 1):
-            cur = best_tour_idx[-1]
-            best_j = min((j for j in range(n) if not visited[j]), key=lambda j: dist[cur][j])
-            best_tour_idx.append(best_j)
-            visited[best_j] = True
-        best_tour_idx.append(best_tour_idx[0])
-        best_d = _tour_distance(best_tour_idx[:-1], dist) + dist[best_tour_idx[-2]][best_tour_idx[0]]
-
-    quantum_steps = p * n
-    elapsed = (time.perf_counter() - start) * 1000
-
+    if n > MAX_TSP_CITIES:
+        return _failed("optimization", "quantum", "QAOA", "variational", n,
+                       f"QAOA on the local simulator handles up to {MAX_TSP_CITIES} cities: the TSP encoding needs "
+                       f"(N−1)² qubits, so {n} cities would need {(n - 1) ** 2} qubits. Remove some cities or use "
+                       "the classical solver.")
+    try:
+        cmp = compare_optimization(cities=cities, p=2)
+    except (ValueError, MemoryError) as e:
+        return _failed("optimization", "quantum", "QAOA", "variational", n, str(e))
+    q = cmp["quantum"]
+    best = q["best_sampled"]
     return SolveResult(
-        problem_type="optimization",
-        approach="quantum",
-        algorithm="QAOA",
+        problem_type="optimization", approach="quantum", algorithm="QAOA",
         result={
-            "tour":           [cities[i] for i in best_tour_idx],
-            "total_distance": round(best_d, 2),
-            "num_cities":     n,
-            "qaoa_layers":    p,
-            "is_optimal":     n <= 9,
+            "tour": best.get("tour_names") or [], "total_distance": round(best["length"], 1) if best.get("length") else None,
+            "unit": "km", "num_cities": n, "qaoa_layers": q["layers"],
+            "is_optimal": q["correct"], "qubits": q["qubits"], "gates": q["circuit"]["gates"],
+            "p_optimal": q["p_optimal"], "random_p_optimal": q["random_p_optimal"],
+            "amplification": q["amplification"], "p_feasible": q["p_feasible"],
+            "gammas": q["gammas"], "betas": q["betas"], "coords": cmp["input"]["coords"],
+            "hamiltonian": q["bridge"]["ising"]["hamiltonian"],
         },
-        steps=quantum_steps,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(p·N)",
-        theoretical_steps=quantum_steps,
-        input_size=n,
+        steps=q["circuit_evaluations"], steps_label="circuit evaluations", elapsed_ms=q["time_ms"],
+        complexity="variational", theoretical_steps=q["circuit_evaluations"], input_size=n,
         explanation=(
-            f"QAOA encoded the {n}-city TSP into a {n}-qubit parameterised circuit with p={p} layers. "
-            f"Each layer applies a problem Hamiltonian (encodes city distances) and a mixer Hamiltonian (explores routes). "
-            f"A classical variational loop tuned the {2*p} gate parameters (γ, β) to maximise the expected tour quality. "
-            f"Only {quantum_steps} gate operations needed vs {n*n} classical comparisons. "
-            f"Result is {'the provably optimal route' if n <= 9 else 'a near-optimal route that greedy alone would miss'}."
+            f"The route problem was translated into a {q['qubits']}-qubit Ising Hamiltonian (one qubit per "
+            f"city/position pair, with penalty terms enforcing a valid tour). A classical optimiser tuned "
+            f"{2 * q['layers']} QAOA angles over {q['circuit_evaluations']} circuit runs; the final circuit makes "
+            f"the optimal tour {q['amplification']:.1f}× more likely than random guessing, and the best measured tour "
+            f"{'is' if q['correct'] else 'is not'} the true optimum."
         ),
-        success=True,
+        success=bool(best.get("feasible")),
     )
 
 
@@ -366,68 +261,48 @@ def solve_optimization_quantum(cities: List[str]) -> SolveResult:
 
 def solve_database_classical(records: List[str], query: str) -> SolveResult:
     """Sequential Scan — O(N)"""
-    start = time.perf_counter()
-    n = len(records)
-    matches = [{"index": i, "value": r} for i, r in enumerate(records)
-               if query.strip().lower() in r.strip().lower()]
-    elapsed = (time.perf_counter() - start) * 1000
-
+    recs = [str(r).strip() for r in records if str(r).strip()]
+    try:
+        matcher, described = parse_query(query)
+    except ValueError as e:
+        return _failed("database", "classical", "Sequential Scan", "O(N)", len(recs), str(e))
+    r = classical.sequential_scan(recs, matcher)
+    matches = [{"index": i, "value": recs[i]} for i in r["matches"]]
+    n = len(recs)
     return SolveResult(
-        problem_type="database",
-        approach="classical",
-        algorithm="Sequential Scan",
-        result={
-            "query":          query,
-            "total_records":  n,
-            "matches_found":  len(matches),
-            "matches":        matches,
-        },
-        steps=n,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(N)",
-        theoretical_steps=n,
-        input_size=n,
-        explanation=(
-            f"Performed a full sequential scan — evaluated all {n} records from first to last. "
-            f"Every row must be read because there is no index. "
-            f"Found {len(matches)} record(s) containing '{query}'. "
-            f"At large scale (millions of rows) this becomes a serious bottleneck."
-        ),
+        problem_type="database", approach="classical", algorithm="Sequential Scan",
+        result={"query": query, "query_meaning": described, "total_records": n,
+                "matches_found": len(matches), "matches": matches[:100]},
+        steps=n, steps_label="record reads", elapsed_ms=r["time_ms"], complexity="O(N)",
+        theoretical_steps=n, input_size=n,
+        explanation=(f"Read all {n} records once (no index exists) and found {len(matches)} {described}."),
         success=True,
     )
 
 
 def solve_database_quantum(records: List[str], query: str) -> SolveResult:
-    """Amplitude Amplification (Generalised Grover) — O(√N)"""
-    start = time.perf_counter()
-    n = len(records)
-    matches = [{"index": i, "value": r} for i, r in enumerate(records)
-               if query.strip().lower() in r.strip().lower()]
-    quantum_steps = max(1, math.ceil(math.sqrt(n)))
-    elapsed = (time.perf_counter() - start) * 1000
-
+    """Amplitude Amplification (generalised Grover) — O(√(N/M))"""
+    recs = [str(r).strip() for r in records if str(r).strip()]
+    try:
+        cmp = compare_database(records=recs, query=query)
+    except (ValueError, MemoryError) as e:
+        return _failed("database", "quantum", "Amplitude Amplification", "O(√(N/M))", len(recs), str(e))
+    q = cmp["quantum"]
+    n = len(recs)
+    matches = [{"index": m["index"], "value": m["record"], "count": m["count"]} for m in q["retrieved"]]
     return SolveResult(
-        problem_type="database",
-        approach="quantum",
-        algorithm="Amplitude Amplification",
-        result={
-            "query":          query,
-            "total_records":  n,
-            "matches_found":  len(matches),
-            "matches":        matches,
-            "quantum_queries": quantum_steps,
-        },
-        steps=quantum_steps,
-        elapsed_ms=round(elapsed, 4),
-        complexity="O(√N)",
-        theoretical_steps=quantum_steps,
-        input_size=n,
+        problem_type="database", approach="quantum", algorithm="Amplitude Amplification",
+        result={"query": query, "query_meaning": cmp["input"]["query_meaning"], "total_records": n,
+                "matches_found": len(matches), "matches": matches, "true_matches": cmp["input"]["n_matches"],
+                "quantum_queries": q["iterations"], "success_probability": q["success_probability"],
+                "qubits": q["n_qubits"], "shots": q["shots"]},
+        steps=q["iterations"], steps_label="oracle queries", elapsed_ms=q["simulation_ms"],
+        complexity="O(√(N/M))", theoretical_steps=max(1, math.ceil(math.sqrt(n))), input_size=n,
         explanation=(
-            f"Amplitude Amplification (a generalisation of Grover's algorithm) loaded all {n} records "
-            f"into a quantum superposition. A bitstring oracle marked every record containing '{query}'. "
-            f"Repeated amplitude amplification rotated the quantum state toward the solution subspace "
-            f"in just {quantum_steps} quantum queries (√{n} ≈ {quantum_steps}). "
-            f"That is {n // quantum_steps if quantum_steps else n}× fewer operations than a classical sequential scan."
+            f"Loaded {n} records into {q['n_qubits']} qubits. The oracle marks the "
+            f"{cmp['input']['n_matches']} matching record(s); {q['iterations']} amplification round(s) raised the "
+            f"chance that a measurement returns a match to {q['success_probability']:.1%}. Across {q['shots']} "
+            f"simulated measurements, {len(matches)} distinct matching record(s) were retrieved."
         ),
-        success=True,
+        success=cmp["input"]["n_matches"] == 0 or bool(matches),
     )

@@ -138,7 +138,7 @@ export function ForgotPasswordPage() {
                 </h1>
                 <p className="text-gray-500 text-sm">
                   {step === 'email' && (isAdmin ? "Enter the admin account's email to receive an OTP" : 'Enter your email to receive an OTP')}
-                  {step === 'otp' && 'Enter the 5-digit OTP sent to your email'}
+                  {step === 'otp' && 'Enter the 5-digit OTP from your email'}
                   {step === 'password' && 'Create a new password'}
                 </p>
               </>
@@ -213,6 +213,14 @@ export function ForgotPasswordPage() {
               }}
               className="space-y-4"
             >
+              {/* Same wording whether or not the account exists, so the page can't be used to probe emails. */}
+              <div className="flex gap-2.5 bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-xs text-gray-400 leading-relaxed">
+                <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-gray-500" />
+                <span>
+                  If an account exists for <span className="text-gray-200">{email}</span>, you'll receive a
+                  5-digit OTP there shortly. Check your spam folder if it doesn't arrive.
+                </span>
+              </div>
               <div>
                 <label className="block text-xs text-gray-400 font-medium mb-1.5">5-Digit OTP</label>
                 <input

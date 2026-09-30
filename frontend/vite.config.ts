@@ -14,6 +14,8 @@ export default defineConfig({
       '/api': {
         target: `http://${BACKEND_HOST}:8000`,
         changeOrigin: true,
+        xfwd: true, // pass the visitor's IP on (X-Forwarded-For) — the contact form rate-limits by it
+        ws: true,   // live progress sockets (/api/kernel/ws/…, /api/dashboard/ws/…)
       },
       '/ws': {
         target: `ws://${BACKEND_HOST}:8000`,

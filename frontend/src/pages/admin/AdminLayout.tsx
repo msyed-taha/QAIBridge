@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldCheck, Inbox } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const TABS = [
   { path: '/admin',       label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/admin/users', label: 'Users',     icon: Users,           exact: false },
+  { path: '/admin/messages', label: 'Messages', icon: Inbox,         exact: false },
 ];
 
 /** Shared shell for every admin page: identity banner + section tabs. */

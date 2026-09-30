@@ -7,7 +7,7 @@ const CAPABILITIES = [
     icon: Cpu,
     color: 'from-teal-500 to-cyan-400',
     title: 'Quantum Simulation',
-    desc: 'Run quantum circuits on up to 20 qubits using a custom-built state-vector engine — no Qiskit, no cloud QPU required.',
+    desc: 'Run quantum circuits on 20+ qubits (up to 28, RAM permitting) using a custom-built state-vector engine — no Qiskit inside, no cloud QPU required.',
   },
   {
     icon: BarChart2,
@@ -19,7 +19,7 @@ const CAPABILITIES = [
     icon: Brain,
     color: 'from-purple-500 to-pink-400',
     title: 'AI-Powered Optimization',
-    desc: 'A Deep Reinforcement Learning agent automatically tunes quantum gate angles and escapes the Barren Plateau problem.',
+    desc: 'Neural networks learn quantum gate angles — including QAOA\'s γ and β — and a live monitor escapes barren plateaus.',
   },
   {
     icon: BookOpen,
@@ -116,16 +116,6 @@ export function Home() {
 
           <p className="text-gray-700 text-xs mt-5">
             Free to use. No credit card required. No QPU hardware needed.
-          </p>
-
-          <p className="text-gray-600 text-xs mt-3">
-            Platform administrator?{' '}
-            <Link
-              to="/login?as=admin"
-              className="text-amber-300/90 hover:text-amber-300 font-medium transition-colors"
-            >
-              Sign in to the admin area →
-            </Link>
           </p>
         </div>
       </section>

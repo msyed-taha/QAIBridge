@@ -5,7 +5,9 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
+
+from ..config import is_owner_email
 
 
 # ── Password strength validation ──────────────────────────────────────────────
@@ -134,6 +136,11 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @computed_field
+    @property
+    def is_owner(self) -> bool:
+        return is_owner_email(self.email)
 
 
 class TokenResponse(BaseModel):

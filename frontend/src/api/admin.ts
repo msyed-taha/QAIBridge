@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { AdminStats, AdminUser, Role } from '../types';
+import type { AdminStats, AdminUser, ContactMessage, Role } from '../types';
 
 const BASE = '/api/admin';
 
@@ -39,5 +39,22 @@ export const adminApi = {
   /** Permanently delete a user. */
   deleteUser: async (id: number): Promise<void> => {
     await apiClient.delete(`${BASE}/users/${id}`);
+  },
+
+  /** Contact-form messages, newest first. */
+  listMessages: async (): Promise<ContactMessage[]> => {
+    const { data } = await apiClient.get<ContactMessage[]>(`${BASE}/messages`);
+    return data;
+  },
+
+  /** Mark a message read or unread. */
+  markMessage: async (id: number, is_read: boolean): Promise<ContactMessage> => {
+    const { data } = await apiClient.patch<ContactMessage>(`${BASE}/messages/${id}`, { is_read });
+    return data;
+  },
+
+  /** Delete a message. */
+  deleteMessage: async (id: number): Promise<void> => {
+    await apiClient.delete(`${BASE}/messages/${id}`);
   },
 };

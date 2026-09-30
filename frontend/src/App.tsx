@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useSearchParams } from 'react-router-dom';
 import { AuthProvider }    from './context/AuthContext';
 import { ProtectedRoute }  from './components/ProtectedRoute';
 import { AdminRoute }      from './components/AdminRoute';
@@ -18,24 +18,29 @@ import { Module4Page }     from './pages/Module4Page';
 import { Module5Page }     from './pages/Module5Page';
 import { Module6Page }     from './pages/Module6Page';
 import { Module7Page }     from './pages/Module7Page';
+import { DashboardPage }   from './pages/DashboardPage';
 import { AppHome }         from './pages/AppHome';
 import { AccountPage }     from './pages/AccountPage';
+import { ContactPage }     from './pages/ContactPage';
 import { AdminDashboard }  from './pages/admin/AdminDashboard';
 import { AdminUsers }      from './pages/admin/AdminUsers';
+import { AdminMessages }   from './pages/admin/AdminMessages';
 import { useAuth }         from './context/AuthContext';
 
-// Redirects logged-in users away from the public landing page to their home
+// Redirects logged-in users away from the public landing page to the app.
+// Admins use the app like anyone else; the portal is one click away in the navbar.
 function RootRoute() {
-  const { isAuthed, isAdmin } = useAuth();
+  const { isAuthed } = useAuth();
   if (!isAuthed) return <Home />;
-  return <Navigate to={isAdmin ? '/admin' : '/app'} replace />;
+  return <Navigate to="/app" replace />;
 }
 
-// Redirects logged-in users away from login/register to their home
+// Redirects logged-in users away from login/register (admin login → portal)
 function GuestOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthed, isAdmin } = useAuth();
+  const [params] = useSearchParams();
   if (!isAuthed) return <>{children}</>;
-  return <Navigate to={isAdmin ? '/admin' : '/app'} replace />;
+  return <Navigate to={isAdmin && params.get('as') === 'admin' ? '/admin' : '/app'} replace />;
 }
 
 function NotFoundPage() {
@@ -65,6 +70,7 @@ export default function App() {
                 {/* ── Public ── */}
                 <Route path="/"          element={<RootRoute />} />
                 <Route path="/about"     element={<About />} />
+                <Route path="/contact"   element={<ContactPage />} />
                 <Route path="/login"     element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
                 <Route path="/register"  element={<GuestOnlyRoute><RegisterPage /></GuestOnlyRoute>} />
                 <Route path="/forgot-password" element={<GuestOnlyRoute><ForgotPasswordPage /></GuestOnlyRoute>} />
@@ -72,6 +78,7 @@ export default function App() {
                 {/* ── Admin (requires the admin role) ── */}
                 <Route path="/admin"       element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                <Route path="/admin/messages" element={<AdminRoute><AdminMessages /></AdminRoute>} />
 
                 {/* ── Protected ── */}
                 <Route path="/app"       element={<ProtectedRoute><AppHome /></ProtectedRoute>} />
@@ -79,6 +86,7 @@ export default function App() {
                 <Route path="/simulator" element={<ProtectedRoute><Module1Page /></ProtectedRoute>} />
                 <Route path="/circuit"   element={<ProtectedRoute><Module3Page /></ProtectedRoute>} />
                 <Route path="/solve"     element={<ProtectedRoute><SolvePage /></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
 
                 {/* ── Legacy /moduleX routes ── */}
                 <Route path="/module1"   element={<ProtectedRoute><Module1Page /></ProtectedRoute>} />
@@ -88,6 +96,7 @@ export default function App() {
                 <Route path="/module5"   element={<ProtectedRoute><Module5Page /></ProtectedRoute>} />
                 <Route path="/module6"   element={<ProtectedRoute><Module6Page /></ProtectedRoute>} />
                 <Route path="/module7"   element={<ProtectedRoute><Module7Page /></ProtectedRoute>} />
+                <Route path="/module8"   element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
 
                 {/* ── Fallback ── */}
                 <Route path="*" element={<NotFoundPage />} />

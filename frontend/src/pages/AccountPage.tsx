@@ -279,13 +279,20 @@ export function AccountPage() {
             <AlertTriangle className="w-4 h-4" /> Delete account
           </h2>
           <p className="text-gray-400 text-xs mb-4 leading-relaxed">
-            Permanently deletes your account and all its data. We'll email a verification
-            code to <span className="text-gray-300">{profile?.email ?? user?.email}</span> first.
-            This cannot be undone.
+            {profile?.is_owner ? (
+              <>This is the owner account, so it can't be deleted.</>
+            ) : (
+              <>
+                Closes your account and signs you out. We'll email a verification code
+                to <span className="text-gray-300">{profile?.email ?? user?.email}</span> first.
+                You can come back any time by signing up again with the same email.
+              </>
+            )}
           </p>
           <button
             onClick={startDelete}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-red-300 bg-red-950/40 border border-red-800 hover:bg-red-900/40 transition-colors"
+            disabled={profile?.is_owner}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-red-300 bg-red-950/40 border border-red-800 hover:bg-red-900/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" /> Delete my account
           </button>
@@ -310,8 +317,9 @@ export function AccountPage() {
             {delStep === 'confirm' && (
               <>
                 <p className="text-gray-400 text-sm mb-5 leading-relaxed">
-                  This permanently deletes <span className="text-white">{profile?.email ?? user?.email}</span> and
-                  everything in it. To continue, we'll send a 5-digit code to that email address.
+                  This closes <span className="text-white">{profile?.email ?? user?.email}</span> and signs you
+                  out. To continue, we'll send a 5-digit code to that email address. Signing up again
+                  with it later restores the account.
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -357,7 +365,7 @@ export function AccountPage() {
                     disabled={delBusy || delOtp.length !== 5}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {delBusy ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : <><Trash2 className="w-4 h-4" /> Delete forever</>}
+                    {delBusy ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : <><Trash2 className="w-4 h-4" /> Delete account</>}
                   </button>
                 </div>
               </>

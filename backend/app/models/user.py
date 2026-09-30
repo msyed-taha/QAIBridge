@@ -22,6 +22,10 @@ class User(Base):
     role       = Column(String(20), nullable=False, index=True, server_default=ROLE_USER, default=ROLE_USER)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    # Set when the user deletes their own account. The row is kept (inactive) so
+    # signing up again with the same email restores it. An admin deactivation
+    # leaves this NULL, so it can't be undone by re-registering.
+    deleted_at    = Column(DateTime(timezone=True), nullable=True)
 
     @property
     def is_admin(self) -> bool:

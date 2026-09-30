@@ -43,7 +43,7 @@ export const kernelApi = {
     return data;
   },
 
-  /** Full RAM table (1–20 qubits) */
+  /** Full RAM table (1–MAX_QUBITS qubits) */
   ramTable: async (): Promise<RamTableRow[]> => {
     const { data } = await apiClient.get<{ table: RamTableRow[] }>(`${BASE}/ram-table`);
     return data.table;

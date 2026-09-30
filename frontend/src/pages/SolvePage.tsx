@@ -30,6 +30,7 @@ interface SolveResult {
   algorithm:         string;
   result:            Record<string, unknown>;
   steps:             number;
+  steps_label?:      string;
   elapsed_ms:        number;
   complexity:        string;
   theoretical_steps: number;
@@ -76,10 +77,10 @@ const PROBLEMS: Record<ProblemType, {
     color: 'from-orange-500 to-yellow-400',
     label: 'Optimization',
     tagline: 'Find the shortest route through a set of cities',
-    classicalAlgo: 'Greedy Nearest Neighbour',
-    quantumAlgo:   'QAOA',
-    classicalComplexity: 'O(N²)',
-    quantumComplexity:   'O(p·N)',
+    classicalAlgo: 'Exhaustive search (greedy beyond 9 cities)',
+    quantumAlgo:   'QAOA (Ising Hamiltonian)',
+    classicalComplexity: 'O(N!)',
+    quantumComplexity:   'variational',
   },
   database: {
     icon: Database,
@@ -89,76 +90,51 @@ const PROBLEMS: Record<ProblemType, {
     classicalAlgo: 'Sequential Scan',
     quantumAlgo:   'Amplitude Amplification',
     classicalComplexity: 'O(N)',
-    quantumComplexity:   'O(√N)',
+    quantumComplexity:   'O(√(N/M))',
   },
 };
 
 // ── Per-problem comparison metadata ──────────────────────────────────────────
 
+const gnfsOps = (bits: number) => {
+  const lnN = bits * Math.log(2);
+  return Math.exp(Math.cbrt(64 / 9) * Math.cbrt(lnN) * Math.pow(Math.log(lnN), 2 / 3));
+};
+
 const COMPARISON_META: Record<ProblemType, {
-  spaceClassical:  string;
-  spaceQuantum:    string;
-  typeClassical:   string;
-  typeQuantum:     string;
-  qualityClassical: string;
-  qualityQuantum:   string;
-  scaleN:          number;
-  scaleLabel:      string;
-  scaleClassical:  (n: number) => number;
-  scaleQuantum:    (n: number) => number;
-  advantage:       string;
+  advantage:      string;
+  scaleLabel?:    string;
+  scaleClassical?: number;
+  scaleQuantum?:   number;
+  scaleUnitC?:     string;
+  scaleUnitQ?:     string;
 }> = {
   search: {
-    spaceClassical:   'O(1) — just a pointer',
-    spaceQuantum:     'O(log N) qubits',
-    typeClassical:    'Deterministic',
-    typeQuantum:      'Probabilistic',
-    qualityClassical: 'Exact — always finds correct answer',
-    qualityQuantum:   'High probability — succeeds with P > 99%',
-    scaleN:           1_000_000,
-    scaleLabel:       '1,000,000 items',
-    scaleClassical:   n => n,
-    scaleQuantum:     n => Math.ceil(Math.PI / 4 * Math.sqrt(n)),
-    advantage:        'Quadratic — Quantum needs √N steps instead of N',
+    advantage:      'Quadratic — Grover needs ≈ π/4·√N oracle queries instead of ≈ N/2 comparisons',
+    scaleLabel:     '1 billion items',
+    scaleClassical: 500_000_000,
+    scaleQuantum:   Math.floor(Math.PI / 4 * Math.sqrt(1e9)),
+    scaleUnitC:     'comparisons (average)',
+    scaleUnitQ:     'oracle queries',
   },
   factoring: {
-    spaceClassical:   'O(log N) — store factors',
-    spaceQuantum:     'O(log N) qubits',
-    typeClassical:    'Deterministic',
-    typeQuantum:      'Probabilistic (QFT)',
-    qualityClassical: 'Exact — always correct',
-    qualityQuantum:   'Exact — correct with high probability',
-    scaleN:           1_000_000,
-    scaleLabel:       'N = 1,000,000',
-    scaleClassical:   n => Math.ceil(Math.sqrt(n)),
-    scaleQuantum:     n => Math.ceil(Math.log2(n + 1) ** 3),
-    advantage:        'Exponential — Quantum breaks RSA-scale numbers classically impossible',
+    advantage:      'Super-polynomial — classical sieves grow sub-exponentially with the bit length, Shor only polynomially',
+    scaleLabel:     'an RSA-2048 key',
+    scaleClassical: gnfsOps(2048),
+    scaleQuantum:   4 * 2048 ** 3,
+    scaleUnitC:     'operations (number field sieve)',
+    scaleUnitQ:     'quantum gates (4099 logical qubits)',
   },
   optimization: {
-    spaceClassical:   'O(N) — visited array',
-    spaceQuantum:     'O(N) qubits',
-    typeClassical:    'Greedy Heuristic',
-    typeQuantum:      'Variational Quantum',
-    qualityClassical: 'Suboptimal — locks into local minima',
-    qualityQuantum:   'Near-optimal — explores full solution space',
-    scaleN:           20,
-    scaleLabel:       '20 cities',
-    scaleClassical:   n => n * n,
-    scaleQuantum:     n => 3 * n,
-    advantage:        'Polynomial — QAOA scales O(p·N) vs O(N²) greedy',
+    advantage:      'Heuristic — QAOA concentrates probability on short routes; exhaustive search grows as (N−1)!',
   },
   database: {
-    spaceClassical:   'O(1) — no extra memory',
-    spaceQuantum:     'O(log N) qubits',
-    typeClassical:    'Deterministic',
-    typeQuantum:      'Probabilistic',
-    qualityClassical: 'Exact — reads every row',
-    qualityQuantum:   'High probability — √N quantum queries',
-    scaleN:           1_000_000,
-    scaleLabel:       '1,000,000 records',
-    scaleClassical:   n => n,
-    scaleQuantum:     n => Math.ceil(Math.sqrt(n)),
-    advantage:        'Quadratic — Quantum queries √N rows vs N rows',
+    advantage:      'Quadratic — amplitude amplification needs ≈ π/4·√(N/M) queries instead of ≈ N/(M+1) reads',
+    scaleLabel:     '1 million records, 1 match',
+    scaleClassical: 500_000,
+    scaleQuantum:   Math.floor(Math.PI / 4 * Math.sqrt(1e6)),
+    scaleUnitC:     'record reads (average)',
+    scaleUnitQ:     'oracle queries',
   },
 };
 
@@ -169,7 +145,7 @@ const DEFAULTS: Record<ProblemType, Record<string, string>> = {
     dataset: 'Alice\nBob\nCharlie\nDavid\nEve\nFrank\nGrace\nHenry',
     target:  'Grace',
   },
-  factoring:    { number: '999999999989' },
+  factoring:    { number: '91' },
   optimization: { cities: 'Islamabad\nLahore\nKarachi\nPeshawar\nQuetta' },
   database: {
     records: 'John Smith - Age 28 - Engineer\nSarah Khan - Age 34 - Doctor\nAli Raza - Age 22 - Student\nMaria Ahmed - Age 45 - Manager\nUsman Malik - Age 31 - Engineer',
@@ -309,9 +285,10 @@ export function SolvePage() {
     setError(null);
 
     try {
+      const token = localStorage.getItem('qai_token');
       const res  = await fetch('/api/dashboard/solve', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body:    JSON.stringify(buildBody(approach)),
       });
       const data = await res.json();
@@ -482,8 +459,8 @@ export function SolvePage() {
                     className={`w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 font-mono text-lg transition-opacity ${uploadedFile ? 'opacity-30 cursor-not-allowed' : ''}`}
                   />
                   <p className="text-xs text-gray-600 mt-1.5">
-                    Use a large number (10⁹ – 10¹²) to see quantum win clearly.
-                    Small numbers have tiny factors that classical finds instantly.
+                    The quantum side runs Shor's algorithm exactly for odd N ≤ 127 (up to 21 simulated qubits),
+                    e.g. 15, 21, 35, 77, 91. The classical side accepts any N up to 10¹².
                   </p>
                 </div>
                 <div className="p-4 bg-quantum-700/40 rounded-xl border border-quantum-700 self-start space-y-3">
@@ -491,14 +468,14 @@ export function SolvePage() {
                     <span className="text-white font-semibold block mb-2">What will happen:</span>
                     The platform decomposes your number into prime factors using two different approaches and compares theoretical step counts.<br /><br />
                     <span className="text-red-400">Classical</span> — Trial Division tests divisors 2 → √N in the worst case<br />
-                    <span className="text-quantum-neon">Quantum</span> — Shor's QFT needs only (log N)³ gate operations
+                    <span className="text-quantum-neon">Quantum</span> — Shor's circuit finds the period of aˣ mod N; gcd turns it into factors
                   </p>
                   <div className="border-t border-quantum-600 pt-3">
                     <p className="text-[11px] text-yellow-400/80 leading-relaxed">
                       <span className="font-semibold">💡 When does quantum win?</span><br />
-                      Shor's advantage grows with the <em>bit length</em> of N.
-                      For N ≈ 10¹², quantum needs ~60K steps vs ~1M classical — a 17× speedup.
-                      At RSA-2048 scale it becomes a trillion-fold advantage.
+                      Not at this size — trial division factors small numbers instantly. Shor's advantage grows with
+                      the <em>bit length</em> of N: an RSA-2048 key needs ~10³⁵ classical operations but only ~10¹⁰–10¹¹
+                      quantum gates (on a future fault-tolerant computer).
                     </p>
                   </div>
                 </div>
@@ -510,7 +487,7 @@ export function SolvePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-xs text-gray-400 font-medium mb-2">
-                    Cities to Visit <span className="text-gray-600">— one city per line, 3 to 12</span>
+                    Cities to Visit <span className="text-gray-600">— one per line, 3 to 12 (first = start)</span>
                   </label>
                   <FileUploadZone
                     dest="cities"
@@ -531,14 +508,17 @@ export function SolvePage() {
                     disabled={!!uploadedFile}
                     className={`w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 resize-none font-mono overflow-hidden min-h-[120px] transition-opacity ${uploadedFile ? 'opacity-30 cursor-not-allowed' : ''}`}
                   />
-                  <p className="text-xs text-gray-600 mt-1.5">Distances between cities are auto-generated. Max 12 cities.</p>
+                  <p className="text-xs text-gray-600 mt-1.5">
+                    Real great-circle distances: known cities use their real coordinates, or type <span className="font-mono">Name, lat, lon</span>.
+                    Classical: up to 12 cities · Quantum (QAOA): up to 5 cities = 16 qubits.
+                  </p>
                 </div>
                 <div className="p-4 bg-quantum-700/40 rounded-xl border border-quantum-700 self-start">
                   <p className="text-xs text-gray-400 leading-relaxed">
                     <span className="text-white font-semibold block mb-2">Travelling Salesman Problem:</span>
                     Find the shortest route that visits all cities exactly once and returns to the start.<br /><br />
-                    <span className="text-red-400">Classical</span> — Greedy picks closest unvisited city each step<br />
-                    <span className="text-quantum-neon">Quantum</span> — QAOA explores the full solution space simultaneously
+                    <span className="text-red-400">Classical</span> — checks every possible tour (exact) up to 9 cities, greedy beyond<br />
+                    <span className="text-quantum-neon">Quantum</span> — QAOA: the route becomes an Ising Hamiltonian whose lowest energy is the shortest tour
                   </p>
                 </div>
               </div>
@@ -581,7 +561,7 @@ export function SolvePage() {
                       placeholder="e.g. Engineer"
                       className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50"
                     />
-                    <p className="text-xs text-gray-600 mt-1.5">Finds all records containing this keyword.</p>
+                    <p className="text-xs text-gray-600 mt-1.5">A keyword, <span className="font-mono">field = text</span> or <span className="font-mono">age &gt; 30</span>.</p>
                   </div>
                   <div className="p-4 bg-quantum-700/40 rounded-xl border border-quantum-700">
                     <p className="text-xs text-gray-400 leading-relaxed">
@@ -762,10 +742,10 @@ function ResultPanel({
           </span>
         </div>
         <span className={`font-mono text-xs font-semibold ${isQ ? 'text-quantum-neon' : 'text-red-400'}`}>
-          {complexity}
+          {result?.complexity ?? complexity}
         </span>
       </div>
-      <p className="text-gray-500 text-xs -mt-2">{algo}</p>
+      <p className="text-gray-500 text-xs -mt-2">{result?.algorithm ?? algo}</p>
 
       {/* Loading */}
       {loading && (
@@ -792,7 +772,7 @@ function ResultPanel({
               <p className={`text-xl font-extrabold font-mono ${isQ ? 'text-quantum-neon' : 'text-red-400'}`}>
                 {result.steps.toLocaleString()}
               </p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Steps Taken</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">{result.steps_label ?? 'Steps taken'}</p>
             </div>
             <div className="bg-quantum-800 border border-quantum-700 rounded-xl p-3 text-center">
               <p className="text-xl font-extrabold font-mono text-white">
@@ -816,7 +796,47 @@ function ResultPanel({
   );
 }
 
-// ── Speedup Banner ────────────────────────────────────────────────────────────
+// ── Comparison (real measured metrics) ──────────────────────────────────────
+
+function fmtBig(x: number): string {
+  if (!isFinite(x)) return '∞';
+  if (x >= 1e6) return x.toExponential(1).replace('e+', ' × 10^');
+  return Math.round(x).toLocaleString();
+}
+
+function answerSummary(r: SolveResult): string {
+  const d = r.result as Record<string, any>;
+  if (!r.success && r.error) return 'No result';
+  switch (r.problem_type) {
+    case 'search':
+      return d.found ? `Found "${d.value}" at index ${d.index}` : 'Not in the dataset';
+    case 'factoring':
+      return d.is_prime ? `${d.number} is prime` : `${d.number} = ${d.factored_form}`;
+    case 'optimization':
+      return d.total_distance != null ? `${Math.round(d.total_distance).toLocaleString()} km route` : 'No valid route sampled';
+    case 'database':
+      return `${d.matches_found} matching record(s)`;
+    default:
+      return '';
+  }
+}
+
+function HeroBars({ rows }: { rows: { label: string; value: number; display: string; color: string }[] }) {
+  const max = Math.max(...rows.map(r => r.value), 1e-12);
+  return (
+    <div className="mt-4 max-w-lg mx-auto space-y-1.5">
+      {rows.map(r => (
+        <div key={r.label} className="flex items-center gap-2">
+          <span className="text-xs w-24 text-right flex-shrink-0" style={{ color: r.color }}>{r.label}</span>
+          <div className="flex-1 h-4 bg-quantum-800 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: r.color }} />
+          </div>
+          <span className="text-xs font-mono w-24 flex-shrink-0" style={{ color: r.color }}>{r.display}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ComparisonSection({
   classical, quantum, problemType,
@@ -825,121 +845,96 @@ function ComparisonSection({
   quantum:   SolveResult;
   problemType: ProblemType;
 }) {
-  const meta    = COMPARISON_META[problemType];
-  const speedup = classical.theoretical_steps / Math.max(1, quantum.theoretical_steps);
-  const scaleC  = meta.scaleClassical(meta.scaleN).toLocaleString();
-  const scaleQ  = meta.scaleQuantum(meta.scaleN).toLocaleString();
-  const scaleSpeedup = Math.round(meta.scaleClassical(meta.scaleN) / Math.max(1, meta.scaleQuantum(meta.scaleN)));
+  const meta = COMPARISON_META[problemType];
+  const q = quantum.result as Record<string, any>;
+  const bothCorrect = classical.success && quantum.success && answerSummary(classical) !== '' ;
 
-  const stepsWinner = quantum.steps < classical.steps ? 'quantum' : classical.steps < quantum.steps ? 'classical' : 'tie';
-  const stepsRatio  = quantum.steps < classical.steps
-    ? `Quantum used ${(classical.steps / Math.max(1, quantum.steps)).toFixed(1)}× fewer steps`
-    : quantum.steps > classical.steps
-    ? `Classical used ${(quantum.steps / Math.max(1, classical.steps)).toFixed(1)}× fewer steps at this N — quantum advantage grows with larger inputs`
-    : 'Equal step counts at this input size';
+  // ── Hero: the honest headline for each problem type ──
+  let heroTitle = '';
+  let heroBig = '';
+  let heroText: React.ReactNode = null;
+  let bars: { label: string; value: number; display: string; color: string }[] = [];
+  if (problemType === 'search' || problemType === 'database') {
+    const qs = Math.max(1, quantum.steps);
+    const ratio = classical.steps / qs;
+    heroTitle = 'Queries needed on your data';
+    heroBig = quantum.steps === 0 ? 'no amplification needed' : `${ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)}× fewer`;
+    heroText = <>Quantum: <span className="text-quantum-neon font-mono font-bold">{quantum.steps}</span> oracle queries ·
+      Classical: <span className="text-red-400 font-mono font-bold">{classical.steps}</span> {classical.steps_label ?? 'steps'}</>;
+    bars = [
+      { label: 'Classical', value: classical.steps, display: classical.steps.toLocaleString(), color: '#ef4444' },
+      { label: 'Quantum', value: quantum.steps, display: quantum.steps.toLocaleString(), color: '#00ffcc' },
+    ];
+  } else if (problemType === 'factoring') {
+    heroTitle = 'Answer check';
+    heroBig = quantum.success ? 'Both found the factors' : 'Classical only';
+    heroText = quantum.success
+      ? <>Shor's algorithm measured the period r = <span className="text-quantum-neon font-mono">{String(q.period ?? '—')}</span>
+          {q.qubits ? <> on a {q.qubits}-qubit circuit ({Number(q.gates).toLocaleString()} gates)</> : null}. At this size trial division is
+          faster — the advantage appears only for very large N (see the last row).</>
+      : <>{quantum.error ?? quantum.explanation}</>;
+  } else {
+    const amp = Number(q.amplification ?? 0);
+    heroTitle = 'How much QAOA boosted the optimal route';
+    heroBig = amp ? `${amp.toFixed(1)}× more likely` : '—';
+    heroText = <>than picking a random bit-string: P(optimal) = <span className="text-quantum-neon font-mono">
+      {((q.p_optimal ?? 0) * 100).toFixed(2)}%</span> vs <span className="text-red-400 font-mono">{((q.random_p_optimal ?? 0) * 100).toFixed(3)}%</span>.
+      Best measured route {q.is_optimal ? 'equals' : 'differs from'} the exact optimum.</>;
+    bars = [
+      { label: 'Random guess', value: q.random_p_optimal ?? 0, display: `${((q.random_p_optimal ?? 0) * 100).toFixed(3)}%`, color: '#ef4444' },
+      { label: 'QAOA', value: q.p_optimal ?? 0, display: `${((q.p_optimal ?? 0) * 100).toFixed(2)}%`, color: '#00ffcc' },
+    ];
+  }
 
-  const rows = [
-    {
-      metric:    'Steps Taken (your input)',
-      classical: classical.steps.toLocaleString(),
-      quantum:   quantum.steps.toLocaleString(),
-      winner:    stepsWinner,
-      note:      stepsRatio,
-    },
-    {
-      metric:    'Time Complexity',
-      classical: classical.complexity,
-      quantum:   quantum.complexity,
-      winner:    'quantum',
-      note:      meta.advantage,
-    },
-    {
-      metric:    'Space Complexity',
-      classical: meta.spaceClassical,
-      quantum:   meta.spaceQuantum,
-      winner:    'tie',
-      note:      'Both are memory-efficient; quantum uses qubit registers instead of RAM',
-    },
-    {
-      metric:    'Algorithm Type',
-      classical: meta.typeClassical,
-      quantum:   meta.typeQuantum,
-      winner:    'tie',
-      note:      'Quantum algorithms are probabilistic but tuned to succeed with > 99% probability',
-    },
-    {
-      metric:    'Solution Quality',
-      classical: meta.qualityClassical,
-      quantum:   meta.qualityQuantum,
-      winner:    'tie',
-      note:      'Both return the correct answer; quantum achieves it in fewer operations',
-    },
-    {
-      metric:    `Steps at Scale (${meta.scaleLabel})`,
-      classical: scaleC,
-      quantum:   scaleQ,
-      winner:    'quantum',
-      note:      `At large scale quantum needs ${scaleSpeedup.toLocaleString()}× fewer operations — this is where quantum advantage becomes undeniable`,
-    },
+  const successQ = q.success_probability != null ? `${(q.success_probability * 100).toFixed(1)}%`
+    : q.p_optimal != null ? `${(q.p_optimal * 100).toFixed(2)}% optimal · ${((q.p_feasible ?? 0) * 100).toFixed(1)}% valid`
+    : quantum.success ? 'Probabilistic (retries if unlucky)' : '—';
+
+  const rows: { metric: string; classical: string; quantum: string; note: string }[] = [
+    { metric: 'Answer', classical: answerSummary(classical), quantum: answerSummary(quantum),
+      note: bothCorrect ? 'Both approaches returned a valid answer' : 'See the panels above for details' },
+    { metric: 'Steps on your input', classical: `${classical.steps.toLocaleString()} ${classical.steps_label ?? ''}`,
+      quantum: `${quantum.steps.toLocaleString()} ${quantum.steps_label ?? ''}`, note: 'Oracle queries and comparisons ask the same question of the data' },
+    { metric: 'Measured time', classical: `${classical.elapsed_ms.toFixed(3)} ms (CPU)`,
+      quantum: `${quantum.elapsed_ms.toFixed(1)} ms (simulating the circuit)`,
+      note: 'A CPU emulating a quantum computer is slower than real quantum hardware would be' },
+    { metric: 'Success probability', classical: 'Deterministic', quantum: successQ,
+      note: 'Quantum algorithms return the right answer with high probability' },
+    { metric: 'Resources', classical: 'Constant extra memory',
+      quantum: q.qubits ? `${q.qubits} qubits${q.gates ? ` · ${Number(q.gates).toLocaleString()} gates` : ''}` : '—',
+      note: 'Qubits simulated on this machine by the Module 1 kernel' },
+    { metric: 'Complexity', classical: classical.complexity, quantum: quantum.complexity, note: meta.advantage },
   ];
+  if (meta.scaleLabel && meta.scaleClassical && meta.scaleQuantum) {
+    rows.push({
+      metric: `At scale (${meta.scaleLabel})`,
+      classical: `${fmtBig(meta.scaleClassical)} ${meta.scaleUnitC}`,
+      quantum: `${fmtBig(meta.scaleQuantum)} ${meta.scaleUnitQ}`,
+      note: 'Where the quantum advantage becomes decisive',
+    });
+  }
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-
-      {/* Speedup hero */}
       <div
         className="rounded-2xl border border-quantum-600/40 p-6 text-center"
         style={{ background: 'linear-gradient(135deg, rgba(0,255,204,0.06), rgba(204,68,255,0.06))' }}
       >
-        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Quantum Speedup at Your Input Size</p>
-        <p
-          className="text-5xl font-extrabold text-transparent bg-clip-text mb-2"
-          style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}
-        >
-          {speedup >= 100 ? speedup.toFixed(0) : speedup >= 10 ? speedup.toFixed(1) : speedup.toFixed(2)}×
+        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">{heroTitle}</p>
+        <p className="text-4xl font-extrabold text-transparent bg-clip-text mb-2"
+          style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
+          {heroBig}
         </p>
-        <p className="text-gray-400 text-sm">
-          Quantum needed{' '}
-          <span className="text-quantum-neon font-mono font-bold">{quantum.theoretical_steps.toLocaleString()}</span> steps vs
-          Classical's{' '}
-          <span className="text-red-400 font-mono font-bold">{classical.theoretical_steps.toLocaleString()}</span> steps
-          at N = {classical.input_size.toLocaleString()}
-        </p>
-
-        {/* Visual bar */}
-        <div className="mt-4 max-w-lg mx-auto">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs text-red-400 w-20 text-right flex-shrink-0">Classical</span>
-            <div className="flex-1 h-4 bg-quantum-800 rounded-full overflow-hidden">
-              <div className="h-full rounded-full bg-red-600/70" style={{ width: '100%' }} />
-            </div>
-            <span className="text-xs text-red-400 font-mono w-16 flex-shrink-0">{classical.theoretical_steps.toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-quantum-neon w-20 text-right flex-shrink-0">Quantum</span>
-            <div className="flex-1 h-4 bg-quantum-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${Math.max(2, (quantum.theoretical_steps / classical.theoretical_steps) * 100)}%`,
-                  background: 'linear-gradient(90deg, #00ffcc, #00ccaa)',
-                }}
-              />
-            </div>
-            <span className="text-xs text-quantum-neon font-mono w-16 flex-shrink-0">{quantum.theoretical_steps.toLocaleString()}</span>
-          </div>
-        </div>
+        <p className="text-gray-400 text-sm max-w-2xl mx-auto">{heroText}</p>
+        {bars.length > 0 && <HeroBars rows={bars} />}
       </div>
 
-      {/* Detailed comparison table */}
       <div className="bg-quantum-800 border border-quantum-700 rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-quantum-700">
           <h3 className="text-white font-bold text-sm">Full Algorithm Comparison</h3>
-          <p className="text-gray-500 text-xs mt-0.5">Side-by-side breakdown across all key metrics</p>
+          <p className="text-gray-500 text-xs mt-0.5">Measured on your input — both sides really ran</p>
         </div>
-
-        {/* Table header */}
-        <div className="grid grid-cols-[2fr_1.5fr_1.5fr] gap-0 border-b border-quantum-700 bg-quantum-900/50">
+        <div className="grid grid-cols-[2fr_1.5fr_1.5fr] border-b border-quantum-700 bg-quantum-900/50">
           <div className="px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Metric</div>
           <div className="px-4 py-2.5 text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
             <Cpu className="w-3 h-3" /> Classical
@@ -948,69 +943,18 @@ function ComparisonSection({
             <Zap className="w-3 h-3" /> Quantum
           </div>
         </div>
-
-        {/* Rows */}
         {rows.map((row, i) => (
-          <div
-            key={row.metric}
-            className={`grid grid-cols-[2fr_1.5fr_1.5fr] gap-0 border-b border-quantum-700/50 last:border-0 ${
-              i % 2 === 0 ? '' : 'bg-quantum-900/20'
-            }`}
-          >
-            <div className="px-5 py-3.5">
+          <div key={row.metric}
+            className={`grid grid-cols-[2fr_1.5fr_1.5fr] border-b border-quantum-700/50 last:border-0 ${i % 2 ? 'bg-quantum-900/20' : ''}`}>
+            <div className="px-5 py-3">
               <p className="text-gray-300 text-xs font-medium">{row.metric}</p>
               <p className="text-gray-600 text-[10px] mt-0.5 leading-relaxed">{row.note}</p>
             </div>
-            <div className={`px-4 py-3.5 flex items-start ${row.winner === 'classical' ? '' : ''}`}>
-              <span className={`text-xs font-mono font-semibold ${
-                row.winner === 'classical' ? 'text-red-300' : 'text-red-500/80'
-              }`}>
-                {row.classical}
-              </span>
-            </div>
-            <div className="px-4 py-3.5 flex items-start gap-1.5">
-              <span className={`text-xs font-mono font-semibold ${
-                row.winner === 'quantum' ? 'text-quantum-neon' : 'text-quantum-neon/70'
-              }`}>
-                {row.quantum}
-              </span>
-              {row.winner === 'quantum' && (
-                <span className="text-[9px] bg-teal-900/50 text-quantum-neon border border-teal-800 px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5">
-                  ✓ faster
-                </span>
-              )}
-            </div>
+            <div className="px-4 py-3 text-xs font-mono text-red-300/90 break-words">{row.classical}</div>
+            <div className="px-4 py-3 text-xs font-mono text-quantum-neon/90 break-words">{row.quantum}</div>
           </div>
         ))}
       </div>
-
-      {/* Scale projection card */}
-      <div className="bg-quantum-800/50 border border-quantum-700 rounded-2xl p-5">
-        <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Why This Matters at Scale</p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4 text-center">
-            <p className="text-xs text-red-400 mb-1">Classical at {meta.scaleLabel}</p>
-            <p className="text-2xl font-extrabold text-red-400 font-mono">{scaleC}</p>
-            <p className="text-xs text-gray-600 mt-1">operations needed</p>
-          </div>
-          <div className="bg-teal-950/20 border border-teal-900/30 rounded-xl p-4 text-center">
-            <p className="text-xs text-quantum-neon mb-1">Quantum at {meta.scaleLabel}</p>
-            <p className="text-2xl font-extrabold text-quantum-neon font-mono">{scaleQ}</p>
-            <p className="text-xs text-gray-600 mt-1">operations needed</p>
-          </div>
-        </div>
-        <p className="text-center text-gray-400 text-sm mt-4">
-          At {meta.scaleLabel}, Quantum is{' '}
-          <span
-            className="font-extrabold text-transparent bg-clip-text"
-            style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}
-          >
-            {scaleSpeedup.toLocaleString()}× faster
-          </span>{' '}
-          — this is where quantum computing changes everything.
-        </p>
-      </div>
-
     </div>
   );
 }
@@ -1144,25 +1088,61 @@ function FileUploadZone({
 
 // ── Answer Display ────────────────────────────────────────────────────────────
 
+function Extra({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <span className="text-[11px] text-gray-500">
+      {label}: <span className="text-gray-300 font-mono">{value}</span>
+    </span>
+  );
+}
+
 function ResultDisplay({ result }: { result: SolveResult }) {
-  const r = result.result;
+  const r = result.result as Record<string, any>;
+  const isQ = result.approach === 'quantum';
+
+  if (!result.success && result.error) {
+    return <p className="text-xs text-amber-300 leading-relaxed">{result.error}</p>;
+  }
 
   if (result.problem_type === 'search') {
+    const hist = (r.histogram ?? []) as { label: string; count: number; marked: boolean }[];
+    const maxC = Math.max(1, ...hist.map(h => h.count));
     return (
-      <div className="space-y-1.5 text-sm">
+      <div className="space-y-2 text-sm">
         <div className="flex items-center gap-2">
           {r.found
             ? <CheckCircle className="w-4 h-4 text-quantum-neon flex-shrink-0" />
-            : <XCircle     className="w-4 h-4 text-red-400 flex-shrink-0" />
-          }
+            : <XCircle     className="w-4 h-4 text-red-400 flex-shrink-0" />}
           <span className="text-white font-semibold text-sm">
             {r.found ? `Found "${String(r.value)}"` : `"${String(r.target)}" not in dataset`}
           </span>
         </div>
         {Boolean(r.found) && (
-          <p className="text-gray-500 text-xs pl-6">
-            at index <span className="text-white font-mono">{String(r.index)}</span>
-          </p>
+          <p className="text-gray-500 text-xs pl-6">at index <span className="text-white font-mono">{String(r.index)}</span></p>
+        )}
+        {isQ && (
+          <>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+              <Extra label="P(success)" value={`${(r.success_probability * 100).toFixed(1)}%`} />
+              <Extra label="qubits" value={r.qubits} />
+              <Extra label="gates" value={Number(r.gates).toLocaleString()} />
+              <Extra label="Grover iterations" value={r.grover_iterations} />
+            </div>
+            {hist.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wide">Measurements ({r.shots} shots)</p>
+                {hist.slice(0, 5).map(h => (
+                  <div key={h.label} className="flex items-center gap-2">
+                    <span className={`text-[11px] w-20 truncate ${h.marked ? 'text-quantum-neon' : 'text-gray-500'}`}>{h.label}</span>
+                    <div className="flex-1 h-2 bg-quantum-900 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${(h.count / maxC) * 100}%`, background: h.marked ? '#00ffcc' : '#4b4b8a' }} />
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-500 w-10 text-right">{h.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -1172,67 +1152,79 @@ function ResultDisplay({ result }: { result: SolveResult }) {
     return (
       <div className="space-y-2">
         <p className="text-white font-mono text-base font-bold">
-          {String(r.number)} ={' '}
-          <span className="text-quantum-neon">{String(r.factored_form)}</span>
+          {String(r.number)} = <span className="text-quantum-neon">{String(r.factored_form)}</span>
         </p>
         {Boolean(r.is_prime) && <p className="text-xs text-yellow-400">⚠ This is a prime number</p>}
         <div className="flex flex-wrap gap-1.5 mt-1">
-          {(r.factors as number[]).map((f, i) => (
-            <span key={i} className="bg-quantum-700 text-quantum-neon font-mono text-xs px-2 py-1 rounded-lg border border-quantum-600">
-              {f}
-            </span>
+          {((r.factors ?? []) as number[]).map((f, i) => (
+            <span key={i} className="bg-quantum-700 text-quantum-neon font-mono text-xs px-2 py-1 rounded-lg border border-quantum-600">{f}</span>
           ))}
         </div>
-        {Boolean(r.qubits_needed) && (
-          <p className="text-xs text-gray-600">
-            Qubits needed: <span className="text-gray-400 font-mono">{String(r.qubits_needed)}</span>
-          </p>
+        {isQ && r.period != null && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <Extra label="base a" value={r.a} />
+            <Extra label="measured period r" value={r.period} />
+            <Extra label="qubits" value={r.qubits} />
+            <Extra label="gates" value={Number(r.gates).toLocaleString()} />
+          </div>
+        )}
+        {isQ && r.period == null && r.status && r.status !== 'factored' && (
+          <p className="text-xs text-gray-500">Handled by the classical pre-checks of Shor's algorithm ({String(r.status).replace('_', ' ')}).</p>
         )}
       </div>
     );
   }
 
   if (result.problem_type === 'optimization') {
-    const tour = r.tour as string[];
+    const tour = (r.tour ?? []) as string[];
     return (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
           {tour.map((city, i) => (
             <div key={i} className="flex items-center gap-1">
-              <span className="bg-quantum-700 border border-quantum-600 text-white text-xs px-2 py-0.5 rounded-lg">
-                {city}
-              </span>
+              <span className="bg-quantum-700 border border-quantum-600 text-white text-xs px-2 py-0.5 rounded-lg">{city}</span>
               {i < tour.length - 1 && <ArrowRight className="w-2.5 h-2.5 text-gray-600 flex-shrink-0" />}
             </div>
           ))}
         </div>
         <p className="text-white text-sm font-semibold">
-          Distance: <span className="text-quantum-neon font-mono">{String(r.total_distance)} units</span>
+          Distance: <span className="text-quantum-neon font-mono">{r.total_distance != null ? `${Number(r.total_distance).toLocaleString()} km` : '—'}</span>
         </p>
-        {r.is_optimal !== undefined && (
-          <p className="text-xs text-gray-600">
-            {r.is_optimal ? '✓ Provably optimal' : '~ Near-optimal approximation'}
-          </p>
+        <p className="text-xs text-gray-600">{r.is_optimal ? '✓ Provably optimal (matches exhaustive search)' : '~ Approximate route'}</p>
+        {isQ && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <Extra label="qubits" value={r.qubits} />
+            <Extra label="QAOA layers" value={r.qaoa_layers} />
+            <Extra label="P(optimal)" value={`${((r.p_optimal ?? 0) * 100).toFixed(2)}%`} />
+            <Extra label="valid-tour probability" value={`${((r.p_feasible ?? 0) * 100).toFixed(1)}%`} />
+          </div>
         )}
       </div>
     );
   }
 
   if (result.problem_type === 'database') {
-    const matches = r.matches as Array<{ index: number; value: string }>;
+    const matches = (r.matches ?? []) as Array<{ index: number; value: string; count?: number }>;
     return (
       <div className="space-y-2">
         <p className="text-white font-semibold text-sm">
           {matches.length > 0
-            ? <><span className="text-quantum-neon font-mono">{matches.length}</span> match(es) for "<span className="text-quantum-neon">{String(r.query)}</span>"</>
-            : <>No records matched "{String(r.query)}"</>
-          }
+            ? <><span className="text-quantum-neon font-mono">{matches.length}</span> {isQ ? 'distinct match(es) retrieved' : 'match(es)'} — {String(r.query_meaning ?? r.query)}</>
+            : <>No records matched "{String(r.query)}"</>}
         </p>
+        {isQ && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <Extra label="P(match per run)" value={`${((r.success_probability ?? 0) * 100).toFixed(1)}%`} />
+            <Extra label="qubits" value={r.qubits} />
+            <Extra label="true matches" value={r.true_matches} />
+          </div>
+        )}
         <div className="space-y-1 max-h-32 overflow-y-auto">
           {matches.map((m, i) => (
             <div key={i} className="flex items-start gap-2 bg-quantum-700/40 rounded-lg px-2.5 py-1.5">
               <span className="text-gray-600 font-mono text-[10px] flex-shrink-0 mt-0.5">#{m.index}</span>
-              <span className="text-gray-300 text-xs">{m.value}</span>
+              <span className="text-gray-300 text-xs flex-1">{m.value}</span>
+              {m.count != null && <span className="text-quantum-neon font-mono text-[10px]">{m.count}×</span>}
             </div>
           ))}
         </div>

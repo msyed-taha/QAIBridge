@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, UserCheck, UserX, ShieldCheck, UserPlus, Activity, Loader2, ArrowRight } from 'lucide-react';
+import { Users, UserCheck, UserX, ShieldCheck, UserPlus, Activity, Loader2, ArrowRight, Inbox } from 'lucide-react';
 import { adminApi } from '../../api/admin';
 import { getApiErrorMessage } from '../../api/client';
 import type { AdminStats } from '../../types';
@@ -53,6 +53,9 @@ export function AdminDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
             <StatCard icon={UserPlus}    label="New (last 7 days)"      value={stats.new_last_7_days}       tint="#cc44ff" />
             <StatCard icon={Activity}    label="Signed in (last 7 days)" value={stats.logged_in_last_7_days} tint="#00ccaa" />
+            <Link to="/admin/messages" className="block hover:brightness-110 transition-all">
+              <StatCard icon={Inbox}     label="Unread messages"         value={stats.unread_messages}       tint="#38bdf8" />
+            </Link>
           </div>
 
           <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">

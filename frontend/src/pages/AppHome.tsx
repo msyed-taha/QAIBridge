@@ -42,10 +42,10 @@ const PROBLEMS = [
     glow: 'rgba(249,115,22,0.2)',
     label: 'Optimization',
     tagline: 'Find the shortest route through cities',
-    classical: 'O(N²)',
-    quantum: 'O(p·N)',
+    classical: 'O(N!)',
+    quantum: 'variational',
     algo: 'QAOA',
-    speedup: 'Polynomial',
+    speedup: 'Heuristic',
     speedupColor: '#f97316',
   },
   {
@@ -67,10 +67,29 @@ const PROBLEMS = [
 // ── Quantum advantage stats ───────────────────────────────────────────────────
 
 const STATS = [
-  { label: 'Quantum Algorithms', value: '6+', icon: Atom,      color: '#00ffcc' },
-  { label: 'Max Speedup (Shor\'s)', value: '10⁹×', icon: TrendingUp, color: '#cc44ff' },
-  { label: 'Qubits Supported',   value: '1–20',  icon: Cpu,       color: '#3b82f6' },
-  { label: 'Problem Types',      value: '4',     icon: Star,      color: '#f97316' },
+  { label: 'Algorithms that really run', value: '6',        icon: Atom,       color: '#00ffcc' },
+  { label: 'Qubits (RAM-aware kernel)',  value: 'up to 28', icon: Cpu,        color: '#3b82f6' },
+  { label: 'Problem types',              value: '4 + 4',    icon: Star,       color: '#f97316' },
+  { label: 'Integrated modules',         value: '8',        icon: TrendingUp, color: '#cc44ff' },
+];
+
+const MODULE_CARDS = [
+  { n: 1, path: '/simulator', title: 'Simulation Kernel', icon: Cpu, color: '#00ffcc',
+    desc: 'Our own NumPy state-vector simulator — live progress, Bloch spheres, the memory wall.' },
+  { n: 2, path: '/module2', title: 'SFOD Suite', icon: Search, color: '#14b8a6',
+    desc: "Grover, Shor, QAOA and amplitude amplification vs classical — both really run." },
+  { n: 3, path: '/module3', title: 'Circuit Builder', icon: Atom, color: '#34d399',
+    desc: 'Drag-and-drop gates, live simulation and 10 gamified challenges.' },
+  { n: 4, path: '/module4', title: 'AI Advisor', icon: Brain, color: '#f97316',
+    desc: 'Random-Forest advisor: quantum or classical for your problem — then solve it.' },
+  { n: 5, path: '/module5', title: 'Logic Transformer', icon: Code2, color: '#cc44ff',
+    desc: 'Classical code → QUBO / Ising Hamiltonian / oracle → verified quantum circuit.' },
+  { n: 6, path: '/module6', title: 'Neural Optimizer', icon: TrendingUp, color: '#a855f7',
+    desc: 'A neural network learns gate angles and avoids barren plateaus.' },
+  { n: 7, path: '/module7', title: 'QNN Converter', icon: Database, color: '#3b82f6',
+    desc: 'Map a classical neural network to a quantum neural network and compare.' },
+  { n: 8, path: '/dashboard', title: 'Performance Dashboard', icon: BarChart2, color: '#fbbf24',
+    desc: 'Live quantum vs classical benchmarks, history and CSV export.' },
 ];
 
 // ── How it works steps ────────────────────────────────────────────────────────
@@ -95,7 +114,7 @@ const STEPS = [
     icon: BarChart2,
     color: 'from-orange-500 to-yellow-400',
     title: 'Analyse the Speedup',
-    desc: 'See step counts, complexity, and a full side-by-side breakdown of why quantum wins at scale.',
+    desc: 'See answers checked side by side, oracle queries vs comparisons, success probability and where quantum wins at scale.',
   },
 ];
 
@@ -156,7 +175,7 @@ const FACTS = [
     topBar: '#06b6d4',
     title: 'Quantum Fourier Transform',
     tag: 'Algorithm Core',
-    body: 'The QFT is the quantum version of the Fast Fourier Transform and runs exponentially faster. It is the key subroutine inside Shor\'s Algorithm that enables period-finding and prime factorisation.',
+    body: 'The QFT is the quantum version of the Fast Fourier Transform: O(n²) gates for 2ⁿ amplitudes (though they cannot all be read out). It is the key subroutine inside Shor\'s Algorithm that enables period-finding and prime factorisation.',
   },
   {
     color: 'from-violet-500 to-purple-400',
@@ -172,7 +191,7 @@ const FACTS = [
     topBar: '#ef4444',
     title: 'Quantum Advantage',
     tag: 'Why It Matters',
-    body: "Shor's algorithm can break RSA-2048 encryption in hours — a task that would take classical computers millions of years. Grover's algorithm searches a billion items in ~31,623 steps instead of 1,000,000,000.",
+    body: "A large, error-corrected quantum computer running Shor's algorithm could break RSA-2048 in hours — a task far beyond classical computers. Grover's algorithm searches a billion items in ~25,000 oracle queries instead of ~500 million comparisons.",
   },
 ];
 
@@ -257,6 +276,36 @@ export function AppHome() {
                       <ChevronRight className="w-3.5 h-3.5 text-gray-700 group-hover:text-quantum-neon group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ALL MODULES ──────────────────────────────────────────────────── */}
+      <section className="px-6 pb-10">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4 text-center">
+            Explore the eight modules
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {MODULE_CARDS.map(m => {
+              const Icon = m.icon;
+              return (
+                <Link key={m.n} to={m.path}
+                  className="group bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 hover:scale-[1.02] transition-all">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${m.color}1f`, border: `1px solid ${m.color}55` }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: m.color }} />
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-mono">MODULE {m.n}</span>
+                  </div>
+                  <h3 className="text-white font-bold text-sm mb-1">{m.title}</h3>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">{m.desc}</p>
+                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-quantum-neon opacity-0 group-hover:opacity-100 transition-opacity">
+                    Open <ChevronRight className="w-3 h-3" />
+                  </span>
                 </Link>
               );
             })}

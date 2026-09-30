@@ -22,6 +22,14 @@ Set it in backend/.env as a comma-separated list. Two entry styles:
 
 To add or remove an admin later: edit this line, restart the backend, then
 promote/demote the account from the dashboard or scripts/make_admin.py.
+
+── OWNER_EMAIL — the protected super-admin (optional) ────────────────────────
+One address whose account is always an active admin and cannot be demoted,
+deactivated or deleted by any other admin (or by itself). It is implicitly on
+the allowlist, its account is promoted automatically, and no admin can create
+an account with this email — the owner must sign up (email OTP) themselves.
+
+    OWNER_EMAIL=you@gmail.com
 """
 from __future__ import annotations
 
@@ -45,17 +53,26 @@ if not ADMIN_EMAILS:
     )
 
 
+OWNER_EMAIL: str = (os.getenv("OWNER_EMAIL") or "").strip().lower()
+
+
+def is_owner_email(email: str | None) -> bool:
+    """True if `email` belongs to the protected owner account (OWNER_EMAIL)."""
+    return bool(OWNER_EMAIL) and bool(email) and email.strip().lower() == OWNER_EMAIL
+
+
 def is_admin_email(email: str | None) -> bool:
     """
     True if `email` is permitted to be an administrator.
 
-    Matches either an exact listed address, or a listed "@domain" entry.
-    Referenced (not copied) by callers so tests can override ADMIN_EMAILS.
+    Matches either an exact listed address, or a listed "@domain" entry. The
+    owner is always permitted. Referenced (not copied) by callers so tests can
+    override ADMIN_EMAILS / OWNER_EMAIL.
     """
     if not email:
         return False
     addr = email.strip().lower()
-    if addr in ADMIN_EMAILS:
+    if addr in ADMIN_EMAILS or is_owner_email(addr):
         return True
     _, _, domain = addr.partition("@")
     return bool(domain) and f"@{domain}" in ADMIN_EMAILS

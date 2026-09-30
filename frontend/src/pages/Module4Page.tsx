@@ -1,5 +1,19 @@
 import { useState, useRef, useCallback } from 'react';
-import { Brain, Upload, FileText, X, ChevronDown, Zap, Cpu, Info, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Brain, Upload, FileText, X, ChevronDown, Zap, Cpu, Info, CheckCircle, AlertCircle, ArrowRight, Play } from 'lucide-react';
+
+// Recommended algorithm → the SFOD task that solves it on the user's own data (FE-3)
+const SOLVE_TARGET: Record<string, { type: string; label: string }> = {
+  grovers: { type: 'search', label: "Grover's search" },
+  linear_search: { type: 'search', label: 'search' },
+  binary_search: { type: 'search', label: 'search' },
+  amplitude_amp: { type: 'database', label: 'amplitude amplification' },
+  shors: { type: 'factoring', label: "Shor's algorithm" },
+  trial_division: { type: 'factoring', label: 'factoring' },
+  qaoa: { type: 'optimization', label: 'QAOA route optimisation' },
+  dynamic_programming: { type: 'optimization', label: 'route optimisation' },
+  hillclimbing: { type: 'optimization', label: 'route optimisation' },
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -368,6 +382,53 @@ export function Module4Page() {
               </div>
             </div>
           </div>
+
+          {/* Solve it now (FE-3) */}
+          {(() => {
+            const preview = String((result as any).input_preview ?? '').toLowerCase();
+            const finance = /portfolio|stock|asset|invest|shares/.test(preview);
+            const knap = /knapsack|budget|capacity/.test(preview);
+            const target = result.top_algorithm_id === 'qaoa' && (finance || knap)
+              ? { type: '', label: finance ? 'portfolio optimisation (QAOA)' : 'knapsack optimisation (QAOA)',
+                  path: `/module5?example=${finance ? 'portfolio' : 'knapsack'}` }
+              : SOLVE_TARGET[result.top_algorithm_id] && { ...SOLVE_TARGET[result.top_algorithm_id],
+                  path: `/solve?type=${SOLVE_TARGET[result.top_algorithm_id].type}` };
+            return (
+              <div className="rounded-2xl p-5 border border-quantum-neon/30 bg-quantum-neon/5 flex flex-wrap items-center gap-4">
+                <Play className="w-6 h-6 text-quantum-neon flex-shrink-0" />
+                <div className="flex-1 min-w-[220px]">
+                  <p className="text-white font-bold text-sm">Solve it now</p>
+                  <p className="text-gray-400 text-xs leading-relaxed">
+                    {target
+                      ? <>Run {target.label} on your own data — both the classical and the quantum version execute, and the answers are compared.</>
+                      : <>This is a simulation-style problem: explore it on the QAIBridge simulation kernel, or describe it as code in the Logic Transformer.</>}
+                  </p>
+                </div>
+                {target ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Link to={target.path}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-black"
+                      style={{ background: 'linear-gradient(90deg,#00ffcc,#00ccaa)' }}>
+                      Enter my data <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <Link to="/module2" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-white border border-quantum-600 hover:bg-quantum-700">
+                      See it in the SFOD Suite
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <Link to="/simulator" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-black"
+                      style={{ background: 'linear-gradient(90deg,#00ffcc,#00ccaa)' }}>
+                      Open the simulator <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <Link to="/module5" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-white border border-quantum-600 hover:bg-quantum-700">
+                      Logic Transformer
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* What AI detected toggle */}
           <button

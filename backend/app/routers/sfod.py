@@ -1,153 +1,146 @@
 """
 Module 2 - SFOD Model Comparison Suite
 Routes:
-  POST /api/module2/run        - Run classical vs quantum comparison
+  POST /api/module2/run        - Run the classical algorithm AND the quantum algorithm
+                                 (on the Module 1 kernel) and compare them
   GET  /api/module2/info       - Static metadata about all 4 algorithms
+  GET  /api/module2/presets    - Ready-made inputs for the UI (cities, queries, N values)
   POST /api/module2/tutorial   - Get step-by-step walkthrough tutorial
 """
 from __future__ import annotations
+
 import math
-import time
-from typing import Literal
-from fastapi import APIRouter
+from typing import List, Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from ..models.benchmark import KIND_SFOD
+from ..models.user import User
+from ..modules.module8_dashboard import history
+from ..routers.auth import get_optional_user
+
+from ..modules.module1_kernel.limits import simulation_slot
+from ..modules.module2_sfod.suite import (
+    DEFAULT_CITIES, MAX_TSP_CITIES, compare_database, compare_factoring,
+    compare_optimization, compare_search, synthetic_records,
+)
+from ..modules.module2_sfod.grover import MAX_GROVER_QUBITS
+from ..modules.module2_sfod.shor import MAX_SHOR_N
 from ..modules.module2_sfod.tutorial import generate_tutorial, TutorialSession
+from ..modules.module5_transformer.bridge import KNOWN_CITIES
 
 router = APIRouter(prefix="/api/module2", tags=["Module 2 - SFOD Comparison Suite"])
 
 AlgoType = Literal["search", "factoring", "optimization", "database"]
 
+
 class RunRequest(BaseModel):
-    algorithm:  AlgoType
-    input_size: int = Field(..., ge=4, le=10000)
+    algorithm:    AlgoType
+    # Search
+    n_qubits:     Optional[int] = Field(None, ge=1, le=MAX_GROVER_QUBITS, description="Search space = 2^n items")
+    target_index: Optional[int] = Field(None, ge=0)
+    items:        Optional[List[str]] = None
+    target:       Optional[str] = None
+    # Factoring
+    N:            Optional[int] = Field(None, ge=3, le=10 ** 18)
+    a:            Optional[int] = Field(None, ge=2)
+    # Optimisation
+    cities:       Optional[List[str]] = None
+    layers:       int = Field(2, ge=1, le=4, description="QAOA depth p")
+    # Database
+    records:      Optional[List[str]] = None
+    n_records:    Optional[int] = Field(None, ge=4, le=2 ** MAX_GROVER_QUBITS)
+    query:        Optional[str] = None
+    # Common
+    shots:        int = Field(1024, ge=16, le=8192)
+    seed:         Optional[int] = None
+    input_size:   Optional[int] = Field(None, ge=2, description="Legacy single-number input")
+
 
 class TutorialRequest(BaseModel):
     algorithm:  AlgoType
     input_size: int = Field(..., ge=4, le=10000)
 
-class AlgoResult(BaseModel):
-    algorithm:            str
-    input_size:           int
-    classical_algo:       str
-    classical_complexity: str
-    classical_steps:      int
-    classical_time_ms:    float
-    quantum_algo:         str
-    quantum_complexity:   str
-    quantum_steps:        int
-    quantum_time_ms:      float
-    speedup_factor:       float
-    qubits_required:      int
-    accuracy_pct:         float
-    step_reduction_pct:   float
-    explanation:          str
 
-def _simulate_search(n: int) -> AlgoResult:
-    classical_steps = n
-    quantum_steps   = max(1, int(math.sqrt(n)))
-    t0 = time.perf_counter(); _ = sum(range(n)); classical_ms = (time.perf_counter()-t0)*1000
-    t0 = time.perf_counter(); _ = sum(range(quantum_steps)); quantum_ms = (time.perf_counter()-t0)*1000
-    qubits  = max(1, math.ceil(math.log2(n+1)))
-    speedup = classical_steps / quantum_steps
-    return AlgoResult(
-        algorithm="search", input_size=n,
-        classical_algo="Linear Search", classical_complexity="O(N)",
-        classical_steps=classical_steps, classical_time_ms=round(classical_ms,4),
-        quantum_algo="Grover's Algorithm", quantum_complexity="O(sqrt(N))",
-        quantum_steps=quantum_steps, quantum_time_ms=round(quantum_ms,4),
-        speedup_factor=round(speedup,2), qubits_required=qubits,
-        accuracy_pct=99.5, step_reduction_pct=round((1-quantum_steps/classical_steps)*100,1),
-        explanation=(f"Grover's algorithm searches {n:,} unsorted items in ~{quantum_steps:,} oracle calls "
-                     f"vs {n:,} classical comparisons - a {speedup:.1f}x speedup. Requires {qubits} qubits."),
-    )
+def run_comparison_request(req: RunRequest) -> dict:
+    """Shared by this router and the benchmark dashboard."""
+    algo = req.algorithm
+    if algo == "search":
+        n_qubits = req.n_qubits
+        if n_qubits is None and req.items is None:
+            n_qubits = min(12, max(2, math.ceil(math.log2(req.input_size)))) if req.input_size else 6
+        return compare_search(n_qubits=n_qubits, target_index=req.target_index, items=req.items,
+                              target=req.target, shots=req.shots, seed=req.seed)
+    if algo == "factoring":
+        N = req.N or req.input_size or 21
+        return compare_factoring(N=N, a=req.a, shots=req.shots, seed=req.seed)
+    if algo == "optimization":
+        cities = req.cities
+        if not cities:
+            k = min(MAX_TSP_CITIES, max(3, req.input_size or 4))
+            cities = DEFAULT_CITIES[:k]
+        return compare_optimization(cities=cities, p=req.layers, shots=req.shots, seed=req.seed)
+    # database
+    n_records = req.n_records or (min(req.input_size, 2 ** MAX_GROVER_QUBITS) if req.input_size else None)
+    return compare_database(records=req.records, query=req.query or "Research",
+                            n_records=n_records, shots=req.shots, seed=req.seed)
 
-def _simulate_factoring(n: int) -> AlgoResult:
-    classical_steps = max(1, int(math.sqrt(n)))
-    log_n           = max(1, int(math.log2(n+1)))
-    quantum_steps   = max(1, log_n**3)
-    t0 = time.perf_counter(); _ = [i for i in range(2,int(math.sqrt(n))+1) if n%i==0]; classical_ms=(time.perf_counter()-t0)*1000
-    t0 = time.perf_counter(); _ = sum(range(quantum_steps)); quantum_ms=(time.perf_counter()-t0)*1000
-    qubits  = 2*log_n+3
-    speedup = classical_steps/max(1,quantum_steps)
-    return AlgoResult(
-        algorithm="factoring", input_size=n,
-        classical_algo="Trial Division", classical_complexity="O(sqrt(N))",
-        classical_steps=classical_steps, classical_time_ms=round(classical_ms,4),
-        quantum_algo="Shor's Algorithm (QFT)", quantum_complexity="O((log N)^3)",
-        quantum_steps=quantum_steps, quantum_time_ms=round(quantum_ms,4),
-        speedup_factor=round(max(speedup,1.0),2), qubits_required=qubits,
-        accuracy_pct=97.8,
-        step_reduction_pct=round(max(0.0,(1-quantum_steps/classical_steps)*100),1),
-        explanation=(f"Factoring N={n:,}: Trial Division needs ~{classical_steps:,} steps. "
-                     f"Shor's QFT algorithm needs only ~{quantum_steps:,} steps. Requires {qubits} qubits."),
-    )
 
-def _simulate_optimization(n: int) -> AlgoResult:
-    classical_steps = n*n
-    p_layers        = max(1, int(math.log2(n+1)))
-    quantum_steps   = p_layers*n
-    t0 = time.perf_counter(); _ = [[0]*min(n,100) for _ in range(min(n,100))]; classical_ms=(time.perf_counter()-t0)*1000
-    t0 = time.perf_counter(); _ = sum(range(quantum_steps)); quantum_ms=(time.perf_counter()-t0)*1000
-    qubits  = min(n,20)
-    speedup = classical_steps/max(1,quantum_steps)
-    return AlgoResult(
-        algorithm="optimization", input_size=n,
-        classical_algo="Greedy Nearest-Neighbour", classical_complexity="O(N^2)",
-        classical_steps=classical_steps, classical_time_ms=round(classical_ms,4),
-        quantum_algo="QAOA", quantum_complexity="O(p*N)",
-        quantum_steps=quantum_steps, quantum_time_ms=round(quantum_ms,4),
-        speedup_factor=round(speedup,2), qubits_required=qubits,
-        accuracy_pct=94.2,
-        step_reduction_pct=round((1-quantum_steps/classical_steps)*100,1),
-        explanation=(f"TSP with {n} cities: Greedy NN needs {classical_steps:,} comparisons. "
-                     f"QAOA (p={p_layers} layers) solves it in {quantum_steps:,} steps - {speedup:.1f}x faster."),
-    )
+@router.post("/run")
+def run_comparison(req: RunRequest, user: Optional[User] = Depends(get_optional_user)):
+    """
+    Run both sides for real: the classical baseline on the CPU and the quantum
+    algorithm on the QAIBridge state-vector kernel. Returns answers, step
+    counts, success probabilities, circuit statistics, chart data and the
+    equivalent Qiskit code. Signed-in users' runs are saved to the Module 8
+    dashboard history.
+    """
+    try:
+        with simulation_slot():
+            result = run_comparison_request(req)
+    except MemoryError as e:
+        raise HTTPException(400, str(e))
+    except (ValueError, IndexError) as e:
+        raise HTTPException(422, str(e))
+    if user is not None:
+        title, summary = history.sfod_summary(result)
+        result["run_id"] = history.record_run(user.id, KIND_SFOD, title, summary,
+                                              duration_ms=result["quantum"].get("time_ms"))
+    return result
 
-def _simulate_database(n: int) -> AlgoResult:
-    classical_steps = n
-    quantum_steps   = max(1, int(math.sqrt(n)))
-    t0 = time.perf_counter(); _ = list(range(n)); classical_ms=(time.perf_counter()-t0)*1000
-    t0 = time.perf_counter(); _ = list(range(quantum_steps)); quantum_ms=(time.perf_counter()-t0)*1000
-    qubits  = max(1, math.ceil(math.log2(n+1)))
-    speedup = classical_steps/quantum_steps
-    return AlgoResult(
-        algorithm="database", input_size=n,
-        classical_algo="Sequential Scan", classical_complexity="O(N)",
-        classical_steps=classical_steps, classical_time_ms=round(classical_ms,4),
-        quantum_algo="Amplitude Amplification", quantum_complexity="O(sqrt(N))",
-        quantum_steps=quantum_steps, quantum_time_ms=round(quantum_ms,4),
-        speedup_factor=round(speedup,2), qubits_required=qubits,
-        accuracy_pct=99.1,
-        step_reduction_pct=round((1-quantum_steps/classical_steps)*100,1),
-        explanation=(f"Searching {n:,} records: Classical scan reads all {n:,} entries. "
-                     f"Amplitude Amplification finds the target in ~{quantum_steps:,} queries - {speedup:.1f}x speedup."),
-    )
-
-_RUNNERS = {"search":_simulate_search,"factoring":_simulate_factoring,
-            "optimization":_simulate_optimization,"database":_simulate_database}
-
-@router.post("/run", response_model=AlgoResult)
-def run_comparison(req: RunRequest):
-    return _RUNNERS[req.algorithm](req.input_size)
 
 @router.post("/tutorial", response_model=TutorialSession)
 def get_tutorial(req: TutorialRequest):
     """Get step-by-step walkthrough tutorial for an algorithm."""
     return generate_tutorial(req.algorithm, req.input_size)
 
+
+@router.get("/presets")
+def presets():
+    return {
+        "search": {"max_qubits": MAX_GROVER_QUBITS, "default_qubits": 6},
+        "factoring": {"max_N": MAX_SHOR_N, "examples": [15, 21, 33, 35, 39, 51, 55, 77, 85, 91, 119]},
+        "optimization": {"max_cities": MAX_TSP_CITIES, "default": DEFAULT_CITIES[:4],
+                         "known_cities": sorted(name.title() for name in KNOWN_CITIES)},
+        "database": {"default_records": 256, "sample": synthetic_records(6),
+                     "queries": ["Research", "age > 60", "city = Lahore", "Data Science", "age < 25"]},
+    }
+
+
 @router.get("/info")
 def algorithm_info():
-    return {"algorithms":[
-        {"key":"search","label":"Search","tagline":"Find a target in an unsorted dataset",
-         "classical":{"algo":"Linear Search","complexity":"O(N)"},
-         "quantum":{"algo":"Grover's Algorithm","complexity":"O(sqrt(N))"},"speedup_type":"Quadratic"},
-        {"key":"factoring","label":"Factoring","tagline":"Decompose a number into prime factors",
-         "classical":{"algo":"Trial Division","complexity":"O(sqrt(N))"},
-         "quantum":{"algo":"Shor's Algorithm (QFT)","complexity":"O((log N)^3)"},"speedup_type":"Exponential"},
-        {"key":"optimization","label":"Optimization","tagline":"Find the shortest route through cities",
-         "classical":{"algo":"Greedy Nearest-Neighbour","complexity":"O(N^2)"},
-         "quantum":{"algo":"QAOA","complexity":"O(p*N)"},"speedup_type":"Polynomial"},
-        {"key":"database","label":"Database","tagline":"Query matching records in unstructured data",
-         "classical":{"algo":"Sequential Scan","complexity":"O(N)"},
-         "quantum":{"algo":"Amplitude Amplification","complexity":"O(sqrt(N))"},"speedup_type":"Quadratic"},
+    return {"algorithms": [
+        {"key": "search", "label": "Search", "tagline": "Find a target in an unsorted dataset",
+         "classical": {"algo": "Linear Search", "complexity": "O(N)"},
+         "quantum": {"algo": "Grover's Algorithm", "complexity": "O(√N)"}, "speedup_type": "Quadratic"},
+        {"key": "factoring", "label": "Factoring", "tagline": "Decompose a number into prime factors",
+         "classical": {"algo": "Trial Division", "complexity": "O(√N)"},
+         "quantum": {"algo": "Shor's Algorithm (QFT)", "complexity": "O((log N)³)"}, "speedup_type": "Exponential"},
+        {"key": "optimization", "label": "Optimization", "tagline": "Find the shortest route through cities",
+         "classical": {"algo": "Exhaustive search / greedy", "complexity": "O(N!) / O(N²)"},
+         "quantum": {"algo": "QAOA", "complexity": "variational (p layers)"}, "speedup_type": "Heuristic"},
+        {"key": "database", "label": "Database", "tagline": "Query matching records in unstructured data",
+         "classical": {"algo": "Sequential Scan", "complexity": "O(N)"},
+         "quantum": {"algo": "Amplitude Amplification", "complexity": "O(√(N/M))"}, "speedup_type": "Quadratic"},
     ]}

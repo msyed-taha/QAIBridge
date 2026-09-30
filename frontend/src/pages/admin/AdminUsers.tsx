@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Search, Loader2, Trash2, ShieldCheck, User as UserIcon, Check, X, UserPlus } from 'lucide-react';
+import { Search, Loader2, Trash2, ShieldCheck, User as UserIcon, Check, X, UserPlus, Crown } from 'lucide-react';
 import { adminApi } from '../../api/admin';
 import { getApiErrorMessage } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -63,7 +63,7 @@ export function AdminUsers() {
   };
 
   return (
-    <AdminLayout title="Users" subtitle="Every registered account. You can't change your own role or status.">
+    <AdminLayout title="Users" subtitle="Every registered account. You can't change your own role or status, or the owner's.">
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="relative flex-1 min-w-[16rem] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
@@ -125,17 +125,30 @@ export function AdminUsers() {
               {!loading && users.map(u => {
                 const self = u.id === me?.id;
                 const busy = busyId === u.id;
+                const locked = self || u.is_owner;
+                const ownerNote = "The owner account can't be changed";
+                // A self-deleted account is frozen until the user signs up again.
+                const deletedNote = u.deleted_at
+                  ? `Deleted by the user on ${new Date(u.deleted_at).toLocaleDateString()}. Only they can restore it, by signing up again.`
+                  : null;
                 return (
                   <tr key={u.id} className="border-b border-quantum-700/50 last:border-0">
                     <td className="px-4 py-3">
-                      <p className="text-white font-medium">{u.username}{self && <span className="text-gray-600 font-normal"> (you)</span>}</p>
+                      <p className="text-white font-medium flex items-center gap-2">
+                        <span>{u.username}{self && <span className="text-gray-600 font-normal"> (you)</span>}</span>
+                        {u.is_owner && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            <Crown className="w-3 h-3" />owner
+                          </span>
+                        )}
+                      </p>
                       <p className="text-gray-600 text-xs">{u.email}</p>
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        disabled={self || busy}
+                        disabled={locked || !!deletedNote || busy}
                         onClick={() => patch(u.id, { role: u.role === 'admin' ? 'user' : 'admin' })}
-                        title={self ? "You can't change your own role" : 'Toggle admin role'}
+                        title={u.is_owner ? ownerNote : self ? "You can't change your own role" : deletedNote ?? 'Toggle admin role'}
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                           u.role === 'admin'
                             ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
@@ -148,26 +161,28 @@ export function AdminUsers() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        disabled={self || busy}
+                        disabled={locked || !!deletedNote || busy}
                         onClick={() => patch(u.id, { is_active: !u.is_active })}
-                        title={self ? "You can't deactivate yourself" : 'Toggle active status'}
+                        title={u.is_owner ? ownerNote : self ? "You can't deactivate yourself" : deletedNote ?? 'Toggle active status'}
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                           u.is_active
                             ? 'bg-teal-500/15 text-teal-300 border-teal-500/30 hover:bg-teal-500/25'
+                            : u.deleted_at
+                            ? 'bg-quantum-700 text-gray-400 border-quantum-600'
                             : 'bg-red-500/15 text-red-300 border-red-500/30 hover:bg-red-500/25'
                         }`}
                       >
-                        {u.is_active ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        {u.is_active ? 'active' : 'inactive'}
+                        {u.is_active ? <Check className="w-3 h-3" /> : u.deleted_at ? <Trash2 className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        {u.is_active ? 'active' : u.deleted_at ? 'deleted' : 'inactive'}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-gray-500">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-3 text-gray-500">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'never'}</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        disabled={self || busy}
+                        disabled={locked || busy}
                         onClick={() => remove(u)}
-                        title={self ? "You can't delete yourself" : 'Delete user'}
+                        title={u.is_owner ? ownerNote : self ? "You can't delete yourself" : 'Delete user'}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}

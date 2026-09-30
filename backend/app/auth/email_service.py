@@ -19,6 +19,10 @@ from email.mime.text      import MIMEText
 # real error instead.
 SMTP_TIMEOUT_SECONDS = 15
 
+# What users see when sending fails. The real cause (missing credentials, SMTP
+# rejection, ...) goes to the server log only — it's for the operator, not users.
+EMAIL_UNAVAILABLE = "We couldn't send the verification email right now. Please try again in a few minutes."
+
 
 def send_otp(
     to_email: str,

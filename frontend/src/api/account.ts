@@ -6,6 +6,7 @@ export interface AccountProfile {
   username:   string;
   email:      string;
   role:       Role;
+  is_owner:   boolean;
   created_at: string | null;
 }
 
