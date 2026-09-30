@@ -105,6 +105,15 @@ LLM_API_KEY=sk-ant-…                # Anthropic (auto-detected) — or an Open
 
 Without a key the Transformer uses its offline analyzer; the page shows which engine is active.
 
+### Publishing on a real domain
+
+Link previews (WhatsApp, LinkedIn, X …) need the full address of the preview image,
+so pass the site's address when building the frontend:
+
+```bash
+SITE_URL=https://your-domain.com npm run build
+```
+
 ## 🧪 Tests
 
 ```bash
