@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare } from 'lucide-react';
-import { QAIBridgeLogo } from '../components/layout/QAIBridgeLogo';
+import { ArrowRight, ArrowDown, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare, ShieldCheck } from 'lucide-react';
 
 const CAPABILITIES = [
   {
@@ -54,6 +53,13 @@ const FEATURES = [
   'Classical & Quantum comparison for every problem',
   'AI agent solves the Barren Plateau automatically',
   'Full Docker support for easy deployment',
+];
+
+// Short, verifiable claims under the hero buttons.
+const HERO_PROOF = [
+  { icon: ShieldCheck, text: 'Simulator checked against IBM Qiskit' },
+  { icon: CheckCircle, text: 'Quantum answers checked against classical ones' },
+  { icon: Cpu,         text: 'No quantum hardware needed' },
 ];
 
 // Real screenshots of the app (public/showcase/), captured from actual runs.
@@ -124,62 +130,59 @@ export function Home() {
         <div className="absolute top-10 right-1/4 w-96 h-96 bg-teal-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-4xl mx-auto">
-          {/* Logo big */}
-          <div className="flex justify-center mb-8">
-            <QAIBridgeLogo size={64} showText={false} />
-          </div>
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-6">
-            <span className="w-2 h-2 rounded-full bg-quantum-neon animate-pulse" />
-            Quantum Simulation &nbsp;·&nbsp; AI-Driven &nbsp;·&nbsp; Open Platform
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-6xl sm:text-7xl font-extrabold tracking-tight mb-6 leading-none">
-            <span className="text-white">QAI</span>
+          {/* Heading — what the product does for you, not its name */}
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.08] mb-6">
+            Find out if{' '}
             <span className="text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
-              bridge
-            </span>
+              quantum computing
+            </span>{' '}
+            can solve your problem
           </h1>
 
-          <p className="text-xl sm:text-2xl text-gray-300 font-medium mb-4">
-            The AI-Driven Quantum Simulation Platform
-          </p>
-
-          <p className="text-gray-500 text-base max-w-2xl mx-auto leading-relaxed mb-10">
-            QAIbridge bridges the gap between classical computing and quantum mechanics —
-            making quantum simulation, benchmarking, and circuit design accessible to everyone,
-            without expensive hardware or a physics degree.
+          <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
+            Describe your problem in plain English or paste your code. QAIbridge picks the right
+            quantum algorithm, runs it on a built-in quantum simulator, and checks the answer
+            against the classical one.
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto">
             <Link
               to="/register"
-              className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
               style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
             >
-              Create Free Account
+              Try it free
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link
-              to="/login"
-              className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all hover:scale-105"
+            <a
+              href="#see-it-in-action"
+              onClick={e => {
+                e.preventDefault();
+                document.getElementById('see-it-in-action')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all hover:scale-105"
             >
-              Sign In
-            </Link>
+              See how it works
+              <ArrowDown className="w-4 h-4" />
+            </a>
           </div>
 
-          <p className="text-gray-700 text-xs mt-5">
-            Free to use. No credit card required. No QPU hardware needed.
-          </p>
+          {/* Proof points */}
+          <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-xs sm:text-sm text-gray-500">
+            {HERO_PROOF.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-1.5">
+                <Icon className="w-4 h-4 text-quantum-neon" />
+                {text}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* ── SEE IT IN ACTION ────────────────────────────────────────────── */}
-      <section className="py-20 px-6 border-t border-quantum-700">
+      <section id="see-it-in-action" className="py-20 px-6 border-t border-quantum-700 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">See it in action</p>
