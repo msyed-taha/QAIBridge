@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BookOpen, Database, Dice5, Hash, Loader2, Play, Search, Shuffle, X } from 'lucide-react';
 import { TutorialWalkthrough } from '../components/module2/TutorialWalkthrough';
 import { HowToUse } from '../components/shared/HowToUse';
@@ -48,8 +49,13 @@ function Label({ children }: { children: React.ReactNode }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const isAlgo = (v: string | null): v is AlgoKey => ALGOS.some(a => a.key === v);
+
 export function Module2Page() {
-  const [selected, setSelected] = useState<AlgoKey>('search');
+  // ?type=search|factoring|optimization|database opens that tab (used by the footer links)
+  const [params, setParams] = useSearchParams();
+  const typeParam = params.get('type');
+  const [selected, setSelected] = useState<AlgoKey>(() => (isAlgo(typeParam) ? typeParam : 'search'));
   const [presets, setPresets] = useState<Module2Presets>(FALLBACK_PRESETS);
 
   // Search
@@ -94,7 +100,17 @@ export function Module2Page() {
     setSelected(key);
     setResult(null);
     setError(null);
+    setParams({ type: key }, { replace: true });   // keep the address in step with the tab
   };
+
+  // Follow the address when it changes while on this page (e.g. another footer link).
+  useEffect(() => {
+    if (isAlgo(typeParam)) {
+      setSelected(typeParam);
+      setResult(null);
+      setError(null);
+    }
+  }, [typeParam]);
 
   const handleRun = async () => {
     setLoading(true);

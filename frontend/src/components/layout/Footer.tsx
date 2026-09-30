@@ -10,11 +10,12 @@ const QUICK_LINKS = [
   { label: 'Contact',     to: '/contact' },
 ];
 
+// Each opens the Classical-vs-Quantum page (Module 2) on that problem's tab.
 const PROBLEM_LINKS = [
-  { label: "Search — Grover's Algorithm",       to: '/simulator?type=search' },
-  { label: "Factoring — Shor's Algorithm",      to: '/simulator?type=factoring' },
-  { label: 'Optimization — QAOA',               to: '/simulator?type=optimization' },
-  { label: 'Database — Amplitude Amplification',to: '/simulator?type=database' },
+  { label: "Search — Grover's Algorithm",       to: '/module2?type=search' },
+  { label: "Factoring — Shor's Algorithm",      to: '/module2?type=factoring' },
+  { label: 'Optimization — QAOA',               to: '/module2?type=optimization' },
+  { label: 'Database — Amplitude Amplification',to: '/module2?type=database' },
 ];
 
 export function Footer() {

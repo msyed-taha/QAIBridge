@@ -20,7 +20,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthed) {
-    return <Navigate to="/login" state={{ from: location.pathname, as: 'admin' }} replace />;
+    return <Navigate to="/login" state={{ from: location.pathname + location.search, as: 'admin' }} replace />;
   }
 
   if (!isAdmin) {
