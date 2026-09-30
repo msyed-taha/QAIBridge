@@ -1,115 +1,170 @@
-import { Cpu, Zap, BarChart2, Brain, BookOpen, Shield, ArrowRight, Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  Brain, Code2, BarChart2, BookOpen, Cpu, Activity, GraduationCap, FlaskConical, Briefcase,
+  ShieldCheck, CheckCircle, Info, ArrowRight, Mail, Sparkles,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-const MODULES = [
-  { id: '01', title: 'Custom Simulation Kernel',     icon: Cpu,      color: 'from-teal-500 to-cyan-400',    status: 'live', desc: 'Proprietary NumPy state-vector engine: 20+ qubits (up to 28, RAM permitting), 30+ gates, memory guard, verified against IBM Qiskit.' },
-  { id: '02', title: 'SFOD Comparison Suite',        icon: Zap,      color: 'from-purple-500 to-pink-400',  status: 'live', desc: "Grover's search, Shor's factoring, QAOA optimisation and amplitude amplification — each run side by side with its classical baseline." },
-  { id: '03', title: 'Educational Circuit Builder',  icon: BookOpen, color: 'from-green-500 to-emerald-400', status: 'live', desc: 'Drag-and-drop circuit canvas with live Bloch spheres and gamified challenge levels — no physics background needed.' },
-  { id: '04', title: 'AI Architecture Advisor',      icon: Brain,    color: 'from-orange-500 to-yellow-400', status: 'live', desc: 'Random Forest classifier (with domain rules) that recommends quantum or classical and the best algorithm, then solves your data.' },
-  { id: '05', title: 'Classical → Quantum Transformer', icon: Code2, color: 'from-blue-500 to-indigo-400',  status: 'live', desc: 'Turns classical code into QUBO / Ising Hamiltonians or oracles (LLM or offline engine), runs the circuit and verifies the answer.' },
-  { id: '06', title: 'Neural Angle Optimizer',       icon: Zap,      color: 'from-red-500 to-rose-400',    status: 'live', desc: 'Deep learning tunes gate angles and QAOA γ/β, with a live barren-plateau monitor and mitigation.' },
-  { id: '07', title: 'QNN Converter',                icon: Shield,   color: 'from-pink-500 to-fuchsia-400', status: 'live', desc: 'Maps a classical neural network to a quantum neural network and compares their training and structure.' },
-  { id: '08', title: 'Performance Dashboard',        icon: BarChart2, color: 'from-amber-500 to-yellow-400', status: 'live', desc: 'Live quantum-vs-classical benchmarks streamed over WebSockets, run history and CSV export.' },
+// What people can do — in plain words, no module numbers or internal names.
+const FEATURES = [
+  {
+    icon: Brain, color: 'from-orange-500 to-pink-500', title: 'Ask the AI Advisor',
+    desc: 'Describe your problem in plain English, or upload a PDF, Word or CSV file. It tells you whether quantum computing would help and which algorithm fits.',
+  },
+  {
+    icon: Code2, color: 'from-blue-500 to-indigo-400', title: 'Turn code into a quantum circuit',
+    desc: 'Paste a Python program. QAIbridge works out what it computes, rewrites it for a quantum computer, runs it and checks the result against your code.',
+  },
+  {
+    icon: BarChart2, color: 'from-teal-500 to-cyan-400', title: 'Compare quantum and classical',
+    desc: "Run Grover's search, Shor's factoring and QAOA next to the best classical method, on examples or on your own data.",
+  },
+  {
+    icon: BookOpen, color: 'from-green-500 to-emerald-400', title: 'Learn by building circuits',
+    desc: 'Drag gates onto a circuit, watch the qubits change on live Bloch spheres, and work through challenge levels.',
+  },
+  {
+    icon: Cpu, color: 'from-purple-500 to-fuchsia-400', title: 'Simulate on an ordinary computer',
+    desc: 'A built-in quantum simulator runs circuits of 20+ qubits on a normal CPU, with live progress as each gate runs.',
+  },
+  {
+    icon: Activity, color: 'from-amber-500 to-yellow-400', title: 'Track performance',
+    desc: 'Run live benchmarks, keep a history of your runs and export the numbers as CSV.',
+  },
 ];
 
-const TECH_STACK = [
-  { layer: 'Simulation Engine', tech: 'Python · NumPy · SciPy (own kernel — Qiskit only as a benchmark)' },
-  { layer: 'AI / ML',           tech: 'scikit-learn · PyTorch · optional LLM (Claude / OpenAI-compatible)' },
-  { layer: 'Backend API',       tech: 'FastAPI · Uvicorn · WebSockets' },
-  { layer: 'Data',              tech: 'PostgreSQL · SQLAlchemy · Alembic' },
-  { layer: 'Frontend',          tech: 'React · TypeScript · Vite · Tailwind CSS' },
-  { layer: 'Visualisation',     tech: 'Plotly.js · SVG Bloch spheres' },
-  { layer: 'Infrastructure',    tech: 'Docker · Docker Compose' },
+const AUDIENCE = [
+  { icon: GraduationCap, title: 'Students', desc: 'Learn how quantum algorithms work by running them, not just reading about them.' },
+  { icon: FlaskConical, title: 'Researchers', desc: 'Test ideas quickly and compare quantum methods against solid classical baselines.' },
+  { icon: Code2, title: 'Developers', desc: 'See how everyday code maps onto quantum circuits, and export them to Qiskit.' },
+  { icon: Briefcase, title: 'Businesses', desc: 'Find out whether quantum computing could help with your routing, finance or search problems before investing in it.' },
+];
+
+const TRUST = [
+  {
+    icon: ShieldCheck, title: 'Checked against IBM Qiskit',
+    desc: "Our simulator gives the same results as IBM's Qiskit on more than 200 test circuits.",
+  },
+  {
+    icon: CheckCircle, title: 'Every answer double-checked',
+    desc: 'Each quantum result is compared with the classical answer, and the page tells you whether they match.',
+  },
+  {
+    icon: Info, title: 'Honest about limits',
+    desc: "If quantum computing won't help, QAIbridge says so. Because quantum computers are simulated on ordinary hardware, problems are kept small, and the charts show how each approach scales.",
+  },
 ];
 
 export function About() {
+  const { isAuthed } = useAuth();
+
   return (
     <div className="min-h-screen">
 
       {/* ── HERO ──────────────────────────────────────────────────────── */}
-      <section className="relative px-6 pt-16 pb-12 text-center overflow-hidden">
+      <section className="relative px-6 pt-16 pb-14 text-center overflow-hidden">
         <div className="absolute top-0 left-1/3 w-80 h-80 bg-quantum-purple opacity-10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-10 right-1/4 w-64 h-64 bg-teal-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-6">
-            <span className="w-2 h-2 rounded-full bg-quantum-neon animate-pulse" />
-            About QAIbridge
-          </div>
-
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
-            Bridging the Gap Between{' '}
-            <span
-              className="text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}
-            >
-              Classical & Quantum
+          <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-4">About QAIbridge</p>
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-5 leading-tight">
+            Quantum computing,{' '}
+            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
+              made practical
             </span>
           </h1>
-
-          <p className="text-gray-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            QAIbridge is an AI-driven quantum simulation platform that automates circuit design,
-            benchmarks performance, and makes quantum computing accessible — without requiring
-            quantum physics expertise or expensive QPU hardware.
+          <p className="text-gray-400 text-base sm:text-lg leading-relaxed">
+            QAIbridge helps you find out whether quantum computing can solve your problem,
+            and shows you the answer with real runs, side by side with the classical one.
           </p>
         </div>
       </section>
 
-      {/* ── WHAT IS IT ────────────────────────────────────────────────── */}
-      <section className="py-14 px-6 bg-quantum-800/30">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-6">What is QAIbridge?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-400 leading-relaxed">
-            <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-400 flex items-center justify-center mb-3">
-                <Cpu className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-white font-semibold mb-2">Simulate</h3>
-              <p>Run quantum circuits on 20+ qubits (up to 28, RAM permitting) using a custom-built state-vector engine. No Qiskit inside. No cloud QPU. Everything runs on local CPU.</p>
-            </div>
-            <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center mb-3">
-                <BarChart2 className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-white font-semibold mb-2">Benchmark</h3>
-              <p>Compare Quantum vs Classical algorithms head-to-head across Search, Factoring, Optimization, and Database problems with live complexity charts.</p>
-            </div>
-            <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-400 flex items-center justify-center mb-3">
-                <Brain className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-white font-semibold mb-2">Automate</h3>
-              <p>AI modules handle circuit design, gate optimization, code transpilation, and neural architecture conversion — removing the need for quantum expertise.</p>
-            </div>
+      {/* ── WHY ───────────────────────────────────────────────────────── */}
+      <section className="py-14 px-6 bg-quantum-800/30 border-y border-quantum-700">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-6">
+            <p className="text-red-300/80 text-xs font-semibold uppercase tracking-widest mb-3">The problem</p>
+            <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+              Quantum computing is in the news every week, but trying it usually means special
+              hardware, a physics background and unfamiliar code. Most people can't tell whether
+              it would help with their own problem at all.
+            </p>
+          </div>
+          <div className="bg-quantum-800 border border-teal-800/60 rounded-2xl p-6">
+            <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">Our answer</p>
+            <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+              Start from your own problem, written in plain English or as ordinary code.
+              QAIbridge picks the right quantum method, runs it on a built-in simulator and
+              compares it with the classical answer, so you can see the difference for yourself.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── 8 MODULES ─────────────────────────────────────────────────── */}
-      <section className="py-14 px-6">
+      {/* ── WHAT YOU CAN DO ───────────────────────────────────────────── */}
+      <section className="py-16 px-6">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-2">Platform Modules</h2>
-          <p className="text-gray-500 text-sm mb-8">Seven integrated modules covering simulation, AI optimization, education, and benchmarking.</p>
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">What you can do</h2>
+            <p className="text-gray-500 text-sm">Nothing to install, and no quantum hardware needed.</p>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {MODULES.map(m => {
-              const Icon = m.icon;
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURES.map(f => {
+              const Icon = f.icon;
               return (
-                <div key={m.id} className="flex gap-4 bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 transition-all">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${m.color} flex items-center justify-center flex-shrink-0`}>
+                <div key={f.title} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5 hover:border-quantum-600 transition-all">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4`}>
                     <Icon className="w-5 h-5 text-white" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-gray-600">{m.id}</span>
-                      <h3 className="text-white font-semibold text-sm truncate">{m.title}</h3>
-                      {m.status === 'live' ? (
-                        <span className="ml-auto flex-shrink-0 text-[10px] bg-teal-900/50 text-quantum-neon border border-teal-800 px-2 py-0.5 rounded-full">Live</span>
-                      ) : (
-                        <span className="ml-auto flex-shrink-0 text-[10px] bg-quantum-700 text-gray-500 px-2 py-0.5 rounded-full">Soon</span>
-                      )}
-                    </div>
-                    <p className="text-gray-500 text-xs leading-relaxed">{m.desc}</p>
+                  <h3 className="text-white font-semibold text-base mb-2">{f.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="flex items-start sm:items-center justify-center gap-2 text-gray-500 text-sm mt-6 text-center">
+            <Sparkles className="w-4 h-4 text-quantum-purple flex-shrink-0 mt-0.5 sm:mt-0" />
+            <span>Plus research tools: AI that tunes quantum circuits, and a converter that turns classical neural networks into quantum ones.</span>
+          </p>
+        </div>
+      </section>
+
+      {/* ── WHO IT'S FOR ──────────────────────────────────────────────── */}
+      <section className="py-16 px-6 bg-quantum-800/30 border-y border-quantum-700">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-10 text-center">Who it's for</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {AUDIENCE.map(a => {
+              const Icon = a.icon;
+              return (
+                <div key={a.title} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
+                  <Icon className="w-6 h-6 text-quantum-neon mb-3" />
+                  <h3 className="text-white font-semibold text-base mb-1.5">{a.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{a.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TRUST ─────────────────────────────────────────────────────── */}
+      <section className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-10 text-center">Why you can trust the results</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {TRUST.map(t => {
+              const Icon = t.icon;
+              return (
+                <div key={t.title} className="flex gap-4 bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
+                  <Icon className="w-5 h-5 text-quantum-neon flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-white font-semibold text-sm mb-1.5">{t.title}</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed">{t.desc}</p>
                   </div>
                 </div>
               );
@@ -118,36 +173,26 @@ export function About() {
         </div>
       </section>
 
-      {/* ── TECH STACK ────────────────────────────────────────────────── */}
-      <section className="py-14 px-6 bg-quantum-800/30">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-8">Technology Stack</h2>
-          <div className="space-y-3">
-            {TECH_STACK.map(t => (
-              <div key={t.layer} className="flex items-center gap-4 bg-quantum-800 border border-quantum-700 rounded-xl px-5 py-3">
-                <span className="text-gray-500 text-sm w-40 flex-shrink-0">{t.layer}</span>
-                <div className="h-px flex-1 bg-quantum-700" />
-                <span className="text-quantum-neon font-mono text-sm">{t.tech}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── CTA ──────────────────────────────────────────────────────── */}
-      <section className="py-16 px-6 text-center">
+      <section className="py-16 px-6 text-center border-t border-quantum-700">
         <div className="max-w-xl mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-3">Ready to explore quantum computing?</h2>
-          <p className="text-gray-400 text-sm mb-8">Start with the Simulation Kernel to see quantum advantage in action.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">See what quantum can do for your problem</h2>
+          <p className="text-gray-400 text-sm mb-8">Free to use. Questions? We read every message.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto">
             <Link
-              to="/simulator"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-black text-sm hover:scale-105 transition-all"
+              to={isAuthed ? '/app' : '/register'}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-xl font-bold text-black text-sm hover:scale-105 hover:brightness-110 transition-all"
               style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
             >
-              <Cpu className="w-4 h-4" />
-              Launch Simulator
+              {isAuthed ? 'Open the app' : 'Try it free'}
               <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/contact"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all"
+            >
+              <Mail className="w-4 h-4" />
+              Contact us
             </Link>
           </div>
         </div>
