@@ -37,15 +37,15 @@ def verify(email: str, otp: str) -> tuple[bool, str]:
     entry = _store.get(email)
 
     if not entry:
-        return False, "No OTP found for this email. Please request a new one."
+        return False, "No code found for this email. Please request a new one."
 
     if datetime.utcnow() > entry["expires_at"]:
         _store.pop(email, None)
-        return False, "OTP has expired. Please request a new one."
+        return False, "This code has expired. Please request a new one."
 
     if entry["attempts"] >= MAX_ATTEMPTS:
         _store.pop(email, None)
-        return False, "Too many failed attempts. Please request a new OTP."
+        return False, "Too many wrong attempts. Please request a new code."
 
     entry["attempts"] += 1
 

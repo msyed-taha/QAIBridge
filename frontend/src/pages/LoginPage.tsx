@@ -4,6 +4,7 @@ import { Mail, Lock, LogIn, Loader2, Zap, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { detailToMessage, friendlyError } from '../api/client';
 import { FirstAdminSetup } from './FirstAdminSetup';
+import { RevealPasswordButton } from '../components/shared/RevealPasswordButton';
 
 type Mode = 'user' | 'admin';
 
@@ -22,6 +23,7 @@ export function LoginPage() {
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
+  const [showPwd,  setShowPwd]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [loading,  setLoading]  = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -128,13 +130,15 @@ export function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                 <input
-                  type="password"
+                  type={showPwd ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                 />
+                <RevealPasswordButton shown={showPwd} onToggle={() => setShowPwd(s => !s)} />
               </div>
               <div className="text-right mt-2">
                 <Link

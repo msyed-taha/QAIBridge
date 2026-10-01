@@ -135,7 +135,7 @@ def send_otp_endpoint(req: SendOtpRequest, db: Session = Depends(get_db)):
         log.exception("Sign-up OTP email could not be sent")
         raise HTTPException(503, EMAIL_UNAVAILABLE)
 
-    return {"message": "OTP sent successfully. Please check your inbox."}
+    return {"message": "We've sent a 5-digit code to your email. Please check your inbox."}
 
 
 # ── OTP: verify ───────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     """
 
     if not otp_store.is_verified(str(req.email)):
-        raise HTTPException(403, "Email not verified. Please complete OTP verification first.")
+        raise HTTPException(403, "Please verify your email with the code we sent first.")
 
     purge_expired(db)   # an account deleted over 30 days ago is erased, never restored
     existing = db.query(User).filter(User.email == req.email).first()
@@ -297,7 +297,7 @@ def forgot_password_send_otp(req: ForgotPasswordSendOtpRequest, db: Session = De
             log.exception("Password-reset OTP email could not be sent")
             raise HTTPException(503, EMAIL_UNAVAILABLE)
 
-    return {"message": "If an account exists for this email, an OTP has been sent. Please check your inbox."}
+    return {"message": "If an account exists for this email, we've sent a 5-digit code to it. Please check your inbox."}
 
 
 # ── Forgot Password: verify OTP ───────────────────────────────────────────────
@@ -310,7 +310,7 @@ def forgot_password_verify_otp(req: ForgotPasswordVerifyOtpRequest):
     if not success:
         raise HTTPException(400, error)
 
-    return {"message": "OTP verified successfully. You may now reset your password."}
+    return {"message": "Code verified. You can now set a new password."}
 
 
 # ── Forgot Password: reset password ────────────────────────────────────────────
@@ -321,7 +321,7 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
 
     # Check if OTP was verified
     if not otp_store.is_verified(f"forgot-password:{req.email}"):
-        raise HTTPException(403, "Please verify OTP first.")
+        raise HTTPException(403, "Please verify the code we sent first.")
 
     # Check if passwords match
     if req.new_password != req.confirm_new_password:

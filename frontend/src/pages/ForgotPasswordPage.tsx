@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Loader2, Zap, CheckCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { detailToMessage, friendlyError } from '../api/client';
+import { RevealPasswordButton } from '../components/shared/RevealPasswordButton';
 
 type Step = 'email' | 'otp' | 'password' | 'success';
 
@@ -19,6 +20,8 @@ export function ForgotPasswordPage() {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<{
@@ -52,7 +55,7 @@ export function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Failed to send OTP'));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Could not send the code'));
       setStep('otp');
     } catch (e: unknown) {
       setError(friendlyError(e));
@@ -72,7 +75,7 @@ export function ForgotPasswordPage() {
         body: JSON.stringify({ email, otp }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Failed to verify OTP'));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'That code didn\'t work'));
       setStep('password');
     } catch (e: unknown) {
       setError(friendlyError(e));
@@ -137,8 +140,8 @@ export function ForgotPasswordPage() {
                   {isAdmin ? 'Reset administrator password' : 'Reset Password'}
                 </h1>
                 <p className="text-gray-500 text-sm">
-                  {step === 'email' && (isAdmin ? "Enter the admin account's email to receive an OTP" : 'Enter your email to receive an OTP')}
-                  {step === 'otp' && 'Enter the 5-digit OTP from your email'}
+                  {step === 'email' && (isAdmin ? "Enter the admin account's email to receive a 5-digit code" : 'Enter your email to receive a 5-digit code')}
+                  {step === 'otp' && 'Enter the 5-digit code from your email'}
                   {step === 'password' && 'Create a new password'}
                 </p>
               </>
@@ -197,7 +200,7 @@ export function ForgotPasswordPage() {
                   </>
                 ) : (
                   <>
-                    <Mail className="w-4 h-4" /> Send OTP
+                    <Mail className="w-4 h-4" /> Send code
                   </>
                 )}
               </button>
@@ -218,11 +221,11 @@ export function ForgotPasswordPage() {
                 <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-gray-500" />
                 <span>
                   If an account exists for <span className="text-gray-200">{email}</span>, you'll receive a
-                  5-digit OTP there shortly. Check your spam folder if it doesn't arrive.
+                  5-digit code there shortly. Check your spam folder if it doesn't arrive.
                 </span>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">5-Digit OTP</label>
+                <label className="block text-xs text-gray-400 font-medium mb-1.5">5-digit code</label>
                 <input
                   type="text"
                   value={otp}
@@ -245,7 +248,7 @@ export function ForgotPasswordPage() {
                     <Loader2 className="w-4 h-4 animate-spin" /> Verifying…
                   </>
                 ) : (
-                  <>Verify OTP</>
+                  <>Verify code</>
                 )}
               </button>
             </form>
@@ -265,13 +268,15 @@ export function ForgotPasswordPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <input
-                    type="password"
+                    type={showNew ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => checkPasswordStrength(e.target.value)}
                     required
+                    autoComplete="new-password"
                     placeholder="••••••••"
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                   />
+                  <RevealPasswordButton shown={showNew} onToggle={() => setShowNew(s => !s)} />
                 </div>
 
                 {/* Password strength indicators */}
@@ -302,15 +307,17 @@ export function ForgotPasswordPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <input
-                    type="password"
+                    type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
+                    autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`w-full bg-quantum-900 border rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none transition-colors ${
+                    className={`w-full bg-quantum-900 border rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none transition-colors ${
                       confirmPassword && !passwordsMatch ? 'border-red-600 focus:border-red-500' : 'border-quantum-700 focus:border-quantum-neon/50'
                     }`}
                   />
+                  <RevealPasswordButton shown={showConfirm} onToggle={() => setShowConfirm(s => !s)} />
                 </div>
                 {confirmPassword && !passwordsMatch && <p className="text-red-400 text-xs mt-1">Passwords do not match</p>}
                 {confirmPassword && passwordsMatch && <p className="text-green-400 text-xs mt-1">Passwords match ✓</p>}

@@ -57,7 +57,7 @@ function getRequirements(pwd: string): Requirement[] {
 // ── Step indicator ────────────────────────────────────────────────────────────
 
 function Steps({ current }: { current: number }) {
-  const steps = ['Email', 'Verify OTP', 'Set Password'];
+  const steps = ['Email', 'Verify email', 'Set password'];
   return (
     <div className="flex items-center justify-center gap-2 mb-8">
       {steps.map((label, i) => {
@@ -141,7 +141,7 @@ export function RegisterPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to send OTP');
+      if (!res.ok) throw new Error(data.detail ?? 'Could not send the code');
       setStep(2);
       setResendIn(60);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
@@ -189,7 +189,7 @@ export function RegisterPage() {
         body: JSON.stringify({ email, otp: code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'OTP verification failed');
+      if (!res.ok) throw new Error(data.detail ?? 'That code didn\'t work');
       setStep(3);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
@@ -210,7 +210,7 @@ export function RegisterPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to resend OTP');
+      if (!res.ok) throw new Error(data.detail ?? 'Could not resend the code');
       setResendIn(60);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     } catch (e: unknown) {
