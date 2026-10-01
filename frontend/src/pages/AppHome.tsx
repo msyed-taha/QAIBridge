@@ -1,10 +1,106 @@
-import { Link } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, Hash, Shuffle, Database,
   Cpu, BarChart2, Zap, ChevronRight, ArrowRight,
-  BookOpen, Atom, TrendingUp, Star, Brain, Code2,
+  BookOpen, Atom, TrendingUp, Star, Brain, Code2, Upload,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// ── Ask the AI Advisor ────────────────────────────────────────────────────────
+
+// One click fills the box. Each one is detailed enough for the Advisor to accept.
+const EXAMPLES = [
+  'Shortest route for a van visiting 8 shops',
+  'Search 10 million unsorted records for a match',
+  'Factor a 2048-bit number to test encryption',
+];
+
+/**
+ * The first thing on the app home page: describe a problem in plain English
+ * and the AI Advisor (Module 4) answers it straight away. The question is
+ * passed as router state, not in the address, so it stays out of the history.
+ */
+function AskTheAdvisor() {
+  const [problem, setProblem] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const navigate = useNavigate();
+
+  const ask = () => {
+    const text = problem.trim();
+    if (text) navigate('/module4', { state: { problem: text } });
+  };
+
+  return (
+    <div>
+      <form
+        onSubmit={e => { e.preventDefault(); ask(); }}
+        className="glass-card rounded-2xl p-3 sm:p-4"
+      >
+        <label htmlFor="ask-advisor" className="sr-only">Describe your problem</label>
+        <textarea
+          id="ask-advisor"
+          ref={inputRef}
+          value={problem}
+          onChange={e => setProblem(e.target.value)}
+          onKeyDown={e => {
+            // Enter asks; Shift + Enter starts a new line (and typing with an
+            // input method, e.g. Urdu or Chinese, isn't cut short).
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              ask();
+            }
+          }}
+          rows={3}
+          placeholder="e.g. I run a delivery company. Each morning a van visits 8 shops and comes back. Which route is shortest?"
+          className="w-full bg-quantum-900/70 border border-quantum-600 rounded-xl px-4 py-3 text-sm sm:text-base text-white leading-relaxed placeholder-gray-500 resize-none focus:outline-none focus:border-quantum-neon/60 transition-colors"
+        />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="hidden sm:block text-xs text-gray-400">
+            <kbd className="font-sans text-gray-300">Enter</kbd> to ask · <kbd className="font-sans text-gray-300">Shift + Enter</kbd> for a new line
+          </p>
+          <button
+            type="submit"
+            disabled={!problem.trim()}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+          >
+            <Brain className="w-4 h-4" />
+            Ask the AI Advisor
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
+
+      {/* Examples */}
+      <p className="mt-5 mb-2 text-center text-xs text-gray-400">Or try an example</p>
+      <div className="flex flex-wrap justify-center gap-2">
+        {EXAMPLES.map(ex => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => { setProblem(ex); inputRef.current?.focus(); }}
+            className="text-xs text-gray-300 bg-quantum-800/80 border border-quantum-600 rounded-full px-3 py-1.5 hover:border-quantum-neon/50 hover:text-white transition-colors text-left"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+
+      {/* Other ways in */}
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+        <Link to="/module5" className="inline-flex items-center gap-1.5 text-gray-300 hover:text-quantum-neon transition-colors">
+          <Code2 className="w-4 h-4 text-quantum-purple" />
+          Have code? Turn it into a quantum circuit
+        </Link>
+        <Link to="/module4" className="inline-flex items-center gap-1.5 text-gray-300 hover:text-quantum-neon transition-colors">
+          <Upload className="w-4 h-4 text-quantum-neon" />
+          Or upload a file (PDF, Word, CSV)
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 // ── Problem type cards ────────────────────────────────────────────────────────
 
@@ -204,30 +300,34 @@ export function AppHome() {
     <div className="min-h-screen">
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative px-6 pt-12 pb-8 overflow-hidden">
+      <section className="relative px-6 pt-12 pb-12 overflow-hidden">
         {/* subtle dot grid — keeps background pure dark */}
         <div className="absolute inset-0 pointer-events-none" style={{
           backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
           backgroundSize: '28px 28px',
         }} />
 
-        <div className="relative z-10 max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-5">
-            <span className="w-2 h-2 rounded-full bg-quantum-neon animate-pulse" />
-            Welcome back, <span className="text-white font-semibold">{user?.username}</span>
+        <div className="relative z-10 max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-5">
+              <span className="w-2 h-2 rounded-full bg-quantum-neon animate-pulse" />
+              Welcome back, <span className="text-white font-semibold">{user?.username}</span>
+            </div>
+
+            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 leading-tight text-balance">
+              <span className="text-white">What problem are you</span>{' '}
+              <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
+                trying to solve?
+              </span>
+            </h1>
+
+            <p className="text-gray-300 text-base max-w-xl mx-auto leading-relaxed">
+              Describe it in plain English. The AI Advisor tells you whether quantum
+              computing can help, and which method to use.
+            </p>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 leading-tight">
-            <span className="text-white">What would you like to</span>{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
-              explore today?
-            </span>
-          </h1>
-
-          <p className="text-gray-300 text-base max-w-xl mx-auto leading-relaxed">
-            Run Classical vs Quantum algorithm comparisons, build quantum circuits,
-            and explore the power of quantum computing — all in one platform.
-          </p>
+          <AskTheAdvisor />
         </div>
       </section>
 

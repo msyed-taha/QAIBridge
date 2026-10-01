@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Brain, Upload, FileText, X, ChevronDown, Zap, Cpu, Info, CheckCircle, AlertCircle, ArrowRight, Play } from 'lucide-react';
 
 // Recommended algorithm → the SFOD task that solves it on the user's own data (FE-3)
@@ -97,7 +97,12 @@ export function Module4Page() {
   const [error, setError]               = useState('');
   const [expanded, setExpanded]         = useState<string | null>(null);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [revealResult, setRevealResult] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const handedOff = useRef(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const ACCEPTED = '.pdf,.docx,.doc,.csv,.txt,.md,.json,.tex,.rtf';
 
@@ -118,8 +123,10 @@ export function Module4Page() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const analyze = async () => {
-    if (!text.trim() && !file) {
+  // `problem` overrides the text box (used for a question handed over from the
+  // app home page); `reveal` scrolls the answer into view once it arrives.
+  const analyze = async (problem = text, reveal = false) => {
+    if (!problem.trim() && !file) {
       setError('Please enter a problem description or upload a file.');
       return;
     }
@@ -136,7 +143,7 @@ export function Module4Page() {
         res = await fetch('/api/module4/advise', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ problem_text: text }),
+          body: JSON.stringify({ problem_text: problem }),
         });
       }
       if (!res.ok) {
@@ -146,12 +153,31 @@ export function Module4Page() {
       const data: AdviseResponse = await res.json();
       setResult(data);
       setExpanded(data.top_algorithm_id);
+      setRevealResult(reveal);
     } catch (e: unknown) {
       setError((e as Error).message || 'Request failed. Is the backend running?');
     } finally {
       setLoading(false);
     }
   };
+
+  // A question asked on the app home page arrives as router state: fill it in
+  // and analyse it straight away. The state is then cleared, so reloading or
+  // coming back to this page doesn't ask it again.
+  useEffect(() => {
+    const problem = (location.state as { problem?: unknown } | null)?.problem;
+    if (handedOff.current || typeof problem !== 'string' || !problem.trim()) return;
+    handedOff.current = true;
+    setText(problem);
+    navigate(location.pathname, { replace: true, state: null });
+    analyze(problem, true);
+  }, []);
+
+  useEffect(() => {
+    if (!revealResult || !result || loading) return;
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setRevealResult(false);
+  }, [revealResult, result, loading]);
 
   const reset = () => {
     setResult(null);
@@ -277,7 +303,7 @@ export function Module4Page() {
 
         {/* Submit */}
         <button
-          onClick={analyze}
+          onClick={() => analyze()}
           disabled={loading || (!text.trim() && !file)}
           className="w-full py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-[1.01] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           style={{ background: 'linear-gradient(90deg, #f97316, #cc44ff)' }}
@@ -302,7 +328,7 @@ export function Module4Page() {
 
       {/* Results section */}
       {result && !loading && (
-        <div className="max-w-4xl mx-auto px-4 pb-16 space-y-5">
+        <div ref={resultsRef} className="max-w-4xl mx-auto px-4 pb-16 space-y-5 scroll-mt-20">
 
           {/* Verdict banner */}
           <div
