@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useSearchParams } from 'react-router-dom';
 import { AuthProvider }    from './context/AuthContext';
 import { ProtectedRoute }  from './components/ProtectedRoute';
@@ -5,29 +6,44 @@ import { AdminRoute }      from './components/AdminRoute';
 import { ErrorBoundary }   from './components/ErrorBoundary';
 import { Navbar }          from './components/layout/Navbar';
 import { Footer }          from './components/layout/Footer';
+// Public pages are small and load with the site, so visitors see them instantly.
 import { Home }            from './pages/Home';
 import { About }           from './pages/About';
 import { LoginPage }       from './pages/LoginPage';
 import { RegisterPage }    from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { SolvePage }       from './pages/SolvePage';
-import { Module1Page }     from './pages/Module1Page';
-import { Module2Page }     from './pages/Module2Page';
-import { Module3Page }     from './pages/Module3Page';
-import { Module4Page }     from './pages/Module4Page';
-import { Module5Page }     from './pages/Module5Page';
-import { Module6Page }     from './pages/Module6Page';
-import { Module7Page }     from './pages/Module7Page';
-import { DashboardPage }   from './pages/DashboardPage';
-import { AppHome }         from './pages/AppHome';
-import { AccountPage }     from './pages/AccountPage';
 import { ContactPage }     from './pages/ContactPage';
 import { PrivacyPage }     from './pages/legal/PrivacyPage';
 import { TermsPage }       from './pages/legal/TermsPage';
-import { AdminDashboard }  from './pages/admin/AdminDashboard';
-import { AdminUsers }      from './pages/admin/AdminUsers';
-import { AdminMessages }   from './pages/admin/AdminMessages';
 import { useAuth }         from './context/AuthContext';
+
+// Signed-in pages (and the charting library most of them use) are downloaded
+// only when first opened, which keeps the first visit fast.
+const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
+  lazy(() => load().then(m => ({ default: m[name] })));
+
+const AppHome        = page(() => import('./pages/AppHome'), 'AppHome');
+const AccountPage    = page(() => import('./pages/AccountPage'), 'AccountPage');
+const SolvePage      = page(() => import('./pages/SolvePage'), 'SolvePage');
+const DashboardPage  = page(() => import('./pages/DashboardPage'), 'DashboardPage');
+const Module1Page    = page(() => import('./pages/Module1Page'), 'Module1Page');
+const Module2Page    = page(() => import('./pages/Module2Page'), 'Module2Page');
+const Module3Page    = page(() => import('./pages/Module3Page'), 'Module3Page');
+const Module4Page    = page(() => import('./pages/Module4Page'), 'Module4Page');
+const Module5Page    = page(() => import('./pages/Module5Page'), 'Module5Page');
+const Module6Page    = page(() => import('./pages/Module6Page'), 'Module6Page');
+const Module7Page    = page(() => import('./pages/Module7Page'), 'Module7Page');
+const AdminDashboard = page(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard');
+const AdminUsers     = page(() => import('./pages/admin/AdminUsers'), 'AdminUsers');
+const AdminMessages  = page(() => import('./pages/admin/AdminMessages'), 'AdminMessages');
+
+function PageLoading() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-label="Loading">
+      <div className="w-8 h-8 border-2 border-quantum-neon border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 // Redirects logged-in users away from the public landing page to the app.
 // Admins use the app like anyone else; the portal is one click away in the navbar.
@@ -68,6 +84,7 @@ export default function App() {
           <div className="min-h-screen flex flex-col bg-quantum-900 text-white">
             <Navbar />
             <main className="flex-1 overflow-y-auto">
+              <Suspense fallback={<PageLoading />}>
               <Routes>
                 {/* ── Public ── */}
                 <Route path="/"          element={<RootRoute />} />
@@ -105,6 +122,7 @@ export default function App() {
                 {/* ── Fallback ── */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              </Suspense>
             </main>
             <Footer />
           </div>
