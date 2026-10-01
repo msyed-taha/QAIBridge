@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// Signed-in tool pages, where the backdrop goes calm so results are easy to read.
-const CALM_PAGES = ['/app', '/account', '/simulator', '/circuit', '/solve', '/dashboard', '/module', '/admin'];
-const isCalmPage = (path: string) => CALM_PAGES.some(p => path === p || path.startsWith(p));
+// Signed-in tool pages (the protected and admin routes in App.tsx), where the
+// backdrop goes calm so results are easy to read.
+const CALM_PAGES = /^\/(app|account|simulator|circuit|solve|dashboard|module\d|admin)(\/|$)/;
 
 // Stars at random-looking but fixed spots (seeded), drawn once as a large SVG
 // tile so no repeating pattern shows.
@@ -35,7 +35,12 @@ const STARS_TWINKLE = starTile(23, 1150, 900, 40);
  */
 export function AppBackground() {
   const ref = useRef<HTMLDivElement>(null);
-  const calm = isCalmPage(useLocation().pathname);
+  const calm = CALM_PAGES.test(useLocation().pathname);
+
+  // Set as a class toggle rather than through className, which would wipe the
+  // is-paused / has-pointer classes the effect below manages. Applied before
+  // paint, so a page opened directly inside the app starts calm.
+  useLayoutEffect(() => { ref.current?.classList.toggle('is-calm', calm); }, [calm]);
 
   useEffect(() => {
     const el = ref.current;
@@ -70,7 +75,7 @@ export function AppBackground() {
   }, []);
 
   return (
-    <div ref={ref} className={`scene${calm ? ' is-calm' : ''}`} aria-hidden="true">
+    <div ref={ref} className="scene" aria-hidden="true">
       <div className="scene-layer scene-depth-far">
         <div className="scene-stars" style={{ backgroundImage: STARS }} />
         <div className="scene-stars scene-stars-twinkle" style={{ backgroundImage: STARS_TWINKLE }} />

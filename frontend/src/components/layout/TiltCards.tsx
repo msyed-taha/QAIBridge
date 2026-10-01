@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+const clamp = (v: number) => Math.min(1, Math.max(0, v));
+
 /**
  * Makes every element marked `data-tilt` lean toward the mouse pointer, and
  * moves the soft light on `.glass-card`s to where the pointer is. One listener
@@ -14,9 +16,12 @@ export function TiltCards() {
 
     let card: HTMLElement | null = null, frame = 0, x = 0, y = 0;
 
-    const release = (el: HTMLElement) => {
-      el.classList.remove('is-tilting');
-      for (const v of ['--rx', '--ry']) el.style.removeProperty(v);
+    const release = () => {
+      if (!card) return;
+      card.classList.remove('is-tilting');
+      card.style.removeProperty('--rx');
+      card.style.removeProperty('--ry');
+      card = null;
     };
     const apply = () => {
       frame = 0;
@@ -32,28 +37,29 @@ export function TiltCards() {
     const onMove = (e: PointerEvent) => {
       const el = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-tilt]') : null;
       if (el !== card) {
-        if (card) release(card);
+        release();
         card = el;
         card?.classList.add('is-tilting');
       }
       x = e.clientX; y = e.clientY;
       if (card && !frame) frame = requestAnimationFrame(apply);
     };
-    const onLeave = () => { if (card) release(card); card = null; };
 
+    // Scrolling moves the card out from under a still pointer, so let it settle;
+    // the next pointer move picks up whichever card is under it then.
     document.addEventListener('pointermove', onMove, { passive: true });
-    document.documentElement.addEventListener('pointerleave', onLeave);
-    window.addEventListener('blur', onLeave);
+    document.addEventListener('scroll', release, { passive: true, capture: true });
+    document.documentElement.addEventListener('pointerleave', release);
+    window.addEventListener('blur', release);
     return () => {
       cancelAnimationFrame(frame);
-      onLeave();
+      release();
       document.removeEventListener('pointermove', onMove);
-      document.documentElement.removeEventListener('pointerleave', onLeave);
-      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('scroll', release, { capture: true });
+      document.documentElement.removeEventListener('pointerleave', release);
+      window.removeEventListener('blur', release);
     };
   }, []);
 
   return null;
 }
-
-const clamp = (v: number) => Math.min(1, Math.max(0, v));

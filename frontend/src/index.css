@@ -6,7 +6,7 @@
 body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-serif; }
 
 /* ── Page backdrop (components/layout/AppBackground.tsx) ─────────────────── */
-/* Movement uses transform/opacity only (plus the separate scale/translate/rotate
+/* Movement uses transform/opacity only (plus the separate scale/rotate
    properties for the arrival effect), so it runs smoothly on the GPU. */
 .scene {
   --mx: 0; --my: 0;
@@ -176,6 +176,7 @@ body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-
   background: linear-gradient(135deg, rgba(0, 255, 204, .5), rgba(119, 119, 238, .2) 45%, rgba(204, 68, 255, .45));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask-composite: exclude;
   opacity: .55; transition: opacity .3s; pointer-events: none;
 }

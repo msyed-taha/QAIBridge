@@ -126,7 +126,7 @@ export function Home() {
     <div className="min-h-screen">
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
-      <section className="relative px-6 pt-8 pb-16 sm:pt-12 lg:pt-14 lg:pb-16 overflow-hidden">
+      <section className="relative px-6 pt-8 pb-16 sm:pt-12 lg:pt-14 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-quantum-purple opacity-10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-10 right-1/4 w-96 h-96 bg-teal-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
 
