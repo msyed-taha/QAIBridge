@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowDown, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare, ShieldCheck } from 'lucide-react';
+import { QubitSphere } from '../components/home/QubitSphere';
 
 const CAPABILITIES = [
   {
@@ -125,59 +126,64 @@ export function Home() {
     <div className="min-h-screen">
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
-      <section className="relative flex flex-col items-center justify-center text-center px-6 pt-20 pb-20 overflow-hidden">
+      <section className="relative px-6 pt-8 pb-16 sm:pt-12 lg:pt-14 lg:pb-16 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-quantum-purple opacity-10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-10 right-1/4 w-96 h-96 bg-teal-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-4xl mx-auto">
-          {/* Heading — what the product does for you, not its name */}
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.08] mb-6">
-            Find out if{' '}
-            <span className="text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
-              quantum computing
-            </span>{' '}
-            can solve your problem
-          </h1>
+        {/* Text on the left, the qubit sphere on the right (above the text on phones) */}
+        <div className="relative z-10 max-w-6xl mx-auto grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] items-center gap-4 lg:gap-6">
+          <QubitSphere className="mx-auto w-56 sm:w-72 lg:w-full lg:max-w-[460px] lg:order-2" />
 
-          <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
-            Describe your problem in plain English or paste your code. QAIbridge picks the right
-            quantum algorithm, runs it on a built-in quantum simulator, and checks the answer
-            against the classical one.
-          </p>
+          <div className="text-center lg:text-left">
+            {/* Heading — what the product does for you, not its name */}
+            <h1 className="text-4xl sm:text-6xl lg:text-[3.5rem] font-extrabold tracking-tight text-white leading-[1.08] mb-6">
+              Find out if{' '}
+              <span className="text-transparent bg-clip-text"
+                style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
+                quantum computing
+              </span>{' '}
+              can solve your problem
+            </h1>
 
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto">
-            <Link
-              to="/register"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
-              style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
-            >
-              Try it free
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a
-              href="#see-it-in-action"
-              onClick={e => {
-                e.preventDefault();
-                document.getElementById('see-it-in-action')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all hover:scale-105"
-            >
-              See how it works
-              <ArrowDown className="w-4 h-4" />
-            </a>
+            <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed mb-10">
+              Describe your problem in plain English or paste your code. QAIbridge picks the right
+              quantum algorithm, runs it on a built-in quantum simulator, and checks the answer
+              against the classical one.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto">
+              <Link
+                to="/register"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
+                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
+              >
+                Try it free
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <a
+                href="#see-it-in-action"
+                onClick={e => {
+                  e.preventDefault();
+                  document.getElementById('see-it-in-action')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all hover:scale-105"
+              >
+                See how it works
+                <ArrowDown className="w-4 h-4" />
+              </a>
+            </div>
+
+            {/* Proof points */}
+            <ul className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 mt-8 text-xs sm:text-sm text-gray-500">
+              {HERO_PROOF.map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-1.5">
+                  <Icon className="w-4 h-4 text-quantum-neon" />
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
-
-          {/* Proof points */}
-          <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-xs sm:text-sm text-gray-500">
-            {HERO_PROOF.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-1.5">
-                <Icon className="w-4 h-4 text-quantum-neon" />
-                {text}
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 
