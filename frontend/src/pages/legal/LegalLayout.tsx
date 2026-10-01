@@ -32,7 +32,7 @@ export function LegalLayout({ title, intro, sections }: { title: string; intro: 
         <div className={`${PROSE} mb-8`}>{intro}</div>
 
         {/* Contents */}
-        <nav aria-label="Contents" className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5 mb-10">
+        <nav aria-label="Contents" className="glass-card rounded-2xl p-5 mb-10">
           <p className="text-white font-semibold text-sm mb-3">Contents</p>
           <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
             {sections.map((s, i) => (

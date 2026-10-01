@@ -239,7 +239,7 @@ export function Home() {
                   </div>
 
                   <figure className={`min-w-0 lg:col-span-7 ${flip ? 'lg:order-1' : ''}`}>
-                    <div className="rounded-2xl border border-quantum-700 bg-quantum-800 overflow-hidden shadow-2xl shadow-black/40">
+                    <div data-tilt="2" className="glass-card rounded-2xl overflow-hidden">
                       <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-quantum-700 bg-quantum-900/60">
                         <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
                         <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
@@ -303,7 +303,7 @@ export function Home() {
             {CAPABILITIES.map(c => {
               const Icon = c.icon;
               return (
-                <div key={c.title} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-6 hover:border-quantum-600 transition-all">
+                <div key={c.title} data-tilt className="glass-card rounded-2xl p-6">
                   <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-4`}>
                     <Icon className="w-5 h-5 text-white" />
                   </div>
@@ -328,7 +328,7 @@ export function Home() {
             {WHO_FOR.map(w => {
               const Icon = w.icon;
               return (
-                <div key={w.title} className="text-center p-6 bg-quantum-800 border border-quantum-700 rounded-2xl hover:border-quantum-600 transition-all">
+                <div key={w.title} data-tilt className="glass-card text-center p-6 rounded-2xl">
                   <div className="w-12 h-12 rounded-2xl bg-quantum-700 border border-quantum-600 flex items-center justify-center mx-auto mb-4">
                     <Icon className="w-6 h-6 text-quantum-neon" />
                   </div>

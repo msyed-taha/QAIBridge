@@ -143,3 +143,41 @@ body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-
 @media (prefers-reduced-motion: reduce) {
   .scene, .scene * { animation: none !important; transition: none !important; }
 }
+
+/* ── Glass cards (public pages) ──────────────────────────────────────────── */
+/* Frosted glass over the moving backdrop, with a thin teal→purple edge. */
+.glass-card {
+  position: relative;
+  background: linear-gradient(160deg, rgba(37, 37, 96, .42), rgba(18, 18, 43, .62) 45%, rgba(13, 13, 26, .7));
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+          backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 12px 32px -16px rgba(0, 0, 0, .7);
+}
+/* The edge: a gradient ring masked down to 1px, so rounded corners stay clean. */
+.glass-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(135deg, rgba(0, 255, 204, .5), rgba(119, 119, 238, .2) 45%, rgba(204, 68, 255, .45));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: .55; transition: opacity .3s; pointer-events: none;
+}
+/* A soft light where the pointer is (position set by TiltCards.tsx). */
+.glass-card::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(380px circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, .08), transparent 45%);
+  opacity: 0; transition: opacity .3s;
+}
+.glass-card:hover::before { opacity: 1; }
+.glass-card:hover::after  { opacity: 1; }
+
+/* Tilt: the card leans toward the pointer and lifts (TiltCards.tsx sets --rx/--ry).
+   The transform is only applied while hovered, so resting cards stay flat and crisp. */
+[data-tilt] { transition: transform .6s cubic-bezier(.16, 1, .3, 1), box-shadow .3s; }
+[data-tilt].is-tilting {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-4px);
+  transition: transform .15s ease-out, box-shadow .3s;
+}
+.glass-card.is-tilting {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 26px 50px -22px rgba(0, 0, 0, .8), 0 0 40px -12px rgba(0, 255, 204, .28);
+}

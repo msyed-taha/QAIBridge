@@ -84,7 +84,7 @@ export function About() {
       {/* ── WHY ───────────────────────────────────────────────────────── */}
       <section className="py-14 px-6 bg-quantum-800/30 border-y border-quantum-700">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-6">
+          <div data-tilt="3" className="glass-card rounded-2xl p-6">
             <p className="text-red-300/80 text-xs font-semibold uppercase tracking-widest mb-3">The problem</p>
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
               Quantum computing is in the news every week, but trying it usually means special
@@ -92,7 +92,7 @@ export function About() {
               it would help with their own problem at all.
             </p>
           </div>
-          <div className="bg-quantum-800 border border-teal-800/60 rounded-2xl p-6">
+          <div data-tilt="3" className="glass-card rounded-2xl p-6">
             <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">Our answer</p>
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
               Start from your own problem, written in plain English or as ordinary code.
@@ -115,7 +115,7 @@ export function About() {
             {FEATURES.map(f => {
               const Icon = f.icon;
               return (
-                <div key={f.title} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5 hover:border-quantum-600 transition-all">
+                <div key={f.title} data-tilt className="glass-card rounded-2xl p-5">
                   <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4`}>
                     <Icon className="w-5 h-5 text-white" />
                   </div>
@@ -141,7 +141,7 @@ export function About() {
             {AUDIENCE.map(a => {
               const Icon = a.icon;
               return (
-                <div key={a.title} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
+                <div key={a.title} data-tilt className="glass-card rounded-2xl p-5">
                   <Icon className="w-6 h-6 text-quantum-neon mb-3" />
                   <h3 className="text-white font-semibold text-base mb-1.5">{a.title}</h3>
                   <p className="text-gray-500 text-sm leading-relaxed">{a.desc}</p>
@@ -160,7 +160,7 @@ export function About() {
             {TRUST.map(t => {
               const Icon = t.icon;
               return (
-                <div key={t.title} className="flex gap-4 bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
+                <div key={t.title} data-tilt className="glass-card flex gap-4 rounded-2xl p-5">
                   <Icon className="w-5 h-5 text-quantum-neon flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-white font-semibold text-sm mb-1.5">{t.title}</h3>

@@ -45,7 +45,7 @@ export function ContactPage() {
       <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-teal-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-lg">
-        <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
+        <div className="glass-card rounded-2xl p-8">
           {done ? (
             <div className="text-center py-6">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-400 flex items-center justify-center mx-auto mb-4">

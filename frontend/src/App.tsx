@@ -8,6 +8,7 @@ import { PageTitle }       from './components/PageTitle';
 import { Navbar }          from './components/layout/Navbar';
 import { Footer }          from './components/layout/Footer';
 import { AppBackground }   from './components/layout/AppBackground';
+import { TiltCards }       from './components/layout/TiltCards';
 // Public pages are small and load with the site, so visitors see them instantly.
 import { Home }            from './pages/Home';
 import { About }           from './pages/About';
@@ -87,6 +88,7 @@ export default function App() {
           {/* No background colour here, so the backdrop behind it shows through. */}
           <div className="min-h-screen flex flex-col text-white">
             <AppBackground />
+            <TiltCards />
             <Navbar />
             <main className="flex-1 overflow-y-auto">
               <Suspense fallback={<PageLoading />}>

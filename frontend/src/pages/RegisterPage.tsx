@@ -254,7 +254,7 @@ export function RegisterPage() {
       <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-teal-500 opacity-8 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-md">
-        <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
+        <div className="glass-card rounded-2xl p-8">
 
           {/* Header */}
           <div className="text-center mb-6">

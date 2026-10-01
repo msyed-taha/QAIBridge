@@ -128,7 +128,7 @@ export function ForgotPasswordPage() {
 
       <div className="relative w-full max-w-md">
         {/* Card */}
-        <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-8">
+        <div className="glass-card rounded-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gradient-to-br ${isAdmin ? 'from-amber-500 to-orange-400' : 'from-teal-500 to-cyan-400'}`}>
