@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// Signed-in tool pages (the protected and admin routes in App.tsx), where the
-// backdrop goes calm so results are easy to read.
-const CALM_PAGES = /^\/(app|account|simulator|circuit|solve|dashboard|module\d|admin)(\/|$)/;
+// Signed-in tool pages (the protected and admin routes in App.tsx) and the
+// lessons, where the backdrop goes calm so results and games are easy to follow.
+const CALM_PAGES = /^\/(app|account|simulator|circuit|solve|dashboard|module\d|admin)(\/|$)|^\/learn\/[^/]/;
 
 // Stars at random-looking but fixed spots (seeded), drawn once as a large SVG
 // tile so no repeating pattern shows.

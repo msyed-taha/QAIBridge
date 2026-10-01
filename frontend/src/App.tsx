@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider }    from './context/AuthContext';
 import { ProtectedRoute }  from './components/ProtectedRoute';
 import { AdminRoute }      from './components/AdminRoute';
@@ -20,8 +20,8 @@ import { PrivacyPage }     from './pages/legal/PrivacyPage';
 import { TermsPage }       from './pages/legal/TermsPage';
 import { useAuth }         from './context/AuthContext';
 
-// Signed-in pages (and the charting library most of them use) are downloaded
-// only when first opened, which keeps the first visit fast.
+// Signed-in pages (and the charting library most of them use) and the Learn
+// course are downloaded only when first opened, which keeps the first visit fast.
 const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
   lazy(() => load().then(m => ({ default: m[name] })));
 
@@ -39,6 +39,8 @@ const Module7Page    = page(() => import('./pages/Module7Page'), 'Module7Page');
 const AdminDashboard = page(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard');
 const AdminUsers     = page(() => import('./pages/admin/AdminUsers'), 'AdminUsers');
 const AdminMessages  = page(() => import('./pages/admin/AdminMessages'), 'AdminMessages');
+const LearnPage      = page(() => import('./pages/learn/LearnPage'), 'LearnPage');
+const LessonPage     = page(() => import('./pages/learn/LessonPage'), 'LessonPage');
 
 function PageLoading() {
   return (
@@ -56,12 +58,14 @@ function RootRoute() {
   return <Navigate to="/app" replace />;
 }
 
-// Redirects logged-in users away from login/register (admin login → portal)
+// Redirects logged-in users away from login/register (admin login → portal),
+// back to the page that sent them here if there was one (e.g. a locked lesson).
 function GuestOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthed, isAdmin } = useAuth();
   const [params] = useSearchParams();
+  const from = (useLocation().state as { from?: string } | null)?.from;
   if (!isAuthed) return <>{children}</>;
-  return <Navigate to={isAdmin && params.get('as') === 'admin' ? '/admin' : '/app'} replace />;
+  return <Navigate to={isAdmin && params.get('as') === 'admin' ? '/admin' : from ?? '/app'} replace />;
 }
 
 function NotFoundPage() {
@@ -99,6 +103,8 @@ export default function App() {
                 <Route path="/contact"   element={<ContactPage />} />
                 <Route path="/privacy"   element={<PrivacyPage />} />
                 <Route path="/terms"     element={<TermsPage />} />
+                <Route path="/learn"     element={<LearnPage />} />
+                <Route path="/learn/:slug" element={<LessonPage />} />
                 <Route path="/login"     element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
                 <Route path="/register"  element={<GuestOnlyRoute><RegisterPage /></GuestOnlyRoute>} />
                 <Route path="/forgot-password" element={<GuestOnlyRoute><ForgotPasswordPage /></GuestOnlyRoute>} />

@@ -166,7 +166,7 @@ export function LoginPage() {
           {!isAdmin && (
             <p className="text-center text-gray-600 text-sm mt-6">
               Don't have an account?{' '}
-              <Link to="/register" className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
+              <Link to="/register" state={state?.from ? { from: state.from } : undefined} className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
                 Create one
               </Link>
             </p>

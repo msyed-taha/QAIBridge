@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Zap, Eye, EyeOff, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { detailToMessage } from '../api/client';
@@ -96,6 +96,7 @@ function Steps({ current }: { current: number }) {
 export function RegisterPage() {
   const { login }  = useAuth();
   const navigate   = useNavigate();
+  const from       = (useLocation().state as { from?: string } | null)?.from;
 
   const [step,     setStep]     = useState<1 | 2 | 3>(1);
   const [email,    setEmail]    = useState('');
@@ -238,7 +239,7 @@ export function RegisterPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(detailToMessage(data.detail, 'Registration failed'));
       login(data.access_token, data.user);
-      navigate('/app', { replace: true });
+      navigate(from ?? '/app', { replace: true });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -528,7 +529,7 @@ export function RegisterPage() {
           {/* Footer */}
           <p className="text-center text-gray-600 text-sm mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
+            <Link to="/login" state={from ? { from } : undefined} className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
               Sign in
             </Link>
           </p>

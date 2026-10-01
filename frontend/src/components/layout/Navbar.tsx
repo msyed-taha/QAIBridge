@@ -5,15 +5,22 @@ import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 import { TOOLS, TOOL_GROUPS, isToolAt, toolsIn } from '../../tools';
 
-// Public nav (not logged in) — landing pages only. All modules require login.
-const PUBLIC_NAV = [
+// `section`: also highlighted on the pages under it (/learn/… for Learn).
+type NavLink = { path: string; label: string; active: boolean; section?: boolean };
+const isNavActive = (link: NavLink, pathname: string) =>
+  pathname === link.path || (!!link.section && pathname.startsWith(link.path + '/'));
+
+// Public nav (not logged in) — landing pages and the Learn course. The tools require login.
+const PUBLIC_NAV: NavLink[] = [
   { path: '/',      label: 'Home',  active: true },
+  { path: '/learn', label: 'Learn', active: true, section: true },
   { path: '/about', label: 'About', active: true },
 ];
 
 // Authenticated nav (logged in as a normal user)
-const AUTH_NAV = [
+const AUTH_NAV: NavLink[] = [
   { path: '/app',       label: 'Home',        active: true },
+  { path: '/learn',     label: 'Learn',       active: true, section: true },
   { path: '/solve',     label: 'Solve',       active: true },
   { path: '/dashboard', label: 'Dashboard',   active: true },
 ];
@@ -23,7 +30,7 @@ const MENU_COLUMNS = [['solve', 'results'], ['build', 'research']] as const;
 const groupLabel = (id: string) => TOOL_GROUPS.find(g => g.id === id)?.label;
 
 // Admin nav (logged in as an administrator) — a different view of the site
-const ADMIN_NAV = [
+const ADMIN_NAV: NavLink[] = [
   { path: '/admin',       label: 'Dashboard', active: true },
   { path: '/admin/users', label: 'Users',     active: true },
   { path: '/admin/messages', label: 'Messages', active: true },
@@ -73,8 +80,9 @@ export function Navbar() {
 
         {/* ── Desktop Nav ── */}
         <nav className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map(({ path, label, active }) => {
-            const isActive = pathname === path;
+          {NAV_LINKS.map(link => {
+            const { path, label, active } = link;
+            const isActive = isNavActive(link, pathname);
             return (
               <Link
                 key={path}
@@ -232,8 +240,9 @@ export function Navbar() {
       {/* ── Mobile Dropdown ── */}
       {mobileOpen && (
         <div className="md:hidden border-t border-quantum-700 bg-quantum-900 px-4 py-3 space-y-1">
-          {NAV_LINKS.map(({ path, label, active }) => {
-            const isActive = pathname === path;
+          {NAV_LINKS.map(link => {
+            const { path, label, active } = link;
+            const isActive = isNavActive(link, pathname);
             return (
               <Link
                 key={path}

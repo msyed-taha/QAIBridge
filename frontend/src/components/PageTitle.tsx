@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { TOOLS } from '../tools';
+import { lessonBySlug } from '../learn/lessons';
 
 // The browser-tab title for every page ("Sign in · QAIbridge"). Shown in tabs,
 // bookmarks, history and search results. Keep HOME_TITLE equal to <title> in index.html.
@@ -17,6 +18,7 @@ const TITLES: Record<string, string> = {
   '/app':             'Home',
   '/account':         'Account settings',
   '/solve':           'Problem Solver',
+  '/learn':           'Learn quantum computing',
   '/admin':           'Admin dashboard',
   '/admin/users':     'Users · Admin',
   '/admin/messages':  'Messages · Admin',
@@ -31,6 +33,10 @@ export function PageTitle() {
     const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
     let name: string | undefined = TITLES[path];
     if (path === '/login' && new URLSearchParams(search).get('as') === 'admin') name = 'Admin sign in';
+    if (path.startsWith('/learn/')) {
+      const lesson = lessonBySlug(path.slice('/learn/'.length));
+      if (lesson) name = `${lesson.title} · Learn`;
+    }
     document.title = path === '/' ? HOME_TITLE : `${name ?? 'Page not found'} · QAIbridge`;
   }, [pathname, search]);
 

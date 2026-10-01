@@ -4,6 +4,7 @@ import { Mail, ExternalLink } from 'lucide-react';
 
 const QUICK_LINKS = [
   { label: 'Home',        to: '/' },
+  { label: 'Learn',       to: '/learn' },
   { label: 'Quantum Simulator', to: '/simulator' },
   { label: 'Circuit Builder',   to: '/circuit' },
   { label: 'About',       to: '/about' },
