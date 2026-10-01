@@ -157,7 +157,10 @@ const DEFAULTS: Record<ProblemType, Record<string, string>> = {
 
 export function SolvePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const typeParam = (searchParams.get('type') ?? 'search') as ProblemType;
+  // An unknown ?type= (old or mistyped link) falls back to Search instead of crashing.
+  const rawType = searchParams.get('type');
+  const typeParam: ProblemType =
+    rawType && Object.prototype.hasOwnProperty.call(PROBLEMS, rawType) ? (rawType as ProblemType) : 'search';
 
   const [problemType, setProblemType] = useState<ProblemType>(typeParam);
 
@@ -233,7 +236,9 @@ export function SolvePage() {
 
   // Reset results when problem type changes
   useEffect(() => {
-    setSearchParams({ type: problemType });
+    // replace, not push: keeping the address in step must not add a history entry,
+    // or the Back button would need two presses to leave this page.
+    setSearchParams({ type: problemType }, { replace: true });
     setClassicalResult(null);
     setQuantumResult(null);
     setClassicalError(null);
