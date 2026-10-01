@@ -4,6 +4,7 @@ import { AuthProvider }    from './context/AuthContext';
 import { ProtectedRoute }  from './components/ProtectedRoute';
 import { AdminRoute }      from './components/AdminRoute';
 import { ErrorBoundary }   from './components/ErrorBoundary';
+import { PageTitle }       from './components/PageTitle';
 import { Navbar }          from './components/layout/Navbar';
 import { Footer }          from './components/layout/Footer';
 // Public pages are small and load with the site, so visitors see them instantly.
@@ -79,6 +80,7 @@ function NotFoundPage() {
 export default function App() {
   return (
     <BrowserRouter>
+      <PageTitle />
       <AuthProvider>
         <ErrorBoundary>
           <div className="min-h-screen flex flex-col bg-quantum-900 text-white">
