@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import config
 from ..config import is_admin_email, is_owner_email
+from ..legal import TERMS_VERSION, purge_expired
 from ..models.user import User, ROLE_ADMIN, ROLE_USER
 from ..auth.security      import hash_password, verify_password, create_access_token, decode_access_token
 from ..auth.schemas       import (
@@ -119,7 +120,9 @@ def send_otp_endpoint(req: SendOtpRequest, db: Session = Depends(get_db)):
     """Generate a 5-digit OTP and email it to the user."""
 
     # Block if email is already registered — unless the user deleted that account
-    # themselves, in which case signing up again restores it.
+    # themselves, in which case signing up again restores it (within 30 days;
+    # after that it has been erased and this is a brand-new account).
+    purge_expired(db)
     existing = db.query(User).filter(User.email == req.email).first()
     if existing and existing.deleted_at is None:
         raise HTTPException(400, "An account with this email already exists.")
@@ -153,14 +156,16 @@ def verify_otp_endpoint(req: VerifyOtpRequest):
 @router.post("/register", response_model=TokenResponse, status_code=201)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
     """
-    Create a new account — or restore one the user deleted themselves, keeping
-    its id and history but taking the new username and password.
-    Requires the email to have been verified via /send-otp → /verify-otp first.
+    Create a new account — or restore one the user deleted themselves in the
+    last 30 days, keeping its id and history but taking the new username and
+    password. Requires the email to have been verified via /send-otp →
+    /verify-otp first, and the Terms/Privacy Policy to be accepted (recorded).
     """
 
     if not otp_store.is_verified(str(req.email)):
         raise HTTPException(403, "Email not verified. Please complete OTP verification first.")
 
+    purge_expired(db)   # an account deleted over 30 days ago is erased, never restored
     existing = db.query(User).filter(User.email == req.email).first()
     if existing and existing.deleted_at is None:
         raise HTTPException(400, "An account with this email already exists.")
@@ -183,6 +188,8 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
             hashed_password=hash_password(req.password),
         )
         db.add(user)
+    user.terms_accepted_at = datetime.now(timezone.utc)
+    user.terms_version     = TERMS_VERSION
     enforce_owner(user)
     db.commit()
     db.refresh(user)

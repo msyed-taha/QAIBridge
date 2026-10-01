@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Zap, Eye, EyeOff, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { detailToMessage } from '../api/client';
 
 // ── Password helpers ──────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ export function RegisterPage() {
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
   const [resendIn, setResendIn] = useState(0);   // countdown seconds
+  const [agreed,   setAgreed]   = useState(false); // 13+ and accepts the Terms / Privacy Policy
 
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -224,16 +226,17 @@ export function RegisterPage() {
     if (!allReqsMet)             { setError('Password does not meet the requirements.'); return; }
     if (password !== confirm)    { setError('Passwords do not match.'); return; }
     if (username.length < 3)     { setError('Username must be at least 3 characters.'); return; }
+    if (!agreed)                 { setError('Please confirm you are 13 or older and agree to the Terms of Use and Privacy Policy.'); return; }
     setError('');
     setLoading(true);
     try {
       const res  = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ username, email, password, accept_terms: agreed }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Registration failed');
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Registration failed'));
       login(data.access_token, data.user);
       navigate('/app', { replace: true });
     } catch (e: unknown) {
@@ -490,9 +493,26 @@ export function RegisterPage() {
                 )}
               </div>
 
+              {/* Consent — required, and recorded by the server with the Terms version */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={e => { setAgreed(e.target.checked); setError(''); }}
+                  className="mt-0.5 w-4 h-4 flex-shrink-0 accent-teal-400 cursor-pointer"
+                />
+                <span className="text-xs text-gray-400 leading-relaxed">
+                  I am 13 or older (under 18 with a parent's or guardian's permission) and I agree to
+                  the{' '}
+                  <Link to="/terms" target="_blank" className="text-quantum-neon hover:text-teal-300 underline underline-offset-2">Terms of Use</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" target="_blank" className="text-quantum-neon hover:text-teal-300 underline underline-offset-2">Privacy Policy</Link>.
+                </span>
+              </label>
+
               <button
                 onClick={register}
-                disabled={loading || !allReqsMet || password !== confirm || username.length < 3}
+                disabled={loading || !allReqsMet || password !== confirm || username.length < 3 || !agreed}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed mt-1"
                 style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
               >

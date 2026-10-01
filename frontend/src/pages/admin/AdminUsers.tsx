@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Search, Loader2, Trash2, ShieldCheck, User as UserIcon, Check, X, UserPlus, Crown } from 'lucide-react';
 import { adminApi } from '../../api/admin';
 import { getApiErrorMessage } from '../../api/client';
+import { LEGAL } from '../../legal';
 import { useAuth } from '../../context/AuthContext';
 import type { AdminUser, Role } from '../../types';
 import { AdminLayout } from './AdminLayout';
@@ -129,7 +130,9 @@ export function AdminUsers() {
                 const ownerNote = "The owner account can't be changed";
                 // A self-deleted account is frozen until the user signs up again.
                 const deletedNote = u.deleted_at
-                  ? `Deleted by the user on ${new Date(u.deleted_at).toLocaleDateString()}. Only they can restore it, by signing up again.`
+                  ? `Deleted by the user on ${new Date(u.deleted_at).toLocaleDateString()}. Only they can restore it, by signing up again ` +
+                    `before ${new Date(new Date(u.deleted_at).getTime() + LEGAL.deletedAccountDays * 86_400_000).toLocaleDateString()}; ` +
+                    'after that it is erased permanently.'
                   : null;
                 return (
                   <tr key={u.id} className="border-b border-quantum-700/50 last:border-0">

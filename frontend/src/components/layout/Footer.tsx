@@ -104,9 +104,13 @@ export function Footer() {
       {/* ── Bottom Bar ───────────────────────────────────────────────────── */}
       <div className="border-t border-quantum-800">
         <div className="max-w-7xl mx-auto px-6 py-5">
-          <p className="text-xs text-gray-700 text-center">
-            © {new Date().getFullYear()} QAIbridge. All rights reserved.
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-x-5 gap-y-2 text-xs">
+            <p className="text-gray-700">© {new Date().getFullYear()} QAIbridge. All rights reserved.</p>
+            <nav aria-label="Legal" className="flex items-center gap-4">
+              <Link to="/privacy" className="text-gray-500 hover:text-quantum-neon transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="text-gray-500 hover:text-quantum-neon transition-colors">Terms of Use</Link>
+            </nav>
+          </div>
         </div>
       </div>
 

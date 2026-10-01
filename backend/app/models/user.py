@@ -26,6 +26,10 @@ class User(Base):
     # signing up again with the same email restores it. An admin deactivation
     # leaves this NULL, so it can't be undone by re-registering.
     deleted_at    = Column(DateTime(timezone=True), nullable=True)
+    # When the user ticked "I agree to the Terms of Use and Privacy Policy" at
+    # sign-up, and which version (app/legal.py TERMS_VERSION) that was.
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    terms_version     = Column(String(20), nullable=True)
 
     @property
     def is_admin(self) -> bool:

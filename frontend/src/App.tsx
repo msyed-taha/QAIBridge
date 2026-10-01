@@ -22,6 +22,8 @@ import { DashboardPage }   from './pages/DashboardPage';
 import { AppHome }         from './pages/AppHome';
 import { AccountPage }     from './pages/AccountPage';
 import { ContactPage }     from './pages/ContactPage';
+import { PrivacyPage }     from './pages/legal/PrivacyPage';
+import { TermsPage }       from './pages/legal/TermsPage';
 import { AdminDashboard }  from './pages/admin/AdminDashboard';
 import { AdminUsers }      from './pages/admin/AdminUsers';
 import { AdminMessages }   from './pages/admin/AdminMessages';
@@ -71,6 +73,8 @@ export default function App() {
                 <Route path="/"          element={<RootRoute />} />
                 <Route path="/about"     element={<About />} />
                 <Route path="/contact"   element={<ContactPage />} />
+                <Route path="/privacy"   element={<PrivacyPage />} />
+                <Route path="/terms"     element={<TermsPage />} />
                 <Route path="/login"     element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
                 <Route path="/register"  element={<GuestOnlyRoute><RegisterPage /></GuestOnlyRoute>} />
                 <Route path="/forgot-password" element={<GuestOnlyRoute><ForgotPasswordPage /></GuestOnlyRoute>} />

@@ -42,11 +42,20 @@ class RegisterRequest(BaseModel):
     username: str      = Field(..., min_length=3, max_length=50)
     email:    EmailStr
     password: str      = Field(..., min_length=8)
+    # "I am 13 or older and agree to the Terms of Use and Privacy Policy"
+    accept_terms: bool = Field(False, validate_default=True)   # missing counts as "not accepted"
 
     @field_validator("password")
     @classmethod
     def strong_password(cls, v: str) -> str:
         return _validate_password(v)
+
+    @field_validator("accept_terms")
+    @classmethod
+    def must_accept_terms(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("Please confirm you are 13 or older and agree to the Terms of Use and Privacy Policy.")
+        return v
 
 
 class LoginRequest(BaseModel):

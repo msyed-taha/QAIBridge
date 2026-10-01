@@ -188,7 +188,8 @@ def _signup(client, monkeypatch, email: str, username: str, password: str):
     if r.status_code != 200:
         return r
     assert client.post("/api/auth/verify-otp", json={"email": email, "otp": sent["otp"]}).status_code == 200
-    return client.post("/api/auth/register", json={"username": username, "email": email, "password": password})
+    return client.post("/api/auth/register", json={"username": username, "email": email, "password": password,
+                                                   "accept_terms": True})
 
 
 def test_signing_up_again_restores_a_deleted_account(client, monkeypatch):

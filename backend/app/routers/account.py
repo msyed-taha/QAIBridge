@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..config import is_owner_email
+from ..legal import DELETED_ACCOUNT_RETENTION_DAYS
 from ..models.user import User, ROLE_ADMIN, ROLE_USER
 from ..auth.security import hash_password, verify_password
 from ..auth.schemas import (
@@ -152,9 +153,11 @@ def delete_account_verify(
 
     otp_store.clear(key)
     # Soft delete: keep the row but switch it off. Signing up again with this
-    # email restores it (see auth.register). Admin rights are dropped.
+    # email within 30 days restores it (see auth.register); after that it is
+    # erased for good (app/legal.py purge_expired). Admin rights are dropped.
     me.is_active  = False
     me.role       = ROLE_USER
     me.deleted_at = datetime.now(timezone.utc)
     db.commit()
-    return {"message": "Your account has been deleted. Sign up again with this email any time to restore it."}
+    return {"message": f"Your account has been deleted. Sign up again with this email within "
+                       f"{DELETED_ACCOUNT_RETENTION_DAYS} days to restore it; after that it is erased permanently."}

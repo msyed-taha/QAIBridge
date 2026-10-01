@@ -125,6 +125,10 @@ export function ContactPage() {
                 {tooShort && message.length > 0 && (
                   <p className="text-center text-xs text-gray-600">Please write at least {MIN_MESSAGE} characters.</p>
                 )}
+                <p className="text-center text-xs text-gray-600">
+                  We use your details only to reply to you. See our{' '}
+                  <Link to="/privacy" className="text-gray-400 underline underline-offset-2 hover:text-quantum-neon">Privacy Policy</Link>.
+                </p>
               </form>
             </>
           )}

@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { accountApi, type AccountProfile } from '../api/account';
 import { getApiErrorMessage } from '../api/client';
+import { LEGAL } from '../legal';
 
 const PW_RULES = [
   { test: (p: string) => p.length >= 8, label: '8+ characters' },
@@ -285,7 +286,8 @@ export function AccountPage() {
               <>
                 Closes your account and signs you out. We'll email a verification code
                 to <span className="text-gray-300">{profile?.email ?? user?.email}</span> first.
-                You can come back any time by signing up again with the same email.
+                You can restore it within {LEGAL.deletedAccountDays} days by signing up again with the same
+                email; after that, your account and its run history are permanently erased.
               </>
             )}
           </p>
@@ -319,7 +321,8 @@ export function AccountPage() {
                 <p className="text-gray-400 text-sm mb-5 leading-relaxed">
                   This closes <span className="text-white">{profile?.email ?? user?.email}</span> and signs you
                   out. To continue, we'll send a 5-digit code to that email address. Signing up again
-                  with it later restores the account.
+                  with it within {LEGAL.deletedAccountDays} days restores the account; after that it is
+                  permanently erased.
                 </p>
                 <div className="flex gap-2">
                   <button

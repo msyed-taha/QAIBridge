@@ -3,23 +3,46 @@ Qaibridge – FastAPI Backend Entry Point
 Registers all module routers and configures CORS for the React frontend.
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables from .env file
 load_dotenv()
 
 from app.database import SessionLocal
+from app.legal import purge_expired
 from app.routers import kernel, dashboard, sfod, education, recommender, transformer, optimizer, qnn, auth, admin, account, contact
 
 # Schema is managed by Alembic migrations (backend/migrations/) — run
 # `alembic upgrade head` before starting the server instead of relying
 # on auto-created tables.
+
+
+log = logging.getLogger(__name__)
+
+
+def _purge_expired_data() -> None:
+    """Erase data past its retention period (app/legal.py) — what the Privacy Policy promises."""
+    try:
+        with SessionLocal() as db:
+            erased = purge_expired(db)
+        if any(erased.values()):
+            log.info("Retention purge erased %s", erased)
+    except Exception:
+        log.warning("Retention purge failed", exc_info=True)
+
+
+async def _daily_purge() -> None:
+    while True:
+        await asyncio.sleep(24 * 60 * 60)
+        await run_in_threadpool(_purge_expired_data)
 
 
 @asynccontextmanager
@@ -29,8 +52,11 @@ async def lifespan(_app: FastAPI):
         with SessionLocal() as db:
             auth.sync_owner_account(db)
     except Exception:
-        logging.getLogger(__name__).warning("Could not sync the owner account at startup", exc_info=True)
+        log.warning("Could not sync the owner account at startup", exc_info=True)
+    await run_in_threadpool(_purge_expired_data)
+    purge_task = asyncio.create_task(_daily_purge())
     yield
+    purge_task.cancel()
 
 
 app = FastAPI(
