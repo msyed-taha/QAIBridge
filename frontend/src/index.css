@@ -134,6 +134,23 @@ body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-
 @keyframes scene-draw { from { scale: 0 1; opacity: 0; } }
 @keyframes scene-breathe { to { opacity: .4; } }
 
+/* Calm mode, inside the signed-in app (AppBackground.tsx adds .is-calm): the
+   scene holds still where it is and dims, so charts, code and results stay easy
+   to read and the background uses no GPU time. Pausing (not removing) the
+   animations means nothing jumps when switching back and forth. */
+.scene-dim {
+  position: absolute; inset: 0;
+  background: rgba(10, 10, 20, .62);
+  opacity: 0; transition: opacity 1s ease;
+}
+.scene.is-calm .scene-dim { opacity: 1; }
+.scene.is-calm .scene-layer, .scene.is-calm .scene-floor { transform: none; }
+.scene.is-calm .scene-spot { opacity: 0; }
+.scene.is-calm .scene-meteor { display: none; }
+.scene.is-calm .scene-glow, .scene.is-calm .scene-stars-twinkle { animation-play-state: paused; }
+/* first animation = arrival (lets it finish), second = the loop (held) */
+.scene.is-calm .scene-grid, .scene.is-calm .scene-horizon { animation-play-state: running, paused; }
+
 /* Phones: fewer layers to move. */
 @media (max-width: 640px) {
   .scene-glow-indigo, .scene-stars-twinkle, .scene-meteor-2 { display: none; }
