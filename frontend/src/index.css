@@ -4,3 +4,142 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-serif; }
+
+/* ── Page backdrop (components/layout/AppBackground.tsx) ─────────────────── */
+/* Movement uses transform/opacity only (plus the separate scale/translate/rotate
+   properties for the arrival effect), so it runs smoothly on the GPU. */
+.scene {
+  --mx: 0; --my: 0;
+  position: fixed; inset: 0; z-index: -10;
+  overflow: hidden; pointer-events: none;
+  background: radial-gradient(ellipse 90% 70% at 50% -10%, #1b1b48 0%, #0d0d1a 60%, #090912 100%);
+  animation: scene-fade 1.2s ease-out both;
+}
+@keyframes scene-fade { from { opacity: 0; } }
+
+/* Parallax: nearer layers move further, opposite to the mouse. */
+.scene-depth-far  { --depth: 10px; }
+.scene-depth-mid  { --depth: 28px; }
+.scene-depth-near { --depth: 48px; }
+.scene-layer {
+  position: absolute; inset: -60px;
+  transform: translate3d(calc(var(--mx) * var(--depth) * -1), calc(var(--my) * var(--depth) * -1), 0);
+  transition: transform 1.2s cubic-bezier(.16, 1, .3, 1);
+}
+
+/* Glows: big soft gradients that drift. On arrival they bloom out from the centre. */
+.scene-depth-mid { animation: scene-bloom 2.4s cubic-bezier(.16, 1, .3, 1) .15s both; }
+@keyframes scene-bloom { from { opacity: 0; scale: .55; } }
+.scene-glow { position: absolute; border-radius: 50%; will-change: transform; }
+.scene-glow-teal {
+  width: 55vmax; height: 55vmax; left: -12vmax; top: -18vmax;
+  background: radial-gradient(circle, rgba(0, 255, 204, .22) 0%, rgba(0, 255, 204, 0) 65%);
+  animation: scene-drift-a 26s ease-in-out infinite alternate;
+}
+.scene-glow-purple {
+  width: 60vmax; height: 60vmax; right: -16vmax; top: 4vh;
+  background: radial-gradient(circle, rgba(204, 68, 255, .22) 0%, rgba(204, 68, 255, 0) 65%);
+  animation: scene-drift-b 32s ease-in-out infinite alternate;
+}
+.scene-glow-indigo {
+  width: 70vmax; height: 70vmax; left: 15vw; bottom: -36vmax;
+  background: radial-gradient(circle, rgba(85, 85, 204, .32) 0%, rgba(85, 85, 204, 0) 62%);
+  animation: scene-drift-c 38s ease-in-out infinite alternate;
+}
+@keyframes scene-drift-a { to { transform: translate3d(18vw, 14vh, 0) scale(1.2); } }
+@keyframes scene-drift-b { to { transform: translate3d(-16vw, 18vh, 0) scale(.85); } }
+@keyframes scene-drift-c { to { transform: translate3d(-14vw, -8vh, 0) scale(1.15); } }
+
+/* Stars (images set in AppBackground.tsx); the second set twinkles.
+   Faded out towards the floor. They fade in just after the glows. */
+.scene-depth-far { animation: scene-fade 2s ease-out .5s both; }
+.scene-stars {
+  position: absolute; inset: 0; opacity: .75;
+  -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 70%);
+          mask-image: linear-gradient(to bottom, #000 25%, transparent 70%);
+}
+.scene-stars-twinkle { animation: scene-twinkle 4s ease-in-out infinite alternate; }
+@keyframes scene-twinkle { from { opacity: .15; } to { opacity: 1; } }
+
+/* Shooting stars: each crosses once per cycle (the first soon after arrival),
+   down the sides so they stay clear of the page text. */
+.scene-meteor {
+  position: absolute; width: 160px; height: 1.5px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, .5) 60%, #fff);
+  opacity: 0;
+}
+.scene-meteor-1 { --angle: 120deg; --travel: 380px; top: 7vh;  left: 93vw; animation: scene-meteor 11s linear -8.6s infinite; }
+.scene-meteor-2 { --angle: 140deg; --travel: 340px; top: 12vh; left: 14vw; animation: scene-meteor 17s linear -6s infinite; }
+@keyframes scene-meteor {
+  0%, 90% { opacity: 0; transform: rotate(var(--angle)) translateX(0); }
+  92%     { opacity: 1; }
+  100%    { opacity: 0; transform: rotate(var(--angle)) translateX(var(--travel)); }
+}
+
+/* A soft light that follows the mouse (shown after the first move). */
+.scene-spot {
+  position: absolute; left: 0; top: 0; width: 680px; height: 680px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 255, 204, .09) 0%, rgba(119, 119, 238, .06) 35%, transparent 65%);
+  transform: translate3d(calc((var(--mx) + 1) * 50vw - 50%), calc((var(--my) + 1) * 50vh - 50%), 0);
+  transition: transform .6s cubic-bezier(.16, 1, .3, 1), opacity 1s;
+  opacity: 0;
+}
+.scene.has-pointer .scene-spot { opacity: 1; }
+
+/* Floor: a grid plane tilted away from the viewer that glides forward. On
+   arrival it sweeps open from flat. The radial mask fades it into the distance
+   and at the sides. */
+.scene-floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 48vh;
+  perspective: 320px; perspective-origin: 50% 0;
+  -webkit-mask-image: radial-gradient(ellipse 78% 112% at 50% 100%, #000 30%, transparent 80%);
+          mask-image: radial-gradient(ellipse 78% 112% at 50% 100%, #000 30%, transparent 80%);
+  transform: translate3d(calc(var(--mx) * var(--depth) * -1), 0, 0);
+  transition: transform 1.2s cubic-bezier(.16, 1, .3, 1);
+}
+.scene-grid {
+  position: absolute; left: -60%; width: 220%; bottom: 0; height: calc(125% + 64px);
+  transform-origin: 50% 100%;
+  transform: rotateX(72deg); /* resting tilt, used when motion is off */
+  background-image:
+    linear-gradient(rgba(0, 255, 204, .30) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(150, 120, 255, .42) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: center bottom;
+  animation: scene-unfold 2.4s cubic-bezier(.16, 1, .3, 1) .3s both, scene-glide 3.5s linear infinite;
+  will-change: transform;
+}
+@keyframes scene-unfold { from { rotate: x 17deg; opacity: 0; } }
+@keyframes scene-glide {
+  from { transform: rotateX(72deg) translateY(0); }
+  to   { transform: rotateX(72deg) translateY(64px); }
+}
+
+/* Horizon: a glowing line where the floor meets the sky; draws in from the
+   centre on arrival, then breathes. */
+.scene-horizon {
+  position: absolute; left: 12%; right: 12%; bottom: 34vh; height: 1.5px;
+  background: linear-gradient(90deg, transparent, #00ffcc 30%, #cc44ff 70%, transparent);
+  opacity: .75;
+  animation: scene-draw 1.8s cubic-bezier(.16, 1, .3, 1) .9s both, scene-breathe 5s ease-in-out 2.7s infinite alternate;
+}
+.scene-horizon::before {
+  content: ''; position: absolute; inset: -5px 0;
+  background: inherit; filter: blur(8px); opacity: .9;
+}
+.scene-horizon::after {
+  content: ''; position: absolute; left: 15%; right: 15%; top: -70px; height: 140px;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(119, 119, 238, .22), transparent 70%);
+}
+@keyframes scene-draw { from { scale: 0 1; opacity: 0; } }
+@keyframes scene-breathe { to { opacity: .4; } }
+
+/* Phones: fewer layers to move. */
+@media (max-width: 640px) {
+  .scene-glow-indigo, .scene-stars-twinkle, .scene-meteor-2 { display: none; }
+  .scene-horizon { left: 0; right: 0; }
+}
+.scene.is-paused, .scene.is-paused * { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .scene, .scene * { animation: none !important; transition: none !important; }
+}

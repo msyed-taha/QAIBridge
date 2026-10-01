@@ -7,6 +7,7 @@ import { ErrorBoundary }   from './components/ErrorBoundary';
 import { PageTitle }       from './components/PageTitle';
 import { Navbar }          from './components/layout/Navbar';
 import { Footer }          from './components/layout/Footer';
+import { AppBackground }   from './components/layout/AppBackground';
 // Public pages are small and load with the site, so visitors see them instantly.
 import { Home }            from './pages/Home';
 import { About }           from './pages/About';
@@ -83,7 +84,9 @@ export default function App() {
       <PageTitle />
       <AuthProvider>
         <ErrorBoundary>
-          <div className="min-h-screen flex flex-col bg-quantum-900 text-white">
+          {/* No background colour here, so the backdrop behind it shows through. */}
+          <div className="min-h-screen flex flex-col text-white">
+            <AppBackground />
             <Navbar />
             <main className="flex-1 overflow-y-auto">
               <Suspense fallback={<PageLoading />}>
