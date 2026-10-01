@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
+import { TOOLS, TOOL_GROUPS, isToolAt, toolsIn } from '../../tools';
 
 // Public nav (not logged in) — landing pages only. All modules require login.
 const PUBLIC_NAV = [
@@ -17,17 +18,9 @@ const AUTH_NAV = [
   { path: '/dashboard', label: 'Dashboard',   active: true },
 ];
 
-// The eight scope modules, grouped under one "Modules" menu
-export const MODULES = [
-  { n: 1, path: '/simulator', label: 'Simulation Kernel',  desc: 'State-vector simulator, up to 28 qubits' },
-  { n: 2, path: '/module2',   label: 'SFOD Suite',         desc: "Grover, Shor, QAOA, database search" },
-  { n: 3, path: '/module3',   label: 'Circuit Builder',    desc: 'Drag-and-drop gates, challenges' },
-  { n: 4, path: '/module4',   label: 'AI Advisor',         desc: 'Quantum or classical? (Random Forest)' },
-  { n: 5, path: '/module5',   label: 'Logic Transformer',  desc: 'Classical code → Hamiltonian → circuit' },
-  { n: 6, path: '/module6',   label: 'Neural Optimizer',   desc: 'Learned gate angles, barren plateaus' },
-  { n: 7, path: '/module7',   label: 'QNN Converter',      desc: 'Classical network → quantum network' },
-  { n: 8, path: '/dashboard', label: 'Performance Dashboard', desc: 'Live quantum vs classical benchmarks' },
-];
+// The Tools menu: two columns of groups (the tools themselves live in tools.ts).
+const MENU_COLUMNS = [['solve', 'results'], ['build', 'research']] as const;
+const groupLabel = (id: string) => TOOL_GROUPS.find(g => g.id === id)?.label;
 
 // Admin nav (logged in as an administrator) — a different view of the site
 const ADMIN_NAV = [
@@ -42,14 +35,14 @@ export function Navbar() {
   const { user, isAuthed, isAdmin, logout } = useAuth();
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [modulesOpen, setModulesOpen] = useState(false);
-  const modulesRef = useRef<HTMLDivElement>(null);
-  const onModulePage = MODULES.some(m => m.path === pathname) || pathname === '/circuit';
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const onToolPage = TOOLS.some(t => isToolAt(t, pathname));
 
-  useEffect(() => { setModulesOpen(false); }, [pathname]);
+  useEffect(() => { setToolsOpen(false); }, [pathname]);
   useEffect(() => {
     const close = (e: MouseEvent) => {
-      if (modulesRef.current && !modulesRef.current.contains(e.target as Node)) setModulesOpen(false);
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) setToolsOpen(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
@@ -115,27 +108,39 @@ export function Navbar() {
             );
           })}
           {isAuthed && !inAdminView && (
-            <div className="relative" ref={modulesRef}>
+            <div className="relative" ref={toolsRef}>
               <button
-                onClick={() => setModulesOpen(o => !o)}
+                onClick={() => setToolsOpen(o => !o)}
+                aria-expanded={toolsOpen}
                 className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  onModulePage ? 'text-white bg-quantum-800' : 'text-gray-400 hover:text-white hover:bg-quantum-800'}`}
+                  onToolPage ? 'text-white bg-quantum-800' : 'text-gray-400 hover:text-white hover:bg-quantum-800'}`}
               >
-                Modules
-                <ChevronDown className={`w-4 h-4 transition-transform ${modulesOpen ? 'rotate-180' : ''}`} />
+                Tools
+                <ChevronDown className={`w-4 h-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
               </button>
-              {modulesOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[26rem] bg-quantum-800 border border-quantum-700 rounded-xl shadow-2xl p-2 grid grid-cols-2 gap-1 z-50">
-                  {MODULES.map(m => (
-                    <Link key={m.n} to={m.path}
-                      className={`flex gap-2.5 p-2.5 rounded-lg transition-colors ${pathname === m.path ? 'bg-quantum-700' : 'hover:bg-quantum-700/60'}`}>
-                      <span className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-black flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg,#00ffcc,#cc44ff)' }}>{m.n}</span>
-                      <span>
-                        <span className="block text-sm text-white font-medium leading-tight">{m.label}</span>
-                        <span className="block text-[11px] text-gray-400 leading-snug">{m.desc}</span>
-                      </span>
-                    </Link>
+              {toolsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-[36rem] bg-quantum-800 border border-quantum-700 rounded-xl shadow-2xl p-3 grid grid-cols-2 gap-x-3 gap-y-1 z-50">
+                  {MENU_COLUMNS.map(column => (
+                    <div key={column.join()} className="space-y-3">
+                      {column.map(group => (
+                        <div key={group}>
+                          <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">{groupLabel(group)}</p>
+                          {toolsIn(group).map(t => (
+                            <Link key={t.path} to={t.path}
+                              className={`flex gap-2.5 p-2.5 rounded-lg transition-colors ${isToolAt(t, pathname) ? 'bg-quantum-700' : 'hover:bg-quantum-700/60'}`}>
+                              <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ background: `${t.color}1f`, border: `1px solid ${t.color}55` }}>
+                                <t.icon className="w-3.5 h-3.5" style={{ color: t.color }} />
+                              </span>
+                              <span>
+                                <span className="block text-sm text-white font-medium leading-tight">{t.name}</span>
+                                <span className="block text-xs text-gray-400 leading-snug mt-0.5">{t.short}</span>
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   ))}
                 </div>
               )}
@@ -250,12 +255,16 @@ export function Navbar() {
 
           {isAuthed && !inAdminView && (
             <div className="pt-2 mt-2 border-t border-quantum-800">
-              <p className="px-4 py-1 text-[10px] uppercase tracking-widest text-gray-600">Modules</p>
-              {MODULES.map(m => (
-                <Link key={m.n} to={m.path} onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${pathname === m.path ? 'bg-quantum-800 text-white' : 'text-gray-400 hover:bg-quantum-800 hover:text-white'}`}>
-                  <span className="text-[10px] font-mono text-quantum-neon w-4">{m.n}</span>{m.label}
-                </Link>
+              {TOOL_GROUPS.map(g => (
+                <div key={g.id}>
+                  <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">{g.label}</p>
+                  {toolsIn(g.id).map(t => (
+                    <Link key={t.path} to={t.path} onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-2.5 px-4 py-2 rounded-lg text-sm ${isToolAt(t, pathname) ? 'bg-quantum-800 text-white' : 'text-gray-300 hover:bg-quantum-800 hover:text-white'}`}>
+                      <t.icon className="w-4 h-4 flex-shrink-0" style={{ color: t.color }} />{t.name}
+                    </Link>
+                  ))}
+                </div>
               ))}
             </div>
           )}

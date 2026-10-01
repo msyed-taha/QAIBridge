@@ -427,7 +427,7 @@ export function Module4Page() {
                   <p className="text-gray-400 text-xs leading-relaxed">
                     {target
                       ? <>Run {target.label} on your own data — both the classical and the quantum version execute, and the answers are compared.</>
-                      : <>This is a simulation-style problem: explore it on the QAIBridge simulation kernel, or describe it as code in the Logic Transformer.</>}
+                      : <>This is a simulation-style problem: explore it in the Quantum Simulator, or describe it as code in Code to Quantum.</>}
                   </p>
                 </div>
                 {target ? (
@@ -438,7 +438,7 @@ export function Module4Page() {
                       Enter my data <ArrowRight className="w-4 h-4" />
                     </Link>
                     <Link to="/module2" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-white border border-quantum-600 hover:bg-quantum-700">
-                      See it in the SFOD Suite
+                      See it in Quantum vs Classical
                     </Link>
                   </div>
                 ) : (
@@ -448,7 +448,7 @@ export function Module4Page() {
                       Open the simulator <ArrowRight className="w-4 h-4" />
                     </Link>
                     <Link to="/module5" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-white border border-quantum-600 hover:bg-quantum-700">
-                      Logic Transformer
+                      Code to Quantum
                     </Link>
                   </div>
                 )}

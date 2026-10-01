@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { TOOLS } from '../tools';
 
 // The browser-tab title for every page ("Sign in · QAIbridge"). Shown in tabs,
 // bookmarks, history and search results. Keep HOME_TITLE equal to <title> in index.html.
@@ -16,20 +17,11 @@ const TITLES: Record<string, string> = {
   '/app':             'Home',
   '/account':         'Account settings',
   '/solve':           'Problem Solver',
-  '/dashboard':       'Performance Dashboard',
-  '/simulator':       'Simulation Kernel',
-  '/circuit':         'Circuit Builder',
-  '/module1':         'Simulation Kernel',
-  '/module2':         'Quantum vs Classical',
-  '/module3':         'Circuit Builder',
-  '/module4':         'AI Advisor',
-  '/module5':         'Code Transformer',
-  '/module6':         'Neural Optimizer',
-  '/module7':         'QNN Converter',
-  '/module8':         'Performance Dashboard',
   '/admin':           'Admin dashboard',
   '/admin/users':     'Users · Admin',
   '/admin/messages':  'Messages · Admin',
+  // Each tool, under the same name as in the Tools menu (tools.ts).
+  ...Object.fromEntries(TOOLS.flatMap(t => [t.path, ...(t.alsoAt ?? [])].map(p => [p, t.name]))),
 };
 
 export function PageTitle() {

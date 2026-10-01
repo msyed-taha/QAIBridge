@@ -6,6 +6,8 @@ import {
   BookOpen, Atom, TrendingUp, Star, Brain, Code2, Upload,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { TOOL_GROUPS, toolsIn } from '../tools';
+import type { Tool, ToolGroup } from '../tools';
 
 // ── Ask the AI Advisor ────────────────────────────────────────────────────────
 
@@ -169,25 +171,6 @@ const STATS = [
   { label: 'Integrated modules',         value: '8',        icon: TrendingUp, color: '#cc44ff' },
 ];
 
-const MODULE_CARDS = [
-  { n: 1, path: '/simulator', title: 'Simulation Kernel', icon: Cpu, color: '#00ffcc',
-    desc: 'Our own NumPy state-vector simulator — live progress, Bloch spheres, the memory wall.' },
-  { n: 2, path: '/module2', title: 'SFOD Suite', icon: Search, color: '#14b8a6',
-    desc: "Grover, Shor, QAOA and amplitude amplification vs classical — both really run." },
-  { n: 3, path: '/module3', title: 'Circuit Builder', icon: Atom, color: '#34d399',
-    desc: 'Drag-and-drop gates, live simulation and 10 gamified challenges.' },
-  { n: 4, path: '/module4', title: 'AI Advisor', icon: Brain, color: '#f97316',
-    desc: 'Random-Forest advisor: quantum or classical for your problem — then solve it.' },
-  { n: 5, path: '/module5', title: 'Logic Transformer', icon: Code2, color: '#cc44ff',
-    desc: 'Classical code → QUBO / Ising Hamiltonian / oracle → verified quantum circuit.' },
-  { n: 6, path: '/module6', title: 'Neural Optimizer', icon: TrendingUp, color: '#a855f7',
-    desc: 'A neural network learns gate angles and avoids barren plateaus.' },
-  { n: 7, path: '/module7', title: 'QNN Converter', icon: Database, color: '#3b82f6',
-    desc: 'Map a classical neural network to a quantum neural network and compare.' },
-  { n: 8, path: '/dashboard', title: 'Performance Dashboard', icon: BarChart2, color: '#fbbf24',
-    desc: 'Live quantum vs classical benchmarks, history and CSV export.' },
-];
-
 // ── How it works steps ────────────────────────────────────────────────────────
 
 const STEPS = [
@@ -291,6 +274,40 @@ const FACTS = [
   },
 ];
 
+// ── Tool cards (names and descriptions come from tools.ts) ─────────────────────
+
+function ToolGroupCards({ group, columns = '' }: { group: ToolGroup; columns?: string }) {
+  return (
+    <div className="flex flex-col">
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+        {TOOL_GROUPS.find(g => g.id === group)?.label}
+      </h2>
+      <div className={`grid content-start gap-3 ${columns}`}>
+        {toolsIn(group).map(t => <ToolCard key={t.path} tool={t} />)}
+      </div>
+    </div>
+  );
+}
+
+function ToolCard({ tool }: { tool: Tool }) {
+  return (
+    <Link to={tool.path}
+      className="group flex flex-col bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 transition-colors">
+      <div className="flex items-center gap-2.5 mb-2">
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: `${tool.color}1f`, border: `1px solid ${tool.color}55` }}>
+          <tool.icon className="w-4 h-4" style={{ color: tool.color }} />
+        </span>
+        <h3 className="text-white font-bold text-sm">{tool.name}</h3>
+      </div>
+      <p className="flex-1 text-gray-400 text-xs leading-relaxed">{tool.desc}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-quantum-neon/70 group-hover:text-quantum-neon transition-colors">
+        Open <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+      </span>
+    </Link>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AppHome() {
@@ -383,32 +400,18 @@ export function AppHome() {
         </div>
       </section>
 
-      {/* ── ALL MODULES ──────────────────────────────────────────────────── */}
+      {/* ── ALL TOOLS ────────────────────────────────────────────────────── */}
       <section className="px-6 pb-10">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4 text-center">
-            Explore the eight modules
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
+            All tools
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {MODULE_CARDS.map(m => {
-              const Icon = m.icon;
-              return (
-                <Link key={m.n} to={m.path}
-                  className="group bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 hover:scale-[1.02] transition-all">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${m.color}1f`, border: `1px solid ${m.color}55` }}>
-                      <Icon className="w-3.5 h-3.5" style={{ color: m.color }} />
-                    </span>
-                    <span className="text-[10px] text-gray-500 font-mono">MODULE {m.n}</span>
-                  </div>
-                  <h3 className="text-white font-bold text-sm mb-1">{m.title}</h3>
-                  <p className="text-gray-400 text-[11px] leading-relaxed">{m.desc}</p>
-                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-quantum-neon opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open <ChevronRight className="w-3 h-3" />
-                  </span>
-                </Link>
-              );
-            })}
+          <div className="space-y-8">
+            <ToolGroupCards group="solve" columns="sm:grid-cols-3" />
+            {/* The rest side by side */}
+            <div className="grid gap-8 md:gap-3 md:grid-cols-3">
+              {(['build', 'research', 'results'] as const).map(g => <ToolGroupCards key={g} group={g} />)}
+            </div>
           </div>
         </div>
       </section>

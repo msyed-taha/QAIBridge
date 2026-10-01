@@ -102,7 +102,7 @@ const sections: LegalSection[] = [
         <ul>
           <li><strong>Hosting and database providers</strong>, which store and run the Service.</li>
           <li><strong>Google (Gmail)</strong>, which sends our verification emails. It receives your email address and the content of the email.</li>
-          <li><strong>An AI provider, only if the AI engine is switched on.</strong> When the Code Transformer’s AI engine is enabled, code you submit to it is sent to the AI provider we use (for example Anthropic, or a service compatible with OpenAI’s) to be analysed. The page always shows which engine is active. With the offline engine, your code does not leave our servers.</li>
+          <li><strong>An AI provider, only if the AI engine is switched on.</strong> When the Code to Quantum tool’s AI engine is enabled, code you submit to it is sent to the AI provider we use (for example Anthropic, or a service compatible with OpenAI’s) to be analysed. The page always shows which engine is active. With the offline engine, your code does not leave our servers.</li>
         </ul>
         <p>We may also disclose personal data:</p>
         <ul>

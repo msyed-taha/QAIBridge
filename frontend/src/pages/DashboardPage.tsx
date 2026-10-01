@@ -342,7 +342,7 @@ export function DashboardPage() {
           <span className="text-xs text-gray-500">benchmarks + your Module 2, Solve and Transformer runs</span>
         </div>
         {runs.length === 0 ? (
-          <p className="text-gray-500 text-sm px-5 py-6">No runs yet — run a benchmark, or use the SFOD Suite / Solve / Logic Transformer while signed in.</p>
+          <p className="text-gray-500 text-sm px-5 py-6">No runs yet — run a benchmark, or use Quantum vs Classical, the Problem Solver or Code to Quantum while signed in.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

@@ -86,7 +86,7 @@ const SHOWCASE = [
   {
     icon: Code2,
     tint: 'from-blue-500 to-indigo-400',
-    label: 'Code Transformer',
+    label: 'Code to Quantum',
     title: 'Turn ordinary code into a quantum circuit',
     body: 'Paste a Python program. QAIbridge works out what it computes, rewrites it as a problem a quantum computer can solve, runs the circuit and checks the answer against your original code.',
     quote: null,
