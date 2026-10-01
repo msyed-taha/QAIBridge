@@ -202,7 +202,6 @@ const STEPS = [
 const FACTS = [
   {
     color: 'from-teal-500 to-cyan-400',
-    glow: 'rgba(20,184,166,0.12)',
     topBar: '#00ffcc',
     title: 'Superposition',
     tag: 'Fundamental',
@@ -210,7 +209,6 @@ const FACTS = [
   },
   {
     color: 'from-purple-500 to-pink-400',
-    glow: 'rgba(168,85,247,0.12)',
     topBar: '#cc44ff',
     title: 'Entanglement',
     tag: 'Fundamental',
@@ -218,7 +216,6 @@ const FACTS = [
   },
   {
     color: 'from-blue-500 to-indigo-400',
-    glow: 'rgba(59,130,246,0.12)',
     topBar: '#3b82f6',
     title: 'Interference',
     tag: 'Core Principle',
@@ -226,7 +223,6 @@ const FACTS = [
   },
   {
     color: 'from-green-500 to-emerald-400',
-    glow: 'rgba(34,197,94,0.12)',
     topBar: '#22c55e',
     title: 'Measurement',
     tag: 'Quantum Mechanics',
@@ -234,7 +230,6 @@ const FACTS = [
   },
   {
     color: 'from-orange-500 to-yellow-400',
-    glow: 'rgba(249,115,22,0.12)',
     topBar: '#f97316',
     title: 'Quantum Gate',
     tag: 'Circuit Element',
@@ -242,7 +237,6 @@ const FACTS = [
   },
   {
     color: 'from-pink-500 to-rose-400',
-    glow: 'rgba(236,72,153,0.12)',
     topBar: '#ec4899',
     title: 'Decoherence',
     tag: 'Key Challenge',
@@ -250,7 +244,6 @@ const FACTS = [
   },
   {
     color: 'from-cyan-500 to-sky-400',
-    glow: 'rgba(6,182,212,0.12)',
     topBar: '#06b6d4',
     title: 'Quantum Fourier Transform',
     tag: 'Algorithm Core',
@@ -258,7 +251,6 @@ const FACTS = [
   },
   {
     color: 'from-violet-500 to-purple-400',
-    glow: 'rgba(139,92,246,0.12)',
     topBar: '#8b5cf6',
     title: 'Qubit vs Bit',
     tag: 'Fundamentals',
@@ -266,7 +258,6 @@ const FACTS = [
   },
   {
     color: 'from-red-500 to-orange-400',
-    glow: 'rgba(239,68,68,0.12)',
     topBar: '#ef4444',
     title: 'Quantum Advantage',
     tag: 'Why It Matters',
@@ -292,7 +283,7 @@ function ToolGroupCards({ group, columns = '' }: { group: ToolGroup; columns?: s
 function ToolCard({ tool }: { tool: Tool }) {
   return (
     <Link to={tool.path}
-      className="group flex flex-col bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 transition-colors">
+      className="group flex flex-col glass-card rounded-2xl p-4">
       <div className="flex items-center gap-2.5 mb-2">
         <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ background: `${tool.color}1f`, border: `1px solid ${tool.color}55` }}>
@@ -318,12 +309,6 @@ export function AppHome() {
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative px-6 pt-12 pb-12 overflow-hidden">
-        {/* subtle dot grid — keeps background pure dark */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }} />
-
         <div className="relative z-10 max-w-3xl mx-auto">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-5">
@@ -362,7 +347,7 @@ export function AppHome() {
                 <Link
                   key={p.key}
                   to={`/solve?type=${p.key}`}
-                  className="group relative bg-quantum-800 border border-quantum-700 rounded-2xl p-4 hover:border-quantum-600 transition-all hover:scale-[1.02] cursor-pointer overflow-hidden"
+                  className="group relative glass-card rounded-2xl p-4 overflow-hidden"
                 >
                   <div
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none rounded-2xl"
@@ -373,24 +358,24 @@ export function AppHome() {
                       <Icon className="w-4 h-4 text-white" />
                     </div>
                     <h3 className="text-white font-bold text-sm mb-0.5">{p.label}</h3>
-                    <p className="text-gray-400 text-[11px] mb-3 leading-tight">{p.tagline}</p>
+                    <p className="text-gray-400 text-xs mb-3 leading-snug">{p.tagline}</p>
 
                     <div className="space-y-1 mb-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">Classical</span>
-                        <span className="text-[10px] text-red-400 font-mono font-semibold">{p.classical}</span>
+                        <span className="text-xs text-gray-400">Classical</span>
+                        <span className="text-xs text-red-400 font-mono font-semibold">{p.classical}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-500">{p.algo}</span>
-                        <span className="text-[10px] font-mono font-semibold" style={{ color: p.speedupColor }}>{p.quantum}</span>
+                        <span className="text-xs text-gray-400">{p.algo}</span>
+                        <span className="text-xs font-mono font-semibold" style={{ color: p.speedupColor }}>{p.quantum}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-quantum-700 border border-quantum-600" style={{ color: p.speedupColor }}>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-quantum-900/60 border border-quantum-600" style={{ color: p.speedupColor }}>
                         {p.speedup}
                       </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-700 group-hover:text-quantum-neon group-hover:translate-x-0.5 transition-all" />
+                      <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-quantum-neon group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
                 </Link>
@@ -420,8 +405,7 @@ export function AppHome() {
       <section className="px-6 pb-10">
         <div className="max-w-5xl mx-auto">
           <div
-            className="rounded-2xl border border-quantum-700 grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-quantum-700 overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, rgba(0,255,204,0.04), rgba(204,68,255,0.04))' }}
+            className="glass-card rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-quantum-700 overflow-hidden"
           >
             {STATS.map((s) => {
               const Icon = s.icon;
@@ -432,7 +416,7 @@ export function AppHome() {
                   </div>
                   <div>
                     <p className="text-xl font-extrabold text-white font-mono leading-none">{s.value}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{s.label}</p>
+                    <p className="text-xs text-gray-400 mt-1">{s.label}</p>
                   </div>
                 </div>
               );
@@ -451,10 +435,10 @@ export function AppHome() {
             {STEPS.map((step, i) => {
               const Icon = step.icon;
               return (
-                <div key={step.num} className="relative bg-quantum-800 border border-quantum-700 rounded-2xl p-6">
+                <div key={step.num} className="relative glass-card rounded-2xl p-6">
                   {i < STEPS.length - 1 && (
                     <div className="hidden md:block absolute -right-2 top-1/2 -translate-y-1/2 z-10">
-                      <ArrowRight className="w-4 h-4 text-quantum-600" />
+                      <ArrowRight className="w-4 h-4 text-gray-500" />
                     </div>
                   )}
                   <div className="flex items-start gap-4">
@@ -462,9 +446,9 @@ export function AppHome() {
                       <Icon className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-600 tracking-widest">STEP {step.num}</span>
+                      <span className="text-xs font-bold text-gray-400 tracking-widest">STEP {step.num}</span>
                       <h3 className="text-white font-bold text-sm mt-0.5 mb-1.5">{step.title}</h3>
-                      <p className="text-gray-400 text-xs leading-relaxed">{step.desc}</p>
+                      <p className="text-gray-400 text-sm leading-relaxed">{step.desc}</p>
                     </div>
                   </div>
                 </div>
@@ -474,7 +458,7 @@ export function AppHome() {
         </div>
       </section>
 
-{/* ── QUANTUM FACTS ────────────────────────────────────────────────── */}
+      {/* ── QUANTUM FACTS ────────────────────────────────────────────────── */}
       <section className="px-6 pb-16 border-t border-quantum-700 pt-10">
         <div className="max-w-5xl mx-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 text-center">
@@ -488,8 +472,7 @@ export function AppHome() {
             {FACTS.map(f => (
               <div
                 key={f.title}
-                className="relative rounded-2xl border border-quantum-700 p-5 overflow-hidden flex flex-col gap-3 hover:border-quantum-600 transition-all hover:scale-[1.01]"
-                style={{ background: f.glow }}
+                className="relative glass-card rounded-2xl p-5 overflow-hidden flex flex-col gap-3"
               >
                 {/* Coloured top accent bar */}
                 <div
@@ -503,7 +486,7 @@ export function AppHome() {
                     {f.title}
                   </h3>
                   <span
-                    className="text-[9px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 mt-0.5"
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full border flex-shrink-0"
                     style={{ color: f.topBar, borderColor: `${f.topBar}40`, background: `${f.topBar}12` }}
                   >
                     {f.tag}
@@ -511,7 +494,7 @@ export function AppHome() {
                 </div>
 
                 {/* Body */}
-                <p className="text-gray-300 text-[11px] leading-relaxed">{f.body}</p>
+                <p className="text-gray-300 text-sm leading-relaxed">{f.body}</p>
               </div>
             ))}
           </div>
