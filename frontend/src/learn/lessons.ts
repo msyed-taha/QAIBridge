@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 
 // The Learn course: nine short lessons on how quantum computers work. Each one
 // has four parts: Read, See (an interactive picture), Play (a small game) and
-// Check (one question). Signed-out visitors can open the `free` lessons; the
+// Test (three questions). Signed-out visitors can open the `free` lessons; the
 // rest ask them to sign in first.
 
 export type LessonPart = 'basics' | 'qubits' | 'limits';

@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigationType, useSearchParams } from 'react-router-dom';
 import { AuthProvider }    from './context/AuthContext';
 import { ProtectedRoute }  from './components/ProtectedRoute';
 import { AdminRoute }      from './components/AdminRoute';
@@ -50,6 +50,15 @@ function PageLoading() {
   );
 }
 
+// A newly opened page starts at the top (a single-page app otherwise keeps the
+// old scroll position). Back / forward are left to the browser.
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  const navigation = useNavigationType();
+  useEffect(() => { if (navigation !== 'POP') window.scrollTo(0, 0); }, [pathname, navigation]);
+  return null;
+}
+
 // Redirects logged-in users away from the public landing page to the app.
 // Admins use the app like anyone else; the portal is one click away in the navbar.
 function RootRoute() {
@@ -87,6 +96,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <PageTitle />
+      <ScrollToTop />
       <AuthProvider>
         <ErrorBoundary>
           {/* No background colour here, so the backdrop behind it shows through. */}
