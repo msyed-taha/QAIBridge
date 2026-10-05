@@ -7,4 +7,5 @@ export const LESSON_BODIES: Partial<Record<string, LazyExoticComponent<Component
   'bit-vs-qubit': lazy(() => import('./BitVsQubit')),
   'superposition': lazy(() => import('./Superposition')),
   'measurement': lazy(() => import('./Measurement')),
+  'quantum-gates': lazy(() => import('./QuantumGates')),
 };
