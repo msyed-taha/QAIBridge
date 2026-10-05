@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 import { Sparkles, Dices, Globe } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
+import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
 import { BlochSphere } from '../components/BlochSphere';
 import { TiltSlider, TurnSlider, OddsBar } from '../components/QubitControls';
 import { GameLevels, CheckAnswer } from '../components/GameLevels';
@@ -52,32 +52,11 @@ function Read() {
         you will almost always get 1.
       </Point>
 
-      <p className="text-gray-400 leading-relaxed border-l-2 border-quantum-neon/60 pl-4">
-        <strong className="text-gray-200">Good to know:</strong> checking a qubit always gives just one 0 or 1. The arrow
+      <GoodToKnow>
+        checking a qubit always gives just one 0 or 1. The arrow
         tells you the odds, but a single check can't tell you exactly where the arrow was pointing.
-      </p>
+      </GoodToKnow>
     </div>
-  );
-}
-
-function Point({ title, visual, children }: { title: string; visual: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0">{visual}</div>
-      <div>
-        <h3 className="text-white font-semibold text-lg leading-snug mb-1.5">{title}</h3>
-        <p className="text-gray-300 leading-relaxed">{children}</p>
-      </div>
-    </div>
-  );
-}
-
-function IconTile({ color, children }: { color: string; children: ReactNode }) {
-  return (
-    <span className="w-12 h-12 rounded-xl flex items-center justify-center"
-      style={{ color, background: `${color}26`, border: `1px solid ${color}66` }}>
-      {children}
-    </span>
   );
 }
 

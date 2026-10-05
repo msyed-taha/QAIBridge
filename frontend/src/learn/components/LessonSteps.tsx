@@ -44,7 +44,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
 
   return (
     <div ref={topRef} className="scroll-mt-24">
-      {/* Progress: Read · See · Play · Check */}
+      {/* Progress: Read · See · Play · Test */}
       <nav aria-label="Lesson steps" className="mb-6">
         <ol className="grid grid-cols-4 gap-2 sm:gap-3">
           {PARTS.map((p, i) => {
