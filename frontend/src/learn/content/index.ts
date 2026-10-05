@@ -6,4 +6,5 @@ import type { ComponentType, LazyExoticComponent } from 'react';
 export const LESSON_BODIES: Partial<Record<string, LazyExoticComponent<ComponentType>>> = {
   'bit-vs-qubit': lazy(() => import('./BitVsQubit')),
   'superposition': lazy(() => import('./Superposition')),
+  'measurement': lazy(() => import('./Measurement')),
 };
