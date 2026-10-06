@@ -59,8 +59,8 @@ function Read() {
       </Point>
 
       <GoodToKnow>
-        the QFT is incredibly fast. On n qubits it needs only about n² gates, where a normal computer needs about
-        n × 2ⁿ steps for the same job. But you can't read the whole result, only one measured number, so it pays off
+        the QFT is incredibly fast. On n qubits it needs only about n<sup>2</sup> gates, where a normal computer needs
+        about n × 2<sup>n</sup> steps for the same job. But you can't read the whole result, only one measured number, so it pays off
         only inside clever algorithms like Shor's.
       </GoodToKnow>
     </ReadList>
