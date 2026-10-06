@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowDown, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare, ShieldCheck } from 'lucide-react';
 import { QubitSphere } from '../components/home/QubitSphere';
+import { LearnTeaser } from '../learn/components/LearnTeaser';
 
 const CAPABILITIES = [
   {
@@ -338,6 +339,13 @@ export function Home() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* ── LEARN (free lessons) ────────────────────────────────────────── */}
+      <section className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <LearnTeaser />
         </div>
       </section>
 
