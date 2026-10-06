@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { TOOL_GROUPS, toolsIn } from '../tools';
 import type { Tool, ToolGroup } from '../tools';
+import { ContinueLearning } from '../learn/components/ContinueLearning';
 
 // ── Ask the AI Advisor ────────────────────────────────────────────────────────
 
@@ -194,74 +195,6 @@ const STEPS = [
     color: 'from-orange-500 to-yellow-400',
     title: 'Analyse the Speedup',
     desc: 'See answers checked side by side, oracle queries vs comparisons, success probability and where quantum wins at scale.',
-  },
-];
-
-// ── Quantum facts ─────────────────────────────────────────────────────────────
-
-const FACTS = [
-  {
-    color: 'from-teal-500 to-cyan-400',
-    topBar: '#00ffcc',
-    title: 'Superposition',
-    tag: 'Fundamental',
-    body: 'A qubit can be 0 and 1 simultaneously. 20 qubits represent 2²⁰ = 1,048,576 states at once — a classical computer needs all of them one at a time.',
-  },
-  {
-    color: 'from-purple-500 to-pink-400',
-    topBar: '#cc44ff',
-    title: 'Entanglement',
-    tag: 'Fundamental',
-    body: 'Entangled qubits share quantum state instantly regardless of distance. Einstein called it "spooky action at a distance" — it powers quantum teleportation and superdense coding.',
-  },
-  {
-    color: 'from-blue-500 to-indigo-400',
-    topBar: '#3b82f6',
-    title: 'Interference',
-    tag: 'Core Principle',
-    body: 'Quantum algorithms amplify correct answer paths and cancel wrong ones using wave-like interference — the same physics as light waves. Grover\'s and Shor\'s both rely on this.',
-  },
-  {
-    color: 'from-green-500 to-emerald-400',
-    topBar: '#22c55e',
-    title: 'Measurement',
-    tag: 'Quantum Mechanics',
-    body: 'Measuring a qubit collapses its superposition into a definite 0 or 1 — permanently. Quantum algorithms are carefully designed to make the correct answer the most probable outcome before measurement.',
-  },
-  {
-    color: 'from-orange-500 to-yellow-400',
-    topBar: '#f97316',
-    title: 'Quantum Gate',
-    tag: 'Circuit Element',
-    body: 'Quantum gates (H, X, Y, Z, CNOT) are reversible operations on qubits — the quantum equivalent of AND, OR, NOT. Unlike classical gates, they operate on probability amplitudes, not just 0s and 1s.',
-  },
-  {
-    color: 'from-pink-500 to-rose-400',
-    topBar: '#ec4899',
-    title: 'Decoherence',
-    tag: 'Key Challenge',
-    body: 'Qubits lose their quantum state when they interact with the environment — called decoherence. It is the biggest engineering challenge in building real quantum computers and limits circuit depth.',
-  },
-  {
-    color: 'from-cyan-500 to-sky-400',
-    topBar: '#06b6d4',
-    title: 'Quantum Fourier Transform',
-    tag: 'Algorithm Core',
-    body: 'The QFT is the quantum version of the Fast Fourier Transform: O(n²) gates for 2ⁿ amplitudes (though they cannot all be read out). It is the key subroutine inside Shor\'s Algorithm that enables period-finding and prime factorisation.',
-  },
-  {
-    color: 'from-violet-500 to-purple-400',
-    topBar: '#8b5cf6',
-    title: 'Qubit vs Bit',
-    tag: 'Fundamentals',
-    body: 'A classical bit is always exactly 0 or 1. A qubit is a unit vector in a 2D complex space — represented as α|0⟩ + β|1⟩ where |α|² + |β|² = 1. This allows exponentially more information to be encoded.',
-  },
-  {
-    color: 'from-red-500 to-orange-400',
-    topBar: '#ef4444',
-    title: 'Quantum Advantage',
-    tag: 'Why It Matters',
-    body: "A large, error-corrected quantum computer running Shor's algorithm could break RSA-2048 in hours — a task far beyond classical computers. Grover's algorithm searches a billion items in ~25,000 oracle queries instead of ~500 million comparisons.",
   },
 ];
 
@@ -458,46 +391,13 @@ export function AppHome() {
         </div>
       </section>
 
-      {/* ── QUANTUM FACTS ────────────────────────────────────────────────── */}
+      {/* ── CONTINUE LEARNING ────────────────────────────────────────────── */}
       <section className="px-6 pb-16 border-t border-quantum-700 pt-10">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 text-center">
-            Did You Know?
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
+            Learn
           </p>
-          <p className="text-gray-400 text-xs text-center mb-8">
-            Essential quantum computing concepts powering this platform
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FACTS.map(f => (
-              <div
-                key={f.title}
-                className="relative glass-card rounded-2xl p-5 overflow-hidden flex flex-col gap-3"
-              >
-                {/* Coloured top accent bar */}
-                <div
-                  className="absolute top-0 left-0 w-full h-[3px] rounded-t-2xl"
-                  style={{ background: `linear-gradient(90deg, transparent, ${f.topBar}, transparent)` }}
-                />
-
-                {/* Header row — title + tag badge */}
-                <div className="flex items-start justify-between gap-2 pt-1">
-                  <h3 className={`text-transparent bg-clip-text bg-gradient-to-r ${f.color} font-bold text-sm leading-tight`}>
-                    {f.title}
-                  </h3>
-                  <span
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full border flex-shrink-0"
-                    style={{ color: f.topBar, borderColor: `${f.topBar}40`, background: `${f.topBar}12` }}
-                  >
-                    {f.tag}
-                  </span>
-                </div>
-
-                {/* Body */}
-                <p className="text-gray-300 text-sm leading-relaxed">{f.body}</p>
-              </div>
-            ))}
-          </div>
+          <ContinueLearning />
         </div>
       </section>
 
