@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Trophy } from 'lucide-react';
+import { shuffled } from '../lists';
 
 export interface QuizOption {
   text: string;
@@ -16,6 +17,8 @@ export interface QuizQuestion {
 /**
  * The quiz at the end of a lesson: questions one at a time. Wrong answers
  * explain why and can be retried; the score counts right-first-time answers.
+ * Multiple-choice answers are shuffled each time a question appears, so the
+ * right one is never always in the same place. True/false keeps its order.
  */
 export function Quiz({ questions }: { questions: QuizQuestion[] }) {
   const [round, setRound] = useState(0);             // restarts the whole quiz
@@ -56,6 +59,11 @@ export function Quiz({ questions }: { questions: QuizQuestion[] }) {
 }
 
 function Question({ question, options, onSolved }: QuizQuestion & { onSolved: (firstTry: boolean) => void }) {
+  // Picked once per showing (a retry of the quiz mounts the question again).
+  const [order] = useState(() => {
+    const indexes = options.map((_, i) => i);
+    return options.length > 2 ? shuffled(indexes) : indexes;
+  });
   const [picked, setPicked] = useState<number | null>(null);
   const [tries, setTries] = useState(0);
   const solved = picked !== null && !!options[picked].correct;
@@ -70,7 +78,8 @@ function Question({ question, options, onSolved }: QuizQuestion & { onSolved: (f
     <div>
       <p className="text-white font-semibold text-lg mb-5">{question}</p>
       <div className="grid gap-2 sm:grid-cols-2">
-        {options.map((o, i) => {
+        {order.map(i => {
+          const o = options[i];
           const isPicked = picked === i;
           const look = isPicked
             ? o.correct ? 'border-green-500/60 bg-green-500/10 text-white' : 'border-red-500/60 bg-red-500/10 text-white'
