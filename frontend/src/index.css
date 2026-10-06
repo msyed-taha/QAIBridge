@@ -199,3 +199,11 @@ body { margin: 0; background: #0d0d1a; color: white; font-family: 'Inter', sans-
 .glass-card.is-tilting {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 26px 50px -22px rgba(0, 0, 0, .8), 0 0 40px -12px rgba(0, 255, 204, .28);
 }
+
+/* ── Learn: noise around a qubit (learn/content/Decoherence.tsx) ───────────── */
+/* Each speck drifts back and forth by its own --dx/--dy. Transform only. */
+.learn-noise { animation: learn-drift var(--t, 3s) ease-in-out infinite alternate; transform-box: fill-box; }
+@keyframes learn-drift { to { transform: translate(var(--dx), var(--dy)); } }
+@media (prefers-reduced-motion: reduce) {
+  .learn-noise { animation: none; }
+}

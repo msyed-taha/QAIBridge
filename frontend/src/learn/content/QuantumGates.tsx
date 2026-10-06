@@ -7,9 +7,9 @@ import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevel
 import { Quiz } from '../components/Quiz';
 import type { QuizQuestion } from '../components/Quiz';
 import { Panel, Tip } from '../components/ui';
-import { GATES, START, run, trace, dialAngle, chanceOf1, spotOf, undoGates } from '../gates';
+import { GATES, START, SPOT_NAMES, run, trace, dialAngle, chanceOf1, spotOf, undoGates } from '../gates';
 import type { Amps, GateName, Spot } from '../gates';
-import { oddsRGB, rgba } from '../colors';
+import { GATE_COLORS, oddsRGB, rgba } from '../colors';
 
 /** Lesson 4 — Quantum gates. */
 export default function QuantumGates() {
@@ -67,9 +67,7 @@ function Read() {
 
 // ── The dial, gate chips and the wire ─────────────────────────────────────────
 
-const GATE_COLORS: Record<GateName, string> = { X: '#22d3ee', H: '#a855f7', Z: '#fbbf24' };
 const GATE_WORDS: Record<GateName, string> = { X: 'flip', H: 'mix', Z: 'sign' };
-const SPOT_NAMES: Record<Spot, string> = { '0': '0', '1': '1', '+': 'the + mix', '-': 'the − mix' };
 const SPOT_TITLES: Record<Spot, string> = { '0': '0', '1': '1', '+': '+ mix (50/50)', '-': '− mix (50/50)' };
 
 const percentOf1 = (s: Amps) => Math.round(chanceOf1(s) * 100);

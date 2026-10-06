@@ -12,6 +12,9 @@ export type Spot = '0' | '1' | '+' | '-';
 
 export const START: Amps = [1, 0];
 
+/** Each spot in words, to use inside a sentence. */
+export const SPOT_NAMES: Record<Spot, string> = { '0': '0', '1': '1', '+': 'the + mix', '-': 'the − mix' };
+
 const S = Math.SQRT1_2;
 export const GATES: Record<GateName, (a: Amps) => Amps> = {
   X: ([a, b]) => [b, a],                       // flip: swaps 0 and 1
