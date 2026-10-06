@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Clock, Gamepad2, Lock, UserPlus } from 'lucide-react';
+import { ArrowRight, BookOpen, Clock, Gamepad2, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LESSONS, LESSON_PARTS, FREE_LESSON_COUNT, TOTAL_MINUTES, lessonPath } from '../../learn/lessons';
 import type { Lesson } from '../../learn/lessons';
+import { BRAND_FILL } from '../../learn/colors';
+import { SignUpButtons } from './SignUpButtons';
 
 /** The Learn course overview: every lesson, grouped, open to everyone. */
 export function LearnPage() {
@@ -35,7 +37,7 @@ export function LearnPage() {
 
           <Link to={lessonPath(LESSONS[0])}
             className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
-            style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
+            style={{ background: BRAND_FILL }}>
             Start lesson 1 <ArrowRight className="w-4 h-4" />
           </Link>
           {!isAuthed && (
@@ -71,17 +73,7 @@ export function LearnPage() {
               Create a free account to open lessons {FREE_LESSON_COUNT + 1}–{LESSONS.length}: gates, interference,
               entanglement and the algorithms that make quantum computers useful.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link to="/register" state={{ from: '/learn' }}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm hover:brightness-110 transition-all"
-                style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
-                <UserPlus className="w-4 h-4" /> Create a free account
-              </Link>
-              <Link to="/login" state={{ from: '/learn' }}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all">
-                Sign in
-              </Link>
-            </div>
+            <SignUpButtons from="/learn" />
           </div>
         </section>
       )}

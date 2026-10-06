@@ -1,11 +1,15 @@
 import { useId, useState } from 'react';
-import { Waves, VolumeX, Split, Target, Sparkles } from 'lucide-react';
+import { Waves, VolumeX, Split, Target } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
-import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
-import { GameLevels, CheckAnswer } from '../components/GameLevels';
-import type { CheckResult } from '../components/GameLevels';
+import { ReadList, Point, IconTile, GoodToKnow } from '../components/ReadPoints';
+import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevels';
 import { Quiz } from '../components/Quiz';
+import type { QuizQuestion } from '../components/Quiz';
+import { Panel, Pills, Segmented, Tip } from '../components/ui';
+import type { Option } from '../components/ui';
 import { brightness, mixStrength, waveAt } from '../waves';
+import { ZERO_COLOR, ONE_COLOR } from '../colors';
+import { replaceAt } from '../lists';
 
 /** Lesson 5 — Interference. */
 export default function Interference() {
@@ -23,7 +27,7 @@ export default function Interference() {
 
 function Read() {
   return (
-    <div className="space-y-8 max-w-2xl">
+    <ReadList>
       <Point title="Waves can add up" visual={<IconTile color="#22d3ee"><Waves className="w-6 h-6" /></IconTile>}>
         Drop two stones in a pond and their ripples meet. Where two crests meet, they make a
         <strong className="text-white"> bigger wave</strong>. This is called <em>interference</em>.
@@ -56,16 +60,14 @@ function Read() {
         interference is the proof that superposition is real (Lesson 2). If a qubit were secretly 0 or 1, its routes
         couldn't cancel, and H then H would give a random answer. Experiments show they do cancel.
       </GoodToKnow>
-    </div>
+    </ReadList>
   );
 }
 
 // ── Shared pieces ─────────────────────────────────────────────────────────────
 
-const TEAL = '#00ffcc';
-const PURPLE = '#cc44ff';
 const AMBER = '#fbbf24';
-const picked = { background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' };
+const WAVE_COLORS = [ZERO_COLOR, ONE_COLOR, '#22d3ee'];
 
 const VIEW_W = 300;
 
@@ -107,6 +109,8 @@ function shiftWords(part: number) {
   return `${part}% of a wave`;
 }
 
+const SHIFT_PRESETS: Option<number>[] = [{ value: 0, label: 'In step' }, { value: 50, label: 'Opposite' }];
+
 function See() {
   const [part, setPart] = useState(20);                 // shift of wave B, in % of one wave
   const shift = part * 3.6;
@@ -118,29 +122,22 @@ function See() {
     <div className="max-w-2xl">
       <p className="text-gray-200 text-lg mb-8">Two waves meet at the same spot. Slide wave B along and watch what they make together.</p>
 
-      <div className="rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
+      <Panel>
         <div className="flex items-baseline justify-between gap-3 mb-1.5">
           <label htmlFor={sliderId} className="text-sm text-gray-200 font-medium">Shift wave B</label>
           <span className="text-sm text-gray-300">{shiftWords(part)}</span>
         </div>
         <input id={sliderId} type="range" min={0} max={100} step={1} value={part}
           onChange={e => setPart(Number(e.target.value))} className="w-full accent-[#00ffcc] cursor-pointer" />
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[{ v: 0, label: 'In step' }, { v: 50, label: 'Opposite' }].map(b => (
-            <button key={b.v} type="button" onClick={() => setPart(b.v)} aria-pressed={part === b.v}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
-                part === b.v ? 'text-black border-transparent' : 'text-white bg-quantum-900/60 border-quantum-600 hover:border-quantum-neon/50'}`}
-              style={part === b.v ? picked : undefined}>
-              {b.label}
-            </button>
-          ))}
+        <div className="mt-3">
+          <Pills label="Quick shifts" labelAt="hidden" options={SHIFT_PRESETS} value={part} onChange={setPart} />
         </div>
-      </div>
+      </Panel>
 
       <div className="mt-8 space-y-2">
         {[
-          { name: 'Wave A', color: TEAL, f: (x: number) => waveAt(x) },
-          { name: 'Wave B', color: PURPLE, f: (x: number) => waveAt(x, shift) },
+          { name: 'Wave A', color: ZERO_COLOR, f: (x: number) => waveAt(x) },
+          { name: 'Wave B', color: ONE_COLOR, f: (x: number) => waveAt(x, shift) },
           { name: 'Together', color: '#ffffff', f: (x: number) => waveAt(x) + waveAt(x, shift) },
         ].map((w, i) => (
           <div key={w.name} className={`grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 ${i === 2 ? 'pt-2 border-t border-quantum-700/60' : ''}`}>
@@ -161,11 +158,11 @@ function See() {
         </div>
       </div>
 
-      <p className="mt-5 flex items-start gap-2 text-sm text-gray-400">
-        <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-quantum-purple" />
-        <span>For a qubit, <strong className="text-gray-200">the same sign</strong> means in step and
-          <strong className="text-gray-200"> opposite signs</strong> mean opposite. That is how the Z gate from Lesson 4 can make an answer vanish completely.</span>
-      </p>
+      <Tip>
+        For a qubit, <strong className="text-gray-200">the same sign</strong> means in step and
+        <strong className="text-gray-200"> opposite signs</strong> mean opposite. That is how the Z gate from Lesson 4
+        can make an answer vanish completely.
+      </Tip>
     </div>
   );
 }
@@ -177,6 +174,7 @@ type Goal = 'dark' | 'bright';
 interface Light { name: string; goal: Goal; arrivesFlipped?: boolean[]; note?: string }
 
 const WAVE_NAMES = ['A', 'B', 'C'];
+const DIRECTIONS: Option<boolean>[] = [{ value: false, label: 'Up' }, { value: true, label: 'Flipped' }];
 
 const LEVELS: { sizes: number[]; lights: Light[]; goal: string; lesson: string }[] = [
   { sizes: [1, 1], lights: [{ name: 'The light', goal: 'dark' }],
@@ -207,35 +205,26 @@ function WavePuzzles() {
 
 function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () => void }) {
   const [flipped, setFlipped] = useState<boolean[]>(() => level.sizes.map(() => false));
-  const [result, setResult] = useState<CheckResult | null>(null);
+  const { result, solved, edit, pass, fail } = useLevelAnswer(onWin);
   const values = level.lights.map(l => brightness(level.sizes, flipped, l.arrivesFlipped));
   // The same scale for every wave in the level, so the biggest total still fits the picture.
   const unit = 20 / level.sizes.reduce((s, x) => s + x, 0);
   const sign = (i: number, arrives?: boolean[]) => (flipped[i] !== !!arrives?.[i] ? -1 : 1);
-
-  // Locked once answered correctly; before that, any change clears an old "not yet".
-  const solved = !!result?.ok;
-  const toggle = (i: number, to: boolean) => {
-    if (solved) return;
-    setFlipped(f => f.map((x, j) => (j === i ? to : x)));
-    setResult(null);
-  };
+  // All the waves are in step apart from their signs, so at each light they make one wave of this height.
+  const heights = level.lights.map(l => level.sizes.reduce((s, size, i) => s + sign(i, l.arrivesFlipped) * size, 0));
 
   const check = () => {
     if (level.lights.every((l, i) => isMet(l.goal, values[i]))) {
-      setResult({ ok: true, text: level.lesson });
-      onWin();
-      return;
-    }
-    if (level.lights.length === 1) {
+      pass(level.lesson);
+    } else if (level.lights.length === 1) {
       const down = level.sizes.reduce((s, x, i) => s + (flipped[i] ? x : 0), 0);
       const up = level.sizes.reduce((s, x, i) => s + (flipped[i] ? 0 : x), 0);
-      setResult({ ok: false, text: `Not yet. The light is still ${pctOf(values[0])}% bright. ` + (down === 0
+      fail(`Not yet. The light is still ${pctOf(values[0])}% bright. ` + (down === 0
         ? 'All the waves are the right way up, so they add up. Flip one so a crest meets a dip.'
-        : `The flipped waves add up to size ${down} and the others to size ${up}. To cancel, the two sides must be equal.`) });
+        : `The flipped waves add up to size ${down} and the others to size ${up}. To cancel, the two sides must be equal.`));
     } else {
-      setResult({ ok: false, text: `Not yet. ${level.lights.map((l, i) => `${l.name} is ${pctOf(values[i])}% bright`).join(' and ')}. `
-        + 'Remember: at answer 1, wave B arrives flipped.' });
+      fail(`Not yet. ${level.lights.map((l, i) => `${l.name} is ${pctOf(values[i])}% bright`).join(' and ')}. `
+        + 'Remember: at answer 1, wave B arrives flipped.');
     }
   };
 
@@ -244,22 +233,9 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
       <ul className="space-y-3">
         {level.sizes.map((size, i) => (
           <li key={i} className="rounded-xl border border-quantum-700 bg-quantum-900/40 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-gray-200 font-medium">
-                Wave {WAVE_NAMES[i]} <span className="text-gray-400 font-normal">· size {size}</span>
-              </span>
-              <div role="group" aria-label={`Wave ${WAVE_NAMES[i]}`} className="inline-flex rounded-full border border-quantum-600 bg-quantum-900/60 p-1">
-                {[{ to: false, label: 'Up' }, { to: true, label: 'Flipped' }].map(o => (
-                  <button key={o.label} type="button" onClick={() => toggle(i, o.to)} aria-pressed={flipped[i] === o.to} disabled={solved}
-                    className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors disabled:cursor-default ${
-                      flipped[i] === o.to ? 'text-black' : 'text-gray-300 hover:text-white disabled:hover:text-gray-300'}`}
-                    style={flipped[i] === o.to ? picked : undefined}>
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <WavePicture f={x => sign(i) * size * waveAt(x)} color={i === 0 ? TEAL : i === 1 ? PURPLE : '#22d3ee'} height={48} unit={unit} />
+            <Segmented label={`Wave ${WAVE_NAMES[i]}`} detail={`size ${size}`} options={DIRECTIONS} value={flipped[i]}
+              onChange={to => edit(() => setFlipped(f => replaceAt(f, i, to)))} disabled={solved} />
+            <WavePicture f={x => sign(i) * size * waveAt(x)} color={WAVE_COLORS[i]} height={48} unit={unit} />
           </li>
         ))}
       </ul>
@@ -276,8 +252,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-400" aria-hidden="true">Waves together</p>
-            <WavePicture height={48} unit={unit} color="#ffffff"
-              f={x => level.sizes.reduce((s, size, i) => s + sign(i, l.arrivesFlipped) * size * waveAt(x), 0)} />
+            <WavePicture height={48} unit={unit} color="#ffffff" f={x => heights[li] * waveAt(x)} />
           </div>
         ))}
       </div>
@@ -289,7 +264,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: QuizQuestion[] = [
   {
     question: 'Two equal waves meet, and one of them is upside down. What happens?',
     options: [

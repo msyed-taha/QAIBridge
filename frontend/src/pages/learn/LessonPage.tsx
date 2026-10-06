@@ -1,12 +1,14 @@
 import { Suspense } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Clock, Lock, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LESSONS, FREE_LESSON_COUNT, lessonBySlug, lessonPath } from '../../learn/lessons';
 import type { Lesson } from '../../learn/lessons';
 import { LESSON_BODIES } from '../../learn/content';
 import { LessonSteps, NextLessonContext, PARTS } from '../../learn/components/LessonSteps';
 import type { PartId } from '../../learn/components/LessonSteps';
+import { SignUpButtons } from './SignUpButtons';
 
 /** One lesson: a short header, the lesson's steps, and previous / next.
  *  Signed-out visitors see a sign-in prompt instead on non-free lessons. */
@@ -31,8 +33,9 @@ export function LessonPage() {
 
   const locked = !isAuthed && !lesson.free;
   const Body = LESSON_BODIES[lesson.slug];
-  const prev = LESSONS[lesson.n - 2];
-  const next = LESSONS[lesson.n];
+  const index = LESSONS.indexOf(lesson);
+  const prev = LESSONS[index - 1];
+  const next = LESSONS[index + 1];
 
   return (
     <div className="min-h-screen px-6 pt-8 pb-16">
@@ -67,7 +70,7 @@ export function LessonPage() {
             ) : (
               <LessonSteps parts={Object.fromEntries(PARTS.map(p => [p.id, (
                 <p className="text-gray-400">{p.hint} <span className="text-gray-500">Coming soon.</span></p>
-              )])) as Record<PartId, React.ReactNode>} />
+              )])) as Record<PartId, ReactNode>} />
             )}
           </NextLessonContext.Provider>
         )}
@@ -104,7 +107,6 @@ function Spinner() {
 
 /** Shown instead of the lesson to signed-out visitors on non-free lessons. */
 function LockedLesson({ lesson }: { lesson: Lesson }) {
-  const from = { from: lessonPath(lesson) };
   return (
     <div className="glass-card rounded-2xl p-8 text-center">
       <span className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -116,17 +118,7 @@ function LockedLesson({ lesson }: { lesson: Lesson }) {
         Lessons 1–{FREE_LESSON_COUNT} are free for everyone. Create a free account to open all {LESSONS.length}.
         You'll come straight back here.
       </p>
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-        <Link to="/register" state={from}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm hover:brightness-110 transition-all"
-          style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
-          <UserPlus className="w-4 h-4" /> Create a free account
-        </Link>
-        <Link to="/login" state={from}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all">
-          Sign in
-        </Link>
-      </div>
+      <SignUpButtons from={lessonPath(lesson)} />
       <Link to={lessonPath(LESSONS[0])} className="inline-block mt-5 text-sm text-quantum-neon hover:text-teal-300">
         Or start with lesson 1, free
       </Link>

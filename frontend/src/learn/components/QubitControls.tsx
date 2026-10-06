@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { deg, rad, percentages } from '../qubit';
 import type { QubitState } from '../qubit';
+import { ZERO_COLOR, ONE_COLOR } from '../colors';
 
 type Change = (s: QubitState, final: boolean) => void;
 
@@ -50,8 +51,8 @@ export function OddsBar({ state, compact = false }: { state: QubitState; compact
     <div>
       <div className="flex h-3 rounded-full overflow-hidden bg-quantum-900/80" role="img"
         aria-label={`${p0}% chance of 0, ${p1}% chance of 1`}>
-        <div style={{ width: `${p0}%`, background: '#00ffcc' }} />
-        <div style={{ width: `${p1}%`, background: '#cc44ff' }} />
+        <div style={{ width: `${p0}%`, background: ZERO_COLOR }} />
+        <div style={{ width: `${p1}%`, background: ONE_COLOR }} />
       </div>
       <div className="mt-2 flex justify-between text-sm font-medium" aria-hidden="true">
         <span className="text-quantum-neon">{compact ? `0: ${p0}%` : `${p0}% chance of 0`}</span>

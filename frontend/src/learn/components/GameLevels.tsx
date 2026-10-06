@@ -1,20 +1,45 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Star, ArrowRight, RotateCcw, Lightbulb, XCircle } from 'lucide-react';
+import { BRAND_FILL } from '../colors';
 
 export interface GameLevel {
   goal: string;
 }
 
-export interface CheckResult {
+interface CheckResult {
   ok: boolean;
   text: string;
 }
 
 /**
+ * The answer state of one level. Every change the player makes goes through
+ * `edit`: it is ignored once the level is solved (the level locks), and it
+ * clears an old "not yet" message. `pass` wins the level; `fail` explains why not.
+ */
+export function useLevelAnswer(onWin: () => void) {
+  const [result, setResult] = useState<CheckResult | null>(null);
+  const solved = !!result?.ok;
+  return {
+    result,
+    solved,
+    edit: (change: () => void) => {
+      if (solved) return;
+      change();
+      setResult(null);
+    },
+    pass: (text: string) => {
+      setResult({ ok: true, text });
+      onWin();
+    },
+    fail: (text: string) => setResult({ ok: false, text }),
+  };
+}
+
+/**
  * The "Check answer" button every game uses. Levels are never won on their own:
  * the player sets things up, then checks. A wrong answer says why and how to
- * fix it; the lesson clears `result` when the player changes something.
+ * fix it. `result` comes from useLevelAnswer.
  */
 export function CheckAnswer({ onCheck, result, disabled = false }: {
   onCheck: () => void;
@@ -26,7 +51,7 @@ export function CheckAnswer({ onCheck, result, disabled = false }: {
       {!result?.ok && (
         <button type="button" onClick={onCheck} disabled={disabled}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-black text-sm hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
+          style={{ background: BRAND_FILL }}>
           Check answer
         </button>
       )}
@@ -89,7 +114,7 @@ export function GameLevels({ title, levels, children }: {
           {level < last ? (
             <button type="button" onClick={() => goTo(level + 1)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-black hover:brightness-110"
-              style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
+              style={{ background: BRAND_FILL }}>
               Next level <ArrowRight className="w-4 h-4" />
             </button>
           ) : (

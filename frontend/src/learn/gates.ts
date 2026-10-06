@@ -23,8 +23,19 @@ export const GATES: Record<GateName, (a: Amps) => Amps> = {
 export const run = (gates: GateName[], start: Amps = START): Amps =>
   gates.reduce((s, g) => GATES[g](s), start);
 
+/** The qubit after each gate in turn, starting from 0 (or from `start`). */
+export function trace(gates: GateName[], start: Amps = START): Amps[] {
+  const states: Amps[] = [];
+  let s = start;
+  for (const g of gates) {
+    s = GATES[g](s);
+    states.push(s);
+  }
+  return states;
+}
+
 /** The arrow on the dial: x is right (+), z is up (0). */
-export const dialVector = ([a, b]: Amps) => ({ x: 2 * a * b, z: a * a - b * b });
+const dialVector = ([a, b]: Amps) => ({ x: 2 * a * b, z: a * a - b * b });
 
 /** The arrow's angle in degrees, clockwise from straight up. */
 export const dialAngle = (s: Amps) => {

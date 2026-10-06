@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Eye, Gamepad2, ListChecks, Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { lessonPath } from '../lessons';
+import { BRAND_FILL } from '../colors';
 import type { Lesson } from '../lessons';
 
 export type PartId = 'read' | 'see' | 'play' | 'test';
@@ -40,7 +41,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
   };
 
   const primary = 'inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm hover:brightness-110 transition-all';
-  const primaryStyle = { background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' };
+  const primaryStyle = { background: BRAND_FILL };
 
   return (
     <div ref={topRef} className="scroll-mt-24">

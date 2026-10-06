@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { blochVector, fromVector, percentages, deg } from '../qubit';
 import type { QubitState, Vec3 } from '../qubit';
 import { project, unproject, LESSON_VIEW } from '../sphereView';
+import { ZERO_RGB, ONE_RGB, oddsRGB, rgba } from '../colors';
 
 // Wireframe circles in sphere coordinates (z up).
 const SEG = 72;
@@ -12,22 +13,12 @@ const EQUATOR = ring(t => [Math.cos(t), Math.sin(t), 0]);
 const MERIDIANS = [0, 30, 60, 90, 120, 150].map(d => ring(t => [Math.sin(t) * Math.cos(r(d)), Math.sin(t) * Math.sin(r(d)), Math.cos(t)]));
 const DEPTH_ALPHA = [0.07, 0.14, 0.28, 0.5]; // wireframe, back → front
 
-type RGB = [number, number, number];
-const TEAL: RGB = [0, 255, 204];
-const PURPLE: RGB = [204, 68, 255];
-const TARGET = '#fbbf24';
-const rgba = (c: RGB, a = 1) => `rgba(${c.map(Math.round).join(',')},${a})`;
-// The arrow is teal near |0⟩, purple near |1⟩, and a blend in between.
-const stateColour = (oneChance: number): RGB => [0, 1, 2].map(i => TEAL[i] + (PURPLE[i] - TEAL[i]) * oneChance) as RGB;
-
 const radiusFor = (size: number) => size * 0.36;
 
 interface Props {
   state: QubitState;
   /** Makes the arrow draggable. `final` is true when the drag ends. */
   onChange?: (state: QubitState, final: boolean) => void;
-  /** A dashed yellow arrow to aim for (the games use it). */
-  target?: QubitState | null;
   className?: string;
 }
 
@@ -36,7 +27,7 @@ interface Props {
  * bottom. Drag the arrow (near side of the sphere) to move it. Drawn on a
  * canvas only when something changes, so it costs nothing while still.
  */
-export function BlochSphere({ state, onChange, target = null, className = '' }: Props) {
+export function BlochSphere({ state, onChange, className = '' }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState(0);
   const dragging = useRef(false);                    // read by the handlers at once
@@ -58,8 +49,8 @@ export function BlochSphere({ state, onChange, target = null, className = '' }: 
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawSphere(ctx, size, state, target);
-  }, [size, state, target]);
+    drawSphere(ctx, size, state);
+  }, [size, state]);
 
   // Pointer position → the state under it.
   const stateAt = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -71,8 +62,7 @@ export function BlochSphere({ state, onChange, target = null, className = '' }: 
   };
 
   const [p0, p1] = percentages(state);
-  const label = `Qubit arrow tilted ${Math.round(deg(state.theta))}° from 0: ${p0}% chance of 0, ${p1}% chance of 1.`
-    + (target ? ` Target tilted ${Math.round(deg(target.theta))}°.` : '');
+  const label = `Qubit arrow tilted ${Math.round(deg(state.theta))}° from 0: ${p0}% chance of 0, ${p1}% chance of 1.`;
 
   return (
     <canvas
@@ -96,7 +86,7 @@ export function BlochSphere({ state, onChange, target = null, className = '' }: 
   );
 }
 
-function drawSphere(ctx: CanvasRenderingContext2D, size: number, state: QubitState, target: QubitState | null) {
+function drawSphere(ctx: CanvasRenderingContext2D, size: number, state: QubitState) {
   const c = size / 2, R = radiusFor(size);
   const P = (v: Vec3) => {
     const p = project(v, LESSON_VIEW);
@@ -136,7 +126,7 @@ function drawSphere(ctx: CanvasRenderingContext2D, size: number, state: QubitSta
   for (const m of MERIDIANS) strokeRing(m, 'rgb(119,119,238)', 1, 1);
   for (const l of LATITUDES) strokeRing(l, 'rgb(119,119,238)', 1, 1);
   const brand = ctx.createLinearGradient(c - R, c, c + R, c);
-  brand.addColorStop(0, rgba(TEAL)); brand.addColorStop(1, rgba(PURPLE));
+  brand.addColorStop(0, rgba(ZERO_RGB)); brand.addColorStop(1, rgba(ONE_RGB));
   strokeRing(EQUATOR, brand, 1.5, 1.8);
 
   // Outline, and the line through 0 and 1.
@@ -159,20 +149,10 @@ function drawSphere(ctx: CanvasRenderingContext2D, size: number, state: QubitSta
 
   const o = P([0, 0, 0]);
 
-  // Target: a dashed yellow arrow with a ring at its tip.
-  if (target) {
-    const t = P(blochVector(target));
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = TARGET; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
-    line(o, t);
-    ctx.setLineDash([]);
-    ctx.beginPath(); ctx.arc(t.x, t.y, 9, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
   // The state arrow, with a guide down to the middle line for depth.
   const v = blochVector(state);
   const tip = P(v);
-  const col = stateColour(percentages(state)[1] / 100);
+  const col = oddsRGB(percentages(state)[1] / 100);
   if (Math.hypot(v[0], v[1]) > 0.05) {
     const foot = P([v[0], v[1], 0]);
     ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.3;

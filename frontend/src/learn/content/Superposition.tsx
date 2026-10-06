@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Layers, Coins, LayoutGrid, Eye, Sparkles } from 'lucide-react';
+import { Layers, Coins, LayoutGrid, Eye } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
-import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
-import { GameLevels, CheckAnswer } from '../components/GameLevels';
-import type { CheckResult } from '../components/GameLevels';
+import { ReadList, Point, IconTile, GoodToKnow } from '../components/ReadPoints';
+import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevels';
 import { Quiz } from '../components/Quiz';
+import type { QuizQuestion } from '../components/Quiz';
+import { Panel, Segmented, Tip } from '../components/ui';
+import type { Option } from '../components/ui';
 import { allPatterns, patternsInMix, settingsFor, shareLabel } from '../patterns';
 import type { Setting } from '../patterns';
+import { ZERO_COLOR, ONE_COLOR } from '../colors';
+import { joinWithAnd, replaceAt } from '../lists';
 
 /** Lesson 2 — Superposition. */
 export default function Superposition() {
@@ -24,7 +28,7 @@ export default function Superposition() {
 
 function Read() {
   return (
-    <div className="space-y-8 max-w-2xl">
+    <ReadList>
       <Point title="A mix of 0 and 1" visual={<IconTile color="#22d3ee"><Layers className="w-6 h-6" /></IconTile>}>
         In Lesson 1 you saw that a qubit's arrow can point in between 0 and 1. That in-between state is called
         a <strong className="text-white">superposition</strong>: the qubit is a mix of 0 and 1 at the same time. Any mix
@@ -54,47 +58,19 @@ function Read() {
         everyday things like coins never seem to be in a mix. That's because their mix is lost almost instantly when
         they bump into the air and light around them. Lesson 7 explains why.
       </GoodToKnow>
-    </div>
+    </ReadList>
   );
 }
 
 // ── The pattern board ─────────────────────────────────────────────────────────
 
-const SETTINGS: { value: Setting; label: string; color: string }[] = [
-  { value: '0', label: '0', color: '#00ffcc' },
-  { value: 'mix', label: 'Mix', color: 'linear-gradient(90deg, #00ffcc, #cc44ff)' },
-  { value: '1', label: '1', color: '#cc44ff' },
+const SETTINGS: Option<Setting>[] = [
+  { value: '0', label: '0', fill: ZERO_COLOR },
+  { value: 'mix', label: 'Mix', fill: `linear-gradient(90deg, ${ZERO_COLOR}, ${ONE_COLOR})` },
+  { value: '1', label: '1', fill: ONE_COLOR },
 ];
 
-const COUNTS = [1, 2, 3].map(n => ({ value: n, label: String(n), color: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }));
-
-/** A row of joined buttons, one of which is picked. */
-function Choice<T extends string | number>({ label, options, value, onChange, disabled = false }: {
-  label: string;
-  options: { value: T; label: string; color: string }[];
-  value: T;
-  onChange: (v: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-gray-200 font-medium">{label}</span>
-      <div role="group" aria-label={label} className="inline-flex rounded-full border border-quantum-600 bg-quantum-900/60 p-1">
-        {options.map(o => {
-          const picked = o.value === value;
-          return (
-            <button key={o.value} type="button" onClick={() => onChange(o.value)} aria-pressed={picked} disabled={disabled}
-              className={`min-w-[3.25rem] px-3 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:cursor-default ${
-                picked ? 'text-black' : 'text-gray-300 hover:text-white disabled:hover:text-gray-300'}`}
-              style={picked ? { background: o.color } : undefined}>
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+const COUNTS: Option<number>[] = [1, 2, 3].map(n => ({ value: n, label: String(n) }));
 
 /** One switch per qubit: 0, Mix or 1. */
 function QubitSwitches({ settings, onChange, disabled }: {
@@ -105,7 +81,7 @@ function QubitSwitches({ settings, onChange, disabled }: {
   return (
     <>
       {settings.map((s, i) => (
-        <Choice key={i} label={`Qubit ${i + 1}`} options={SETTINGS} value={s} onChange={v => onChange(i, v)} disabled={disabled} />
+        <Segmented key={i} label={`Qubit ${i + 1}`} options={SETTINGS} value={s} onChange={v => onChange(i, v)} disabled={disabled} />
       ))}
     </>
   );
@@ -113,12 +89,12 @@ function QubitSwitches({ settings, onChange, disabled }: {
 
 /** Every pattern the qubits could show. Patterns in the mix glow; `target` ones get a dashed outline. */
 function PatternBoard({ settings, target }: { settings: Setting[]; target?: string[] }) {
-  const lit = patternsInMix(settings);
-  const share = shareLabel(lit.length);
+  const lit = new Set(patternsInMix(settings));
+  const share = shareLabel(lit.size);
   return (
     <ul className="grid grid-cols-4 gap-2 sm:gap-3" aria-label="Pattern board">
       {allPatterns(settings.length).map(p => {
-        const on = lit.includes(p);
+        const on = lit.has(p);
         const wanted = target?.includes(p);
         return (
           <li key={p} className={`rounded-xl border px-2 py-3 text-center transition-all duration-300 ${
@@ -157,18 +133,18 @@ function See() {
   const [count, setCount] = useState(2);
   const [settings, setSettings] = useState<Setting[]>(['mix', '0', '0']);
   const used = settings.slice(0, count);
-  const set = (i: number, s: Setting) => setSettings(all => all.map((x, j) => (j === i ? s : x)));
+  const set = (i: number, s: Setting) => setSettings(all => replaceAt(all, i, s));
   const plural = count === 1 ? '' : 's';
 
   return (
     <div className="max-w-2xl">
       <p className="text-gray-200 text-lg mb-8">Set each qubit to 0, 1 or a mix. The board lights up every pattern in the mix.</p>
 
-      <div className="space-y-4 rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
-        <Choice label="How many qubits?" options={COUNTS} value={count} onChange={setCount} />
+      <Panel className="space-y-4">
+        <Segmented label="How many qubits?" options={COUNTS} value={count} onChange={setCount} />
         <div className="border-t border-quantum-700/60" />
         <QubitSwitches settings={used} onChange={set} />
-      </div>
+      </Panel>
 
       <div className="mt-8">
         <PatternBoard settings={used} />
@@ -186,11 +162,10 @@ function See() {
         </div>
       </div>
 
-      <p className="mt-5 flex items-start gap-2 text-sm text-gray-400">
-        <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-quantum-purple" />
-        <span>Every qubit set to <strong className="text-gray-200">Mix</strong> doubles the patterns. When you look, though,
-          you get just one of them, picked by chance. Lesson 3 shows how.</span>
-      </p>
+      <Tip>
+        Every qubit set to <strong className="text-gray-200">Mix</strong> doubles the patterns. When you look, though,
+        you get just one of them, picked by chance. Lesson 3 shows how.
+      </Tip>
     </div>
   );
 }
@@ -209,9 +184,6 @@ const LEVELS = [
     lesson: 'Correct! Two mixes and one fixed qubit make 2 × 2 = 4 patterns. Every Mix doubles the count.' },
 ];
 
-const listOf = (items: string[]) =>
-  items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-
 function LightUpTheBoard() {
   return (
     <GameLevels title="Light up the board" levels={LEVELS}>
@@ -222,40 +194,32 @@ function LightUpTheBoard() {
 
 function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () => void }) {
   const [settings, setSettings] = useState<Setting[]>(() => Array<Setting>(level.qubits).fill('0'));
-  const [result, setResult] = useState<CheckResult | null>(null);
-
-  // Locked once answered correctly; before that, any change clears an old "not yet".
-  const solved = !!result?.ok;
-  const set = (i: number, s: Setting) => {
-    if (solved) return;
-    setSettings(all => all.map((x, j) => (j === i ? s : x)));
-    setResult(null);
-  };
+  const { result, solved, edit, pass, fail } = useLevelAnswer(onWin);
+  const set = (i: number, s: Setting) => edit(() => setSettings(all => replaceAt(all, i, s)));
 
   const check = () => {
     const lit = patternsInMix(settings);
     const extra = lit.filter(p => !level.target.includes(p));
     const missing = level.target.filter(p => !lit.includes(p));
     if (!extra.length && !missing.length) {
-      setResult({ ok: true, text: level.lesson });
-      onWin();
+      pass(level.lesson);
       return;
     }
     const answer = settingsFor(level.target, level.qubits);
     const off = answer ? settings.findIndex((s, i) => s !== answer[i]) : -1;
-    setResult({ ok: false, text: [
+    fail([
       'Not yet.',
-      extra.length ? `${listOf(extra)} ${extra.length === 1 ? 'is' : 'are'} lit but shouldn't be.` : '',
-      missing.length ? `${listOf(missing)} should be lit but ${missing.length === 1 ? "isn't" : "aren't"}.` : '',
+      extra.length ? `${joinWithAnd(extra)} ${extra.length === 1 ? 'is' : 'are'} lit but shouldn't be.` : '',
+      missing.length ? `${joinWithAnd(missing)} should be lit but ${missing.length === 1 ? "isn't" : "aren't"}.` : '',
       off >= 0 ? `Look again at Qubit ${off + 1}.` : '',
-    ].filter(Boolean).join(' ') });
+    ].filter(Boolean).join(' '));
   };
 
   return (
     <div className="max-w-2xl">
-      <div className="space-y-4 rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
+      <Panel className="space-y-4">
         <QubitSwitches settings={settings} onChange={set} disabled={solved} />
-      </div>
+      </Panel>
 
       <p className="mt-6 mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-400" aria-hidden="true">
         <span className="flex items-center gap-1.5">
@@ -274,7 +238,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: QuizQuestion[] = [
   {
     question: 'What does it mean when a qubit is in superposition?',
     options: [

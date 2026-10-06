@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
 
+/** A Read step: its points, one under another. */
+export function ReadList({ children }: { children: ReactNode }) {
+  return <div className="space-y-8 max-w-2xl">{children}</div>;
+}
+
 /** One reading point: a small picture on the left, a title and a few plain sentences. */
 export function Point({ title, visual, children }: { title: string; visual: ReactNode; children: ReactNode }) {
   return (

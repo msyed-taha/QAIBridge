@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Sparkles, Dices, Globe } from 'lucide-react';
+import { Dices, Globe } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
-import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
+import { ReadList, Point, IconTile, GoodToKnow } from '../components/ReadPoints';
 import { BlochSphere } from '../components/BlochSphere';
 import { TiltSlider, TurnSlider, OddsBar } from '../components/QubitControls';
-import { GameLevels, CheckAnswer } from '../components/GameLevels';
-import type { CheckResult } from '../components/GameLevels';
+import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevels';
 import { Quiz } from '../components/Quiz';
+import type { QuizQuestion } from '../components/Quiz';
+import { Pills, Tip } from '../components/ui';
 import { ZERO, ONE, fromDegrees, percentages } from '../qubit';
 import type { QubitState } from '../qubit';
 
@@ -26,7 +27,7 @@ export default function BitVsQubit() {
 
 function Read() {
   return (
-    <div className="space-y-8 max-w-2xl">
+    <ReadList>
       <Point title="Normal computers use bits" visual={<BitButton size="sm" />}>
         Everything on your phone or laptop, from photos to messages to songs, is stored as a huge number of tiny
         switches called <strong className="text-white">bits</strong>. Each bit is either <strong className="text-white">0</strong> (off)
@@ -53,10 +54,10 @@ function Read() {
       </Point>
 
       <GoodToKnow>
-        checking a qubit always gives just one 0 or 1. The arrow
-        tells you the odds, but a single check can't tell you exactly where the arrow was pointing.
+        checking a qubit always gives just one 0 or 1. The arrow tells you the odds, but a single check can't tell
+        you exactly where the arrow was pointing.
       </GoodToKnow>
-    </div>
+    </ReadList>
   );
 }
 
@@ -90,9 +91,11 @@ function BitButton({ size = 'lg', value, onFlip }: { size?: 'sm' | 'lg'; value?:
 
 // ── See: a bit and a qubit side by side ───────────────────────────────────────
 
+const SEE_START = fromDegrees(45, 330);
+
 function See() {
   const [bit, setBit] = useState<0 | 1>(0);
-  const [qubit, setQubit] = useState<QubitState>(fromDegrees(45, 330));
+  const [qubit, setQubit] = useState<QubitState>(SEE_START);
 
   return (
     <div>
@@ -108,18 +111,17 @@ function See() {
         <div className="md:border-l md:border-quantum-700 md:pl-10">
           <h3 className="text-white font-semibold mb-5 text-center md:text-left">A qubit</h3>
           <div className="grid gap-6 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] items-center">
-            <BlochSphere state={qubit} onChange={s => setQubit(s)} className="max-w-[15rem] mx-auto" />
+            <BlochSphere state={qubit} onChange={setQubit} className="max-w-[15rem] mx-auto" />
             <div className="space-y-5">
-              <TiltSlider state={qubit} onChange={s => setQubit(s)} />
-              <TurnSlider state={qubit} onChange={s => setQubit(s)} />
+              <TiltSlider state={qubit} onChange={setQubit} />
+              <TurnSlider state={qubit} onChange={setQubit} />
               <OddsBar state={qubit} />
             </div>
           </div>
-          <p className="mt-5 flex items-start gap-2 text-sm text-gray-400">
-            <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-quantum-purple" />
-            <span>Any mix of odds is possible. Notice that <strong className="text-gray-200">Turn</strong> spins the arrow
-              without changing the odds; that hidden direction matters later, in Lesson 5.</span>
-          </p>
+          <Tip>
+            Any mix of odds is possible. Notice that <strong className="text-gray-200">Turn</strong> spins the arrow
+            without changing the odds; that hidden direction matters later, in Lesson 5.
+          </Tip>
         </div>
       </div>
     </div>
@@ -148,55 +150,43 @@ function BitOrQubit() {
   );
 }
 
+type Tool = 'bit' | 'qubit';
+const TOOLS = [{ value: 'bit' as const, label: 'a bit' }, { value: 'qubit' as const, label: 'a qubit' }];
+
 function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () => void }) {
-  const [tool, setTool] = useState<'bit' | 'qubit' | null>(null);
+  const [tool, setTool] = useState<Tool | null>(null);
   const [bit, setBit] = useState<0 | 1>(0);
   const [qubit, setQubit] = useState<QubitState>(ZERO);
-  const [result, setResult] = useState<CheckResult | null>(null);
+  const { result, solved, edit, pass, fail } = useLevelAnswer(onWin);
 
   const hits = (oneChance: number) => Math.abs(oneChance - level.target) <= ODDS_TOLERANCE;
-  const bitCannot = !hits(0) && !hits(100);
-  // Once answered correctly the level stays as it is; before that, any change
-  // makes an earlier "not yet" out of date.
-  const solved = !!result?.ok;
-  const choose = (t: 'bit' | 'qubit') => { if (!solved) { setTool(t); setResult(null); } };
-  const flip = () => { if (!solved) { setBit(b => (b ? 0 : 1)); setResult(null); } };
-  const move = (s: QubitState) => { if (!solved) { setQubit(s); setResult(null); } };
+  const move = (s: QubitState) => edit(() => setQubit(s));
 
   const check = () => {
     const oneChance = tool === 'bit' ? bit * 100 : percentages(qubit)[1];
     if (hits(oneChance)) {
-      setResult({ ok: true, text: level.lesson });
-      onWin();
+      pass(level.lesson);
     } else if (tool === 'bit') {
-      setResult({ ok: false, text: bitCannot
+      fail(!hits(0) && !hits(100)
         ? 'Not quite. A bit can only be 0 or 1, so its chance of 1 is always 0% or 100%. Try the qubit.'
-        : 'Not yet. The bit gives 0 right now. Tap it to flip it.' });
+        : 'Not yet. The bit gives 0 right now. Tap it to flip it.');
     } else {
-      setResult({ ok: false, text: `Not yet. Your chance of 1 is ${oneChance}% and the goal is ${level.target}%. `
-        + (oneChance < level.target ? 'Tilt the arrow further down, towards 1.' : 'Tilt the arrow back up, towards 0.') });
+      fail(`Not yet. Your chance of 1 is ${oneChance}% and the goal is ${level.target}%. `
+        + (oneChance < level.target ? 'Tilt the arrow further down, towards 1.' : 'Tilt the arrow back up, towards 0.'));
     }
   };
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-6" role="group" aria-label="Choose what to use">
-        <span className="text-sm text-gray-400 mr-1">Use:</span>
-        {(['bit', 'qubit'] as const).map(t => (
-          <button key={t} type="button" onClick={() => choose(t)} aria-pressed={tool === t} disabled={solved}
-            className={`px-5 py-2 rounded-full text-sm font-semibold border transition-colors disabled:cursor-default ${
-              tool === t ? 'text-black border-transparent' : 'text-white bg-quantum-900/60 border-quantum-600 hover:border-quantum-neon/50 disabled:hover:border-quantum-600'}`}
-            style={tool === t ? { background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' } : undefined}>
-            a {t}
-          </button>
-        ))}
+      <div className="mb-6">
+        <Pills label="Use" labelAt="side" options={TOOLS} value={tool} onChange={t => edit(() => setTool(t))} disabled={solved} />
       </div>
 
       {tool === null && <p className="text-gray-400">Pick a bit or a qubit to try.</p>}
 
       {tool === 'bit' && (
         <div className="flex flex-col sm:flex-row items-center gap-8">
-          <BitButton value={bit} onFlip={flip} />
+          <BitButton value={bit} onFlip={() => edit(() => setBit(b => (b ? 0 : 1)))} />
           <div className="w-full max-w-sm"><OddsBar state={bit ? ONE : ZERO} /></div>
         </div>
       )}
@@ -218,7 +208,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: QuizQuestion[] = [
   {
     question: 'A bit in a normal computer can be…',
     options: [

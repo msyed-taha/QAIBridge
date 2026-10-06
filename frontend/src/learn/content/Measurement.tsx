@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ScanEye, Shuffle, Lock, BarChart3, RotateCcw } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
-import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
-import { GameLevels, CheckAnswer } from '../components/GameLevels';
-import type { CheckResult } from '../components/GameLevels';
+import { ReadList, Point, IconTile, GoodToKnow } from '../components/ReadPoints';
+import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevels';
 import { Quiz } from '../components/Quiz';
+import type { QuizQuestion } from '../components/Quiz';
+import { Panel, Pills } from '../components/ui';
 import { EMPTY_TALLY, measure, tallyPercentages } from '../shots';
 import type { Tally } from '../shots';
+import { BRAND_FILL, ZERO_COLOR, ONE_COLOR } from '../colors';
 
 /** Lesson 3 — Measurement. */
 export default function Measurement() {
@@ -24,7 +26,7 @@ export default function Measurement() {
 
 function Read() {
   return (
-    <div className="space-y-8 max-w-2xl">
+    <ReadList>
       <Point title="Looking makes it pick" visual={<IconTile color="#3b82f6"><ScanEye className="w-6 h-6" /></IconTile>}>
         To read a qubit, a quantum computer <strong className="text-white">measures</strong> it. Measuring forces the
         qubit to pick, so you always get a plain 0 or 1, never a mix. Which one you get comes down to chance.
@@ -51,43 +53,11 @@ function Read() {
         you can't get around this by copying the qubit first and measuring the copies. The laws of physics forbid
         making a perfect copy of an unknown qubit. This is called the "no-cloning" rule.
       </GoodToKnow>
-    </div>
+    </ReadList>
   );
 }
 
 // ── Shared pieces ─────────────────────────────────────────────────────────────
-
-const TEAL = '#00ffcc';
-const PURPLE = '#cc44ff';
-const picked = { background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' };
-
-/** A labelled row of pill buttons, one of which is picked. */
-function Pills<T extends string | number>({ label, options, value, onChange, disabled = false }: {
-  label: string;
-  options: { value: T; label: string }[];
-  value: T | null;
-  onChange: (v: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-sm text-gray-200 font-medium mb-2">{label}</p>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
-        {options.map(o => {
-          const on = o.value === value;
-          return (
-            <button key={o.value} type="button" onClick={() => onChange(o.value)} aria-pressed={on} disabled={disabled}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors disabled:cursor-default ${
-                on ? 'text-black border-transparent' : 'text-white bg-quantum-900/60 border-quantum-600 hover:border-quantum-neon/50 disabled:hover:border-quantum-600'}`}
-              style={on ? picked : undefined}>
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 /** "Measure: Once · 10 times · 100 times". */
 function MeasureButtons({ counts, onMeasure, disabled = false }: {
@@ -102,7 +72,7 @@ function MeasureButtons({ counts, onMeasure, disabled = false }: {
         {counts.map(n => (
           <button key={n} type="button" onClick={() => onMeasure(n)} disabled={disabled}
             className="px-4 py-2 rounded-xl text-sm font-bold text-black hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            style={picked}>
+            style={{ background: BRAND_FILL }}>
             {n === 1 ? 'Once' : `${n} times`}
           </button>
         ))}
@@ -119,8 +89,8 @@ function Jars({ tally, chanceOf1 }: { tally: Tally; chanceOf1?: number }) {
     <div className="grid grid-cols-2 gap-6 max-w-xs" role="img"
       aria-label={`0 came up ${tally.zeros} times (${p0}%), 1 came up ${tally.ones} times (${p1}%)`
         + (real === undefined ? '' : `. Real odds: ${100 - real}% chance of 0, ${real}% chance of 1`)}>
-      <Jar digit="0" count={tally.zeros} pct={p0} color={TEAL} real={real === undefined ? undefined : 100 - real} />
-      <Jar digit="1" count={tally.ones} pct={p1} color={PURPLE} real={real} />
+      <Jar digit="0" count={tally.zeros} pct={p0} color={ZERO_COLOR} real={real === undefined ? undefined : 100 - real} />
+      <Jar digit="1" count={tally.ones} pct={p1} color={ONE_COLOR} real={real} />
     </div>
   );
 }
@@ -171,15 +141,15 @@ function See() {
     <div className="max-w-2xl">
       <p className="text-gray-200 text-lg mb-8">Pick a qubit and measure it. Each measurement uses a fresh qubit, set up the same way.</p>
 
-      <div className="space-y-5 rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
+      <Panel className="space-y-5">
         <Pills label="Qubit" options={SEE_QUBITS} value={which} onChange={pick} />
         <MeasureButtons counts={[1, 10, 100]} onMeasure={run} />
-      </div>
+      </Panel>
 
       {last !== null && (
         <div className="mt-6 flex items-center gap-4 rounded-xl border border-quantum-700 bg-quantum-900/40 px-4 py-3" aria-live="polite">
           <span className="w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center font-mono text-2xl font-extrabold text-black"
-            style={{ background: last ? PURPLE : TEAL }}>{last}</span>
+            style={{ background: last ? ONE_COLOR : ZERO_COLOR }}>{last}</span>
           <div>
             <p className="text-gray-200">
               {lookedAgain ? `Still ${last}. Once measured, a qubit keeps its answer.` : `This qubit gave ${last}.`}
@@ -239,38 +209,32 @@ function MysteryQubit() {
 function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () => void }) {
   const [tally, setTally] = useState<Tally>(EMPTY_TALLY);
   const [answer, setAnswer] = useState<number | null>(null);
-  const [result, setResult] = useState<CheckResult | null>(null);
+  const { result, solved, edit, pass, fail } = useLevelAnswer(onWin);
   const total = tally.zeros + tally.ones;
-
-  // Locked once answered correctly; before that, any change clears an old "not yet".
-  const solved = !!result?.ok;
-  const run = (n: number) => { if (!solved) { setTally(t => measure(t, n, level.chance)); setResult(null); } };
-  const choose = (v: number) => { if (!solved) { setAnswer(v); setResult(null); } };
 
   const check = () => {
     if (answer === level.chance) {
-      setResult({ ok: true, text: level.lesson });
-      onWin();
+      pass(level.lesson);
     } else if (total === 0) {
-      setResult({ ok: false, text: 'Not quite. Measure the qubit first to see what it gives.' });
+      fail('Not quite. Measure the qubit first to see what it gives.');
     } else {
-      setResult({ ok: false, text: `Not quite. In your ${total} ${total === 1 ? 'look' : 'looks'}, 1 came up `
+      fail(`Not quite. In your ${total} ${total === 1 ? 'look' : 'looks'}, 1 came up `
         + `${tally.ones} ${tally.ones === 1 ? 'time' : 'times'} (${tallyPercentages(tally)[1]}%). `
-        + 'Take more looks: the more you measure, the closer you get to the real odds.' });
+        + 'Take more looks: the more you measure, the closer you get to the real odds.');
     }
   };
 
   return (
     <div className="max-w-2xl">
-      <div className="rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
-        <MeasureButtons counts={[1, 10]} onMeasure={run} disabled={solved} />
-      </div>
+      <Panel>
+        <MeasureButtons counts={[1, 10]} onMeasure={n => edit(() => setTally(t => measure(t, n, level.chance)))} disabled={solved} />
+      </Panel>
 
       <div className="mt-8"><Jars tally={tally} /></div>
       <p className="mt-4 text-gray-300">{total === 0 ? 'No looks yet.' : `${total} ${total === 1 ? 'look' : 'looks'} so far.`}</p>
 
       <div className="mt-6">
-        <Pills label={level.question} options={level.options} value={answer} onChange={choose} disabled={solved} />
+        <Pills label={level.question} options={level.options} value={answer} onChange={v => edit(() => setAnswer(v))} disabled={solved} />
       </div>
 
       <CheckAnswer onCheck={check} result={result} disabled={answer === null} />
@@ -280,7 +244,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: QuizQuestion[] = [
   {
     question: 'A qubit has a 70% chance of giving 1. You measure it once. What do you get?',
     options: [

@@ -1,13 +1,15 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { RotateCw, ArrowUpDown, Blend, EyeOff, Undo2, Lock, Delete, Trash2, Sparkles } from 'lucide-react';
+import { RotateCw, ArrowUpDown, Blend, EyeOff, Undo2, Lock, Delete, Trash2 } from 'lucide-react';
 import { LessonSteps } from '../components/LessonSteps';
-import { Point, IconTile, GoodToKnow } from '../components/ReadPoints';
-import { GameLevels, CheckAnswer } from '../components/GameLevels';
-import type { CheckResult } from '../components/GameLevels';
+import { ReadList, Point, IconTile, GoodToKnow } from '../components/ReadPoints';
+import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevels';
 import { Quiz } from '../components/Quiz';
-import { GATES, START, run, dialAngle, chanceOf1, spotOf, undoGates } from '../gates';
+import type { QuizQuestion } from '../components/Quiz';
+import { Panel, Tip } from '../components/ui';
+import { GATES, START, run, trace, dialAngle, chanceOf1, spotOf, undoGates } from '../gates';
 import type { Amps, GateName, Spot } from '../gates';
+import { oddsRGB, rgba } from '../colors';
 
 /** Lesson 4 — Quantum gates. */
 export default function QuantumGates() {
@@ -25,7 +27,7 @@ export default function QuantumGates() {
 
 function Read() {
   return (
-    <div className="space-y-8 max-w-2xl">
+    <ReadList>
       <Point title="Gates are moves" visual={<IconTile color="#7777ee"><RotateCw className="w-6 h-6" /></IconTile>}>
         A quantum computer works by making small moves to its qubits, called <strong className="text-white">gates</strong>.
         Each gate turns the qubit's arrow in a fixed way. A quantum program is simply a list of gates, one after
@@ -59,7 +61,7 @@ function Read() {
         give one output, so information is lost and you can't run them backwards. Quantum computers use undoable
         versions instead.
       </GoodToKnow>
-    </div>
+    </ReadList>
   );
 }
 
@@ -72,23 +74,16 @@ const SPOT_TITLES: Record<Spot, string> = { '0': '0', '1': '1', '+': '+ mix (50/
 
 const percentOf1 = (s: Amps) => Math.round(chanceOf1(s) * 100);
 
-/** Teal for 0, purple for 1, blended in between. */
-function arrowColor(s: Amps) {
-  const t = chanceOf1(s);
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
-  return `rgb(${mix(0x00, 0xcc)}, ${mix(0xff, 0x44)}, ${mix(0xcc, 0xff)})`;
-}
+/** `target` moved by whole turns to be as close as possible to `from`, so the arrow turns the short way round. */
+const nearestTurn = (target: number, from: number) => target + 360 * Math.round((from - target) / 360);
 
 /** A flat dial with the qubit's arrow: up is 0, down is 1, right is the + mix, left is the − mix. */
 function Dial({ amps, size = 44, labels = false }: { amps: Amps; size?: number; labels?: boolean }) {
-  // Turn the short way round from the last angle, so the arrow never spins a full lap.
-  const last = useRef<number | null>(null);
-  let angle = dialAngle(amps);
-  if (last.current !== null) {
-    while (angle - last.current > 180) angle -= 360;
-    while (angle - last.current < -180) angle += 360;
-  }
-  last.current = angle;
+  // Remember the angle shown last, so the arrow never spins a full lap
+  // (React's pattern for keeping a value from the previous render).
+  const [shown, setShown] = useState(() => dialAngle(amps));
+  const angle = nearestTurn(dialAngle(amps), shown);
+  if (angle !== shown) setShown(angle);
 
   const c = size / 2;
   const r = labels ? c - 16 : c - 3;
@@ -107,7 +102,7 @@ function Dial({ amps, size = 44, labels = false }: { amps: Amps; size?: number; 
       </>}
       <g className="transition-transform duration-500 ease-out motion-reduce:transition-none"
         style={{ transform: `rotate(${angle}deg)`, transformOrigin: `${c}px ${c}px` }}>
-        <line x1={c} y1={c} x2={c} y2={c - r + 3} stroke={arrowColor(amps)} strokeWidth={labels ? 3.5 : 2.5} strokeLinecap="round" />
+        <line x1={c} y1={c} x2={c} y2={c - r + 3} stroke={rgba(oddsRGB(chanceOf1(amps)))} strokeWidth={labels ? 3.5 : 2.5} strokeLinecap="round" />
         <circle cx={c} cy={c - r + 3} r={labels ? 4.5 : 3} fill="#fff" />
       </g>
       <circle cx={c} cy={c} r={labels ? 3 : 2} fill="#7777ee" />
@@ -144,8 +139,7 @@ function WireStep({ chip, amps, first, label }: { chip: ReactNode; amps: Amps; f
 
 /** The machine: the qubit starts at 0 and goes through the gates left to right. */
 function Wire({ steps }: { steps: { gate: GateName; kind: StepKind }[] }) {
-  let amps = START;
-  const after = steps.map(s => (amps = GATES[s.gate](amps)));
+  const after = trace(steps.map(s => s.gate));
 
   // On narrow screens the wire wraps onto more lines. Mark the first step of
   // each line so it doesn't draw a link back to the line above.
@@ -251,7 +245,7 @@ function See() {
     <div className="max-w-2xl">
       <p className="text-gray-200 text-lg mb-8">Add gates to the machine. The qubit starts at 0 and goes through them from left to right.</p>
 
-      <div className="rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
+      <Panel>
         <GateButtons canAdd={steps.length < MAX_WIRE} canRemove={steps.length > 0}
           onAdd={g => setSteps(s => [...s, { gate: g, kind: 'gate' }])}
           onRemove={() => setSteps(s => s.slice(0, -1))}
@@ -261,7 +255,7 @@ function See() {
             <Undo2 className="w-4 h-4" /> Run it backwards
           </button>
         </GateButtons>
-      </div>
+      </Panel>
 
       <div className="mt-8"><Wire steps={steps} /></div>
       <div className="mt-6">
@@ -269,11 +263,10 @@ function See() {
           note={undone && spotOf(final) === '0' ? 'Back to 0. Doing the gates in reverse order undid every move.' : undefined} />
       </div>
 
-      <p className="mt-5 flex items-start gap-2 text-sm text-gray-400">
-        <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-quantum-purple" />
-        <span>Try <strong className="text-gray-200">H</strong>, then H again: the mix turns straight back into 0. Then
-          try H, Z, H. Where does it end up?</span>
-      </p>
+      <Tip>
+        Try <strong className="text-gray-200">H</strong>, then H again: the mix turns straight back into 0. Then try
+        H, Z, H. Where does it end up?
+      </Tip>
     </div>
   );
 }
@@ -315,31 +308,27 @@ function GatePuzzles() {
 
 function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () => void }) {
   const [added, setAdded] = useState<GateName[]>([]);
-  const [result, setResult] = useState<CheckResult | null>(null);
+  const { result, solved, edit, pass, fail } = useLevelAnswer(onWin);
   const final = run([...level.locked, ...added]);
-
-  // Locked once answered correctly; before that, any change clears an old "not yet".
-  const solved = !!result?.ok;
-  const change = (next: GateName[]) => { if (!solved) { setAdded(next); setResult(null); } };
+  const change = (next: GateName[]) => edit(() => setAdded(next));
 
   const check = () => {
     const at = spotOf(final);
     if (added.length && at === level.target) {
-      setResult({ ok: true, text: level.lesson(added) });
-      onWin();
+      pass(level.lesson(added));
     } else if (!added.length) {
-      setResult({ ok: false, text: 'Not yet. Tap a gate to add it to the machine.' });
+      fail('Not yet. Tap a gate to add it to the machine.');
     } else {
-      setResult({ ok: false, text: `Not yet. Your qubit ends at ${SPOT_NAMES[at]}, but the goal is ${SPOT_NAMES[level.target]}. ${hintFor(final, level.target)}` });
+      fail(`Not yet. Your qubit ends at ${SPOT_NAMES[at]}, but the goal is ${SPOT_NAMES[level.target]}. ${hintFor(final, level.target)}`);
     }
   };
 
   return (
     <div className="max-w-2xl">
-      <div className="rounded-xl border border-quantum-700 bg-quantum-900/40 p-4 sm:p-5">
+      <Panel>
         <GateButtons canAdd={!solved && added.length < MAX_ADDED} canRemove={!solved && added.length > 0}
           onAdd={g => change([...added, g])} onRemove={() => change(added.slice(0, -1))} onClear={() => change([])} />
-      </div>
+      </Panel>
 
       <div className="mt-8">
         <Wire steps={[
@@ -356,7 +345,7 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: QuizQuestion[] = [
   {
     question: 'A qubit is 0. You apply the X gate. What is it now?',
     options: [
