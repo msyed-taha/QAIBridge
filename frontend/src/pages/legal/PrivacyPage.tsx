@@ -4,8 +4,9 @@ import { LegalLayout, type LegalSection } from './LegalLayout';
 
 const RETENTION: [string, string][] = [
   ['Account details and activity', 'While your account exists.'],
-  ['Accounts you delete', `Switched off straight away. You can restore the account within ${L.deletedAccountDays} days by signing up again with the same email. After ${L.deletedAccountDays} days the account and its run history are permanently erased, automatically.`],
+  ['Accounts you delete', `Switched off straight away. You can restore the account within ${L.deletedAccountDays} days by signing up again with the same email. After ${L.deletedAccountDays} days the account, its run history and its learning progress are permanently erased, automatically.`],
   ['Run history', 'Until you delete the run, or your account is erased.'],
+  ['Learning progress', 'While your account exists. It is erased together with your account.'],
   ['Content you submit for processing', 'Not kept after your request is finished (apart from the run summaries above).'],
   ['Verification codes', `${L.codeMinutes} minutes.`],
   ['Contact-form messages', `Up to ${L.contactMessageMonths} months, then erased automatically.`],
@@ -48,6 +49,7 @@ const sections: LegalSection[] = [
         <ul>
           <li><strong>Account activity:</strong> when you created your account, when you last signed in, your role (user or administrator), whether your account is active, and when you accepted our Terms of Use and this Privacy Policy, and which version.</li>
           <li><strong>Run history</strong> (signed-in users): a summary of each run, such as the problem type, algorithm, problem size, timings, number of steps and whether the answers were correct, plus a short title that may include a small part of your input (for example, the number you factored or your database query). Benchmarks also keep their measured results. You can view and delete your runs on your Dashboard.</li>
+          <li><strong>Learning progress</strong> (signed-in users): which Learn lessons you have finished, your best quiz score, and how many stars you earned in each lesson's game. We use it only to show your progress back to you.</li>
           <li><strong>Technical data:</strong> your IP address, held in memory for up to {L.spamIpMinutes} minutes to protect the Contact form from spam. Our servers may also keep basic logs (IP address, date and time, page requested and errors) for security and troubleshooting.</li>
         </ul>
 
@@ -55,8 +57,9 @@ const sections: LegalSection[] = [
         <p>
           We <strong>do not use cookies</strong>. We use your browser’s local storage for: a sign-in token that
           keeps you signed in (it expires after {L.tokenDays} days); a copy of your basic profile (username, email
-          and role) so pages load quickly; and your progress in the circuit builder’s challenge levels. These are
-          strictly necessary for features you ask for, so we do not ask for consent. Signing out removes the
+          and role) so pages load quickly; your progress in the circuit builder’s challenge levels; and, if you use the
+          Learn lessons without signing in, your progress in them (when you sign in, it moves to your account and is
+          removed from the browser). These are strictly necessary for features you ask for, so we do not ask for consent. Signing out removes the
           sign-in token and profile copy, and you can clear everything in your browser settings.
         </p>
 
@@ -77,7 +80,7 @@ const sections: LegalSection[] = [
         <ul>
           <li><strong>To create and run your account and provide the features you use.</strong> This is necessary to perform our agreement with you (our Terms of Use).</li>
           <li><strong>To verify your email address and keep your account secure</strong>, for example with verification codes, password hashing and rate limits. This is necessary for our agreement with you and in our legitimate interest in keeping the Service safe.</li>
-          <li><strong>To show you your results and run history.</strong> Necessary to perform our agreement with you.</li>
+          <li><strong>To show you your results, run history and learning progress.</strong> Necessary to perform our agreement with you.</li>
           <li><strong>To answer your messages.</strong> Our legitimate interest in responding to you.</li>
           <li><strong>To prevent abuse, investigate problems and enforce our Terms.</strong> Our legitimate interest in protecting the Service and its users.</li>
           <li><strong>To comply with the law</strong> and respond to lawful requests from authorities. A legal obligation.</li>

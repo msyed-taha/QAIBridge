@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Star, ArrowRight, RotateCcw, Lightbulb, XCircle } from 'lucide-react';
 import { BRAND_FILL } from '../colors';
+import { LessonProgressContext } from '../useLearnProgress';
 
 export interface GameLevel {
   goal: string;
@@ -84,6 +85,14 @@ export function GameLevels({ title, levels, children }: {
 
   const last = levels.length - 1;
   const stars = won.filter(Boolean).length;
+
+  // Save the stars as they grow; the lesson keeps its best ever.
+  const lessonProgress = useContext(LessonProgressContext);
+  const recordStars = lessonProgress?.recordStars;
+  const bestStars = lessonProgress?.best.stars ?? 0;
+  useEffect(() => {
+    if (stars > 0) recordStars?.(stars);
+  }, [stars, recordStars]);
   const goTo = (i: number) => { setLevel(i); setAttempt(a => a + 1); setCleared(false); };
   const win = () => {
     setCleared(true);
@@ -100,7 +109,10 @@ export function GameLevels({ title, levels, children }: {
           ))}
         </p>
       </div>
-      <p className="text-sm text-gray-400 mb-4">Level {level + 1} of {levels.length}</p>
+      <p className="text-sm text-gray-400 mb-4">
+        Level {level + 1} of {levels.length}
+        {bestStars > 0 && <span className="text-gray-500"> · Your best: {bestStars} of {levels.length} stars</span>}
+      </p>
       <p className="text-gray-200 mb-6">{levels[level].goal}</p>
 
       <div key={`${level}-${attempt}`}>{children(level, win)}</div>

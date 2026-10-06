@@ -4,8 +4,8 @@ Legal settings that the Privacy Policy and Terms of Use (frontend /privacy,
 
   * TERMS_VERSION — the effective date of the current Terms/Privacy Policy.
     Stored with each account when its owner accepts them at sign-up.
-  * Retention — self-deleted accounts (with their run history, via the
-    database's ON DELETE CASCADE) are erased for good after 30 days; Contact-
+  * Retention — self-deleted accounts (with their run history and Learn
+    progress, via the database's ON DELETE CASCADE) are erased for good after 30 days; Contact-
     form messages after 12 months. `purge_expired` enforces both; it runs at
     startup, once a day, and before sign-up so an expired account is never
     restored.

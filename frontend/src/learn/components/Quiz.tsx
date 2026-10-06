@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Trophy } from 'lucide-react';
 import { shuffled } from '../lists';
+import { LessonProgressContext } from '../useLearnProgress';
 
 export interface QuizOption {
   text: string;
@@ -27,6 +28,15 @@ export function Quiz({ questions }: { questions: QuizQuestion[] }) {
   const [firstTry, setFirstTry] = useState<boolean[]>([]);
   const last = questions.length - 1;
   const score = firstTry.filter(Boolean).length;
+  const finished = solved && index === last;
+
+  // Finishing the quiz finishes the lesson; the lesson keeps its best score.
+  const lessonProgress = useContext(LessonProgressContext);
+  const recordQuiz = lessonProgress?.recordQuiz;
+  const bestScore = lessonProgress?.best.quizScore ?? null;
+  useEffect(() => {
+    if (finished) recordQuiz?.(score);
+  }, [finished, score, recordQuiz]);
 
   const restart = () => { setRound(r => r + 1); setIndex(0); setSolved(false); setFirstTry([]); };
 
@@ -42,11 +52,16 @@ export function Quiz({ questions }: { questions: QuizQuestion[] }) {
           Next question <ArrowRight className="w-4 h-4" />
         </button>
       )}
-      {solved && index === last && (
+      {finished && (
         <div role="status" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-quantum-neon/10 px-4 py-3">
           <span className="flex items-center gap-2 text-white font-semibold">
             <Trophy className="w-5 h-5 text-amber-400" />
-            {score === questions.length ? 'Perfect! ' : ''}You got {score} of {questions.length} right first time.
+            <span>
+              {score === questions.length ? 'Perfect! ' : ''}You got {score} of {questions.length} right first time.
+              {bestScore !== null && bestScore > score && (
+                <span className="text-gray-300 font-normal"> Your best: {bestScore} of {questions.length}.</span>
+              )}
+            </span>
           </span>
           <button type="button" onClick={restart}
             className="inline-flex items-center gap-1.5 text-sm text-gray-300 hover:text-white">

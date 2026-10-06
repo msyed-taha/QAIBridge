@@ -1,13 +1,16 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Clock, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LESSONS, FREE_LESSON_COUNT, lessonBySlug, lessonPath } from '../../learn/lessons';
 import type { Lesson } from '../../learn/lessons';
 import { LESSON_BODIES } from '../../learn/content';
 import { LessonSteps, NextLessonContext, PARTS } from '../../learn/components/LessonSteps';
 import type { PartId } from '../../learn/components/LessonSteps';
+import { LessonProgressContext, useLearnProgress } from '../../learn/useLearnProgress';
+import type { LessonRecorder } from '../../learn/useLearnProgress';
+import { NO_PROGRESS } from '../../learn/progress';
 import { SignUpButtons } from './SignUpButtons';
 
 /** One lesson: a short header, the lesson's steps, and previous / next.
@@ -16,6 +19,15 @@ export function LessonPage() {
   const { slug } = useParams();
   const { isAuthed, loading } = useAuth();
   const lesson = lessonBySlug(slug);
+  const { progress, record } = useLearnProgress();
+  const lessonSlug = lesson?.slug;
+  const best = (lessonSlug && progress[lessonSlug]) || NO_PROGRESS;
+  // The game and the quiz save into this lesson's progress through this.
+  const recorder = useMemo<LessonRecorder | null>(() => lessonSlug ? {
+    best,
+    recordStars: stars => record(lessonSlug, { stars }),
+    recordQuiz: score => record(lessonSlug, { quizScore: score, completed: true }),
+  } : null, [lessonSlug, best, record]);
 
   if (!lesson) {
     return (
@@ -55,6 +67,12 @@ export function LessonPage() {
               Lesson {lesson.n} of {LESSONS.length}
               <span aria-hidden="true">·</span>
               <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{lesson.minutes} min</span>
+              {best.completed && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="inline-flex items-center gap-1 text-green-300"><CheckCircle2 className="w-3.5 h-3.5" />Done</span>
+                </>
+              )}
             </p>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{lesson.title}</h1>
           </div>
@@ -65,13 +83,15 @@ export function LessonPage() {
         ) : (
           // Keyed by lesson, so each lesson starts on its first step.
           <NextLessonContext.Provider value={next ?? null} key={lesson.slug}>
-            {Body ? (
-              <Suspense fallback={<Spinner />}><Body /></Suspense>
-            ) : (
-              <LessonSteps parts={Object.fromEntries(PARTS.map(p => [p.id, (
-                <p className="text-gray-400">{p.hint} <span className="text-gray-500">Coming soon.</span></p>
-              )])) as Record<PartId, ReactNode>} />
-            )}
+            <LessonProgressContext.Provider value={recorder}>
+              {Body ? (
+                <Suspense fallback={<Spinner />}><Body /></Suspense>
+              ) : (
+                <LessonSteps parts={Object.fromEntries(PARTS.map(p => [p.id, (
+                  <p className="text-gray-400">{p.hint} <span className="text-gray-500">Coming soon.</span></p>
+                )])) as Record<PartId, ReactNode>} />
+              )}
+            </LessonProgressContext.Provider>
           </NextLessonContext.Provider>
         )}
 
