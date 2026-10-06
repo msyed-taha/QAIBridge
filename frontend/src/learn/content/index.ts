@@ -9,4 +9,5 @@ export const LESSON_BODIES: Partial<Record<string, LazyExoticComponent<Component
   'measurement': lazy(() => import('./Measurement')),
   'quantum-gates': lazy(() => import('./QuantumGates')),
   'interference': lazy(() => import('./Interference')),
+  'entanglement': lazy(() => import('./Entanglement')),
 };
