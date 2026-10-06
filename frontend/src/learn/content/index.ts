@@ -11,4 +11,5 @@ export const LESSON_BODIES: Partial<Record<string, LazyExoticComponent<Component
   'interference': lazy(() => import('./Interference')),
   'entanglement': lazy(() => import('./Entanglement')),
   'decoherence': lazy(() => import('./Decoherence')),
+  'quantum-fourier-transform': lazy(() => import('./QuantumFourier')),
 };
