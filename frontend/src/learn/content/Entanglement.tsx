@@ -315,7 +315,10 @@ function MakeAPlan({ onWin }: { onWin: () => void }) {
 
   const check = () => {
     if (won === 3) {
-      pass('Correct! 75% is the best any plan can do. Try changing it: whatever you pick, at least one card pair is always lost.');
+      // Every winning plan loses exactly one card pair; name the player's own.
+      const [ca, cb] = CARDS.flatMap(a => CARDS.map(b => [a, b])).find(([a, b]) => !wins(a, b, plans.alice[a], plans.bob[b]))!;
+      pass(`Correct! Your plan loses only when Alice gets ${CARD_NAMES[ca]} and Bob gets ${CARD_NAMES[cb]}. 75% is the best any `
+        + 'plan can do: whatever they pick, at least one card pair is always lost.');
     } else {
       fail(`Not yet. Your plan wins ${won} of the 4 card pairs. Look at the squares marked ✗. Hint: what happens if they always say the same number?`);
     }
