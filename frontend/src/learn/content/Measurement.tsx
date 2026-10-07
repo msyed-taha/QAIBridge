@@ -6,6 +6,7 @@ import { GameLevels, CheckAnswer, useLevelAnswer } from '../components/GameLevel
 import { Quiz } from '../components/Quiz';
 import type { QuizQuestion } from '../components/Quiz';
 import { Panel, Pills } from '../components/ui';
+import type { Option } from '../components/ui';
 import { EMPTY_TALLY, measure, tallyPercentages } from '../shots';
 import type { Tally } from '../shots';
 import { BRAND_FILL, ZERO_COLOR, ONE_COLOR } from '../colors';
@@ -183,19 +184,40 @@ function See() {
 
 // ── Play: Mystery qubit ───────────────────────────────────────────────────────
 
-const LEVELS = [
+/** "In your 12 looks, 1 came up 7 times (58%)." */
+function looksSummary(tally: Tally) {
+  const total = tally.zeros + tally.ones;
+  return `In your ${total} ${total === 1 ? 'look' : 'looks'}, 1 came up ${tally.ones} ${tally.ones === 1 ? 'time' : 'times'} `
+    + `(${tallyPercentages(tally)[1]}%).`;
+}
+
+/** "Your one look gave 1" or "All 3 of your looks gave 0", when only one digit has come up. */
+function onlyOneDigit(tally: Tally) {
+  const total = tally.zeros + tally.ones;
+  return `${total === 1 ? 'Your one look' : `All ${total} of your looks`} gave ${tally.ones ? 1 : 0}`;
+}
+
+// `lesson` gets the player's own looks, so it never describes results they didn't see.
+const LEVELS: { chance: number; question: string; options: Option<number>[]; goal: string; lesson: (looks: Tally) => string }[] = [
   { chance: 0.5, question: 'What is it?',
     options: [{ value: 0, label: 'Always 0' }, { value: 1, label: 'Always 1' }, { value: 0.5, label: 'A 50/50 mix' }],
     goal: "This qubit's odds are hidden. Measure it as often as you like, then pick what it is.",
-    lesson: 'Correct! It is a 50/50 mix. One look could never tell you that: you needed to see both 0 and 1 come up.' },
+    lesson: looks => looks.zeros && looks.ones
+      ? `Correct! It is a 50/50 mix. ${looksSummary(looks)} Seeing both 0 and 1 come up rules out "always 0" and "always 1".`
+      : looks.zeros || looks.ones
+        ? `Correct! It is a 50/50 mix. ${onlyOneDigit(looks)}, which can't rule out "always ${looks.ones ? 1 : 0}". `
+          + `More looks would show ${looks.ones ? 0 : 1} too.`
+        : 'Correct! It is a 50/50 mix. You picked it without measuring, though: seeing both 0 and 1 come up is what proves it.' },
   { chance: 0.9, question: 'Its chance of giving 1',
     options: [{ value: 0.1, label: '10%' }, { value: 0.5, label: '50%' }, { value: 0.9, label: '90%' }],
     goal: 'Another hidden qubit. What is its chance of giving 1?',
-    lesson: 'Correct! 1 came up about 9 times in 10. A handful of looks was enough to tell these odds apart.' },
+    lesson: looks => looks.zeros + looks.ones
+      ? `Correct! Its chance of giving 1 is 90%. ${looksSummary(looks)} Odds as different as 10%, 50% and 90% take only a handful of looks to tell apart.`
+      : 'Correct! Its chance of giving 1 is 90%. You picked it without measuring, though: a handful of looks would have shown it.' },
   { chance: 0.25, question: 'Its chance of giving 1',
     options: [{ value: 0.25, label: '25%' }, { value: 0.5, label: '50%' }, { value: 0.75, label: '75%' }],
     goal: 'Harder: the options are closer together. What is its chance of giving 1?',
-    lesson: "Correct! Close odds need lots of shots to tell apart. That's why real quantum computers run thousands." },
+    lesson: () => "Correct! Close odds need lots of shots to tell apart. That's why real quantum computers run thousands." },
 ];
 
 function MysteryQubit() {
@@ -214,13 +236,11 @@ function Challenge({ level, onWin }: { level: typeof LEVELS[number]; onWin: () =
 
   const check = () => {
     if (answer === level.chance) {
-      pass(level.lesson);
+      pass(level.lesson(tally));
     } else if (total === 0) {
       fail('Not quite. Measure the qubit first to see what it gives.');
     } else {
-      fail(`Not quite. In your ${total} ${total === 1 ? 'look' : 'looks'}, 1 came up `
-        + `${tally.ones} ${tally.ones === 1 ? 'time' : 'times'} (${tallyPercentages(tally)[1]}%). `
-        + 'Take more looks: the more you measure, the closer you get to the real odds.');
+      fail(`Not quite. ${looksSummary(tally)} Take more looks: the more you measure, the closer you get to the real odds.`);
     }
   };
 
