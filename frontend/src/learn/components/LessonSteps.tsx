@@ -4,17 +4,17 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Eye, Gamepad2, ListChecks, Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { lessonPath } from '../lessons';
-import { BRAND_FILL } from '../colors';
+import { ACCENT_FILL, BRAND_FILL } from '../colors';
 import type { Lesson } from '../lessons';
 
 export type PartId = 'read' | 'see' | 'play' | 'test';
 
 // The four steps every lesson has, in order.
-export const PARTS: { id: PartId; label: string; icon: LucideIcon; hint: string }[] = [
-  { id: 'read',  label: 'Read',  icon: BookOpen,     hint: 'A short, plain explanation.' },
-  { id: 'see',   label: 'See',   icon: Eye,          hint: 'An interactive picture you can drag and click.' },
-  { id: 'play',  label: 'Play',  icon: Gamepad2,     hint: 'A small game with three levels.' },
-  { id: 'test',  label: 'Test',  icon: ListChecks,   hint: 'Three quick questions on what you learned.' },
+export const PARTS: { id: PartId; label: string; icon: LucideIcon }[] = [
+  { id: 'read', label: 'Read', icon: BookOpen },
+  { id: 'see',  label: 'See',  icon: Eye },
+  { id: 'play', label: 'Play', icon: Gamepad2 },
+  { id: 'test', label: 'Test', icon: ListChecks },
 ];
 
 /** The lesson after this one, for the button on the last step. Set by LessonPage. */
@@ -56,7 +56,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
                 <button type="button" onClick={() => go(i)} aria-current={current ? 'step' : undefined}
                   className="w-full text-left focus-visible:outline-none group">
                   <span className="block h-1.5 rounded-full mb-2 transition-colors"
-                    style={{ background: i <= step ? 'linear-gradient(90deg, #00ffcc, #cc44ff)' : 'rgba(119,119,238,.25)' }} />
+                    style={{ background: i <= step ? ACCENT_FILL : 'rgba(119,119,238,.25)' }} />
                   <span className={`flex items-center gap-1.5 text-sm transition-colors group-focus-visible:underline ${
                     current ? 'text-white font-semibold' : i <= reached ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-300'}`}>
                     {done && !current ? <Check className="w-4 h-4 text-quantum-neon" /> : <p.icon className="w-4 h-4" />}

@@ -12,6 +12,9 @@ export const ONE_COLOR = '#cc44ff';
 /** The teal gradient of the main buttons and of a picked choice. */
 export const BRAND_FILL = 'linear-gradient(90deg, #00ffcc, #00ccaa)';
 
+/** The teal-to-purple gradient of the course's highlights: the step bar, the title, the lock. */
+export const ACCENT_FILL = `linear-gradient(90deg, ${ZERO_COLOR}, ${ONE_COLOR})`;
+
 export const rgba = (c: RGB, alpha = 1) => `rgba(${c.map(Math.round).join(',')},${alpha})`;
 
 /** Each gate's colour, wherever gates are drawn. */

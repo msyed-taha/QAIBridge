@@ -1,16 +1,15 @@
 import { Suspense, useMemo } from 'react';
-import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LESSONS, FREE_LESSON_COUNT, lessonBySlug, lessonPath } from '../../learn/lessons';
 import type { Lesson } from '../../learn/lessons';
 import { LESSON_BODIES } from '../../learn/content';
-import { LessonSteps, NextLessonContext, PARTS } from '../../learn/components/LessonSteps';
-import type { PartId } from '../../learn/components/LessonSteps';
+import { NextLessonContext } from '../../learn/components/LessonSteps';
 import { LessonProgressContext, useLearnProgress } from '../../learn/useLearnProgress';
 import type { LessonRecorder } from '../../learn/useLearnProgress';
 import { NO_PROGRESS } from '../../learn/progress';
+import { ACCENT_FILL } from '../../learn/colors';
 import { SignUpButtons } from './SignUpButtons';
 
 /** One lesson: a short header, the lesson's steps, and previous / next.
@@ -84,13 +83,7 @@ export function LessonPage() {
           // Keyed by lesson, so each lesson starts on its first step.
           <NextLessonContext.Provider value={next ?? null} key={lesson.slug}>
             <LessonProgressContext.Provider value={recorder}>
-              {Body ? (
-                <Suspense fallback={<Spinner />}><Body /></Suspense>
-              ) : (
-                <LessonSteps parts={Object.fromEntries(PARTS.map(p => [p.id, (
-                  <p className="text-gray-400">{p.hint} <span className="text-gray-500">Coming soon.</span></p>
-                )])) as Record<PartId, ReactNode>} />
-              )}
+              <Suspense fallback={<Spinner />}><Body /></Suspense>
             </LessonProgressContext.Provider>
           </NextLessonContext.Provider>
         )}
@@ -130,7 +123,7 @@ function LockedLesson({ lesson }: { lesson: Lesson }) {
   return (
     <div className="glass-card rounded-2xl p-8 text-center">
       <span className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-        style={{ background: 'linear-gradient(135deg, #00ffcc, #cc44ff)' }}>
+        style={{ background: ACCENT_FILL }}>
         <Lock className="w-6 h-6 text-black" />
       </span>
       <h2 className="text-xl font-bold text-white mb-2">Sign in to open this lesson</h2>

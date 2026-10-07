@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, CheckCircle2, Clock, Gamepad2, Lock, Star } from 
 import { useAuth } from '../../context/AuthContext';
 import { LESSONS, LESSON_PARTS, FREE_LESSON_COUNT, TOTAL_MINUTES, lessonPath } from '../../learn/lessons';
 import type { Lesson } from '../../learn/lessons';
-import { BRAND_FILL } from '../../learn/colors';
+import { ACCENT_FILL, BRAND_FILL } from '../../learn/colors';
 import { useLearnProgress } from '../../learn/useLearnProgress';
 import type { LessonProgress } from '../../learn/progress';
 import { SignUpButtons } from './SignUpButtons';
@@ -29,7 +29,7 @@ export function LearnPage() {
           <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-4">Free quantum course</p>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-5 leading-tight text-balance">
             Learn how{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' }}>
+            <span className="text-transparent bg-clip-text" style={{ backgroundImage: ACCENT_FILL }}>
               quantum computers
             </span>{' '}
             work
