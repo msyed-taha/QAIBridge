@@ -13,7 +13,10 @@ const FIRST_LOCKED = LESSONS.find(l => !l.free);
 /** The Learn course overview: every lesson, grouped, open to everyone. */
 export function LearnPage() {
   const { isAuthed } = useAuth();
-  const { progress } = useLearnProgress();
+  const { progress, ready } = useLearnProgress();
+  // A signed-in learner's progress comes from the server a moment after the page
+  // opens. Until then, whatever depends on it keeps its place but stays hidden.
+  const untilReady = ready ? '' : 'invisible';
   const done = LESSONS.filter(l => progress[l.slug]?.completed).length;
   const started = Object.keys(progress).length > 0;
   // The first lesson this learner hasn't finished yet and can open.
@@ -26,7 +29,7 @@ export function LearnPage() {
     : { to: lessonPath(LESSONS[0]), label: 'Review the lessons' };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" aria-busy={!ready}>
 
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section className="px-6 pt-14 pb-10 text-center">
@@ -51,7 +54,7 @@ export function LearnPage() {
           </ul>
 
           <Link to={primary.to} state={primary.state}
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
+            className={`inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110 ${untilReady}`}
             style={{ background: BRAND_FILL }}>
             {primary.label} <ArrowRight className="w-4 h-4" />
           </Link>
@@ -61,8 +64,8 @@ export function LearnPage() {
               {started && ' Your progress is saved in this browser until you sign in.'}
             </p>
           )}
-          {started && (
-            <div className="max-w-sm mx-auto mt-7 text-left">
+          {(isAuthed || started) && (
+            <div className={`max-w-sm mx-auto mt-7 text-left ${untilReady}`}>
               <div className="flex items-baseline justify-between text-sm mb-1.5">
                 <span className="text-gray-300">Your progress</span>
                 <span className="text-white font-semibold">{done} of {LESSONS.length} lessons done</span>
@@ -84,7 +87,7 @@ export function LearnPage() {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">{part.label}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {LESSONS.filter(l => l.part === part.id).map(l => (
-                  <LessonCard key={l.slug} lesson={l} progress={progress[l.slug]}
+                  <LessonCard key={l.slug} lesson={l} progress={progress[l.slug]} loading={!ready}
                     locked={!isAuthed && !l.free} showFree={!isAuthed && l.free} />
                 ))}
               </div>
@@ -110,8 +113,8 @@ export function LearnPage() {
   );
 }
 
-function LessonCard({ lesson: l, progress, locked, showFree }: {
-  lesson: Lesson; progress?: LessonProgress; locked: boolean; showFree: boolean;
+function LessonCard({ lesson: l, progress, loading, locked, showFree }: {
+  lesson: Lesson; progress?: LessonProgress; loading: boolean; locked: boolean; showFree: boolean;
 }) {
   return (
     <Link to={lessonPath(l)} data-tilt className="group glass-card rounded-2xl p-5 flex flex-col">
@@ -125,7 +128,7 @@ function LessonCard({ lesson: l, progress, locked, showFree }: {
       <p className="text-xs font-semibold text-gray-400 tracking-widest mb-1">LESSON {l.n}</p>
       <h3 className="text-white font-bold text-base mb-1.5">{l.title}</h3>
       <p className="flex-1 text-gray-400 text-sm leading-relaxed">{l.summary}</p>
-      <div className="mt-4 flex items-center justify-between gap-2">
+      <div className={`mt-4 flex items-center justify-between gap-2 ${loading ? 'invisible' : ''}`}>
         <div className="flex items-center gap-2">
           {locked ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
