@@ -104,11 +104,11 @@ export function GameLevels({ title, levels, children }: {
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         <h3 className="text-white font-bold text-lg">{title}</h3>
-        <p className="flex items-center gap-0.5" aria-label={`${stars} of ${levels.length} stars`}>
+        <span className="flex items-center gap-0.5" role="img" aria-label={`${stars} of ${levels.length} stars`}>
           {levels.map((_, i) => (
             <Star key={i} className={`w-5 h-5 ${i < stars ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
           ))}
-        </p>
+        </span>
       </div>
       <p className="text-sm text-gray-400 mb-4">
         Level {level + 1} of {levels.length}
