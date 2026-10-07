@@ -276,7 +276,12 @@ const MAX_ADDED = 4;
 const LEVELS: { locked: GateName[]; target: Spot; goal: string; lesson: (added: GateName[]) => string }[] = [
   { locked: [], target: '1',
     goal: 'Turn the qubit from 0 into 1.',
-    lesson: () => 'Correct! X flips 0 into 1, just like NOT in a normal computer.' },
+    // Every longer way to 1 either uses X, or contains H, Z, H in a row (which acts exactly like X).
+    lesson: added => added.join() === 'X'
+      ? 'Correct! X flips 0 into 1, just like NOT in a normal computer.'
+      : added.includes('X')
+        ? `Correct! Your ${added.length} gates (${added.join(' ')}) end at 1, the same as a single X. X alone is the shortest way: it flips 0 into 1, just like NOT in a normal computer.`
+        : 'Correct! You flipped it without X: H, then Z, then H acts exactly like X. X alone is the shortest way: it flips 0 into 1, just like NOT in a normal computer.' },
   { locked: [], target: '-',
     goal: 'Turn 0 into the − mix (the arrow pointing left). You need 2 gates.',
     lesson: () => 'Correct! There is more than one way: H then Z, or X then H. Either way the odds are 50/50, but the sign is −.' },
