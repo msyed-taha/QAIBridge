@@ -3,13 +3,13 @@ import { deg, rad, percentages } from '../qubit';
 import type { QubitState } from '../qubit';
 import { ZERO_COLOR, ONE_COLOR } from '../colors';
 
-type Change = (s: QubitState, final: boolean) => void;
+type Change = (s: QubitState) => void;
 
 /** Tilt slider: 0° points at 0, 180° points at 1. Also the keyboard way to move the arrow. */
 export function TiltSlider({ state, onChange }: { state: QubitState; onChange: Change }) {
   return (
     <Slider label="Tilt" value={Math.round(deg(state.theta))} max={180} ends={['0', '1']}
-      onChange={v => onChange({ theta: rad(v), phi: state.phi }, true)} />
+      onChange={v => onChange({ theta: rad(v), phi: state.phi })} />
   );
 }
 
@@ -17,7 +17,7 @@ export function TiltSlider({ state, onChange }: { state: QubitState; onChange: C
 export function TurnSlider({ state, onChange }: { state: QubitState; onChange: Change }) {
   return (
     <Slider label="Turn" value={Math.round(deg(state.phi)) % 360} max={359}
-      onChange={v => onChange({ theta: state.theta, phi: rad(v) }, true)} />
+      onChange={v => onChange({ theta: state.theta, phi: rad(v) })} />
   );
 }
 

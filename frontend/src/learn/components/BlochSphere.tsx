@@ -17,8 +17,8 @@ const radiusFor = (size: number) => size * 0.36;
 
 interface Props {
   state: QubitState;
-  /** Makes the arrow draggable. `final` is true when the drag ends. */
-  onChange?: (state: QubitState, final: boolean) => void;
+  /** Makes the arrow draggable. */
+  onChange?: (state: QubitState) => void;
   className?: string;
 }
 
@@ -61,6 +61,8 @@ export function BlochSphere({ state, onChange, className = '' }: Props) {
     return fromVector(unproject(u, v, LESSON_VIEW));
   };
 
+  const endDrag = () => { dragging.current = false; setGrabbing(false); };
+
   const [p0, p1] = percentages(state);
   const label = `Qubit arrow tilted ${Math.round(deg(state.theta))}° from 0: ${p0}% chance of 0, ${p1}% chance of 1.`;
 
@@ -73,15 +75,11 @@ export function BlochSphere({ state, onChange, className = '' }: Props) {
       onPointerDown={onChange && (e => {
         e.currentTarget.setPointerCapture(e.pointerId);
         dragging.current = true; setGrabbing(true);
-        onChange(stateAt(e), false);
+        onChange(stateAt(e));
       })}
-      onPointerMove={onChange && (e => { if (dragging.current) onChange(stateAt(e), false); })}
-      onPointerUp={onChange && (e => {
-        if (!dragging.current) return;
-        dragging.current = false; setGrabbing(false);
-        onChange(stateAt(e), true);
-      })}
-      onPointerCancel={() => { dragging.current = false; setGrabbing(false); }}
+      onPointerMove={onChange && (e => { if (dragging.current) onChange(stateAt(e)); })}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
     />
   );
 }
