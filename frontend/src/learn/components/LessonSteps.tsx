@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Eye, Gamepad2, ListChecks, Check, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -28,19 +28,17 @@ export const NextLessonContext = createContext<Lesson | null>(null);
 export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
-  const topRef = useRef<HTMLDivElement>(null);
   const next = useContext(NextLessonContext);
   const last = PARTS.length - 1;
 
   const go = (i: number) => {
     setStep(i);
     setReached(r => Math.max(r, i));
-    // Bring the start of the new step into view if it is scrolled off the top:
+    // Start the new step from the top of the page, with the lesson's title in view:
     // a smooth glide, or a jump for people who ask their device for less motion.
-    const top = topRef.current;
-    if (top && top.getBoundingClientRect().top < 80) {
+    if (window.scrollY > 0) {
       const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      top.scrollIntoView({ behavior: lessMotion ? 'instant' : 'smooth', block: 'start' });
+      window.scrollTo({ top: 0, behavior: lessMotion ? 'instant' : 'smooth' });
     }
   };
 
@@ -48,7 +46,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
   const primaryStyle = { background: BRAND_FILL };
 
   return (
-    <div ref={topRef} className="scroll-mt-24">
+    <div>
       {/* Progress: Read · See · Play · Test */}
       <nav aria-label="Lesson steps" className="mb-6">
         <ol className="grid grid-cols-4 gap-2 sm:gap-3">
