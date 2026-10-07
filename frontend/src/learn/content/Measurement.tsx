@@ -86,9 +86,10 @@ function MeasureButtons({ counts, onMeasure, disabled = false }: {
 function Jars({ tally, chanceOf1 }: { tally: Tally; chanceOf1?: number }) {
   const [p0, p1] = tallyPercentages(tally);
   const real = chanceOf1 === undefined ? undefined : Math.round(chanceOf1 * 100);
+  const times = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
   return (
     <div className="grid grid-cols-2 gap-6 max-w-xs" role="img"
-      aria-label={`0 came up ${tally.zeros} times (${p0}%), 1 came up ${tally.ones} times (${p1}%)`
+      aria-label={`0 came up ${times(tally.zeros)} (${p0}%), 1 came up ${times(tally.ones)} (${p1}%)`
         + (real === undefined ? '' : `. Real odds: ${100 - real}% chance of 0, ${real}% chance of 1`)}>
       <Jar digit="0" count={tally.zeros} pct={p0} color={ZERO_COLOR} real={real === undefined ? undefined : 100 - real} />
       <Jar digit="1" count={tally.ones} pct={p1} color={ONE_COLOR} real={real} />

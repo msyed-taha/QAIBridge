@@ -186,7 +186,7 @@ function CoherenceChart({ surroundings, gates }: { surroundings: Surroundings; g
     <figure>
       <figcaption className="text-sm text-gray-300 mb-2">Coherence left (%), gate by gate</figcaption>
       <svg viewBox={`0 0 ${CHART.w} ${CHART.h}`} className="w-full h-auto select-none" onPointerMove={track} onPointerLeave={() => setHover(null)}
-        role="img" aria-label={`Coherence falls from 100% as the gates go by. After ${gates} gates, ${pct(at)}% is left; after ${MAX_GATES}, ${pct(coherenceLeft(MAX_GATES, surroundings))}%.`}>
+        role="img" aria-label={`Coherence falls from 100% as the gates go by. After ${gates} ${gates === 1 ? 'gate' : 'gates'}, ${pct(at)}% is left; after ${MAX_GATES}, ${pct(coherenceLeft(MAX_GATES, surroundings))}%.`}>
         {[0, 0.25, 0.5, 0.75, 1].map(c => (
           <line key={c} x1={CHART.left} x2={CHART.w - CHART.right} y1={chartY(c)} y2={chartY(c)} stroke="#7777ee" strokeOpacity="0.18" />
         ))}
