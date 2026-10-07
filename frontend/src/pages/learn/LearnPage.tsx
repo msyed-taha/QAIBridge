@@ -8,6 +8,8 @@ import { useLearnProgress } from '../../learn/useLearnProgress';
 import type { LessonProgress } from '../../learn/progress';
 import { SignUpButtons } from './SignUpButtons';
 
+const FIRST_LOCKED = LESSONS.find(l => !l.free);
+
 /** The Learn course overview: every lesson, grouped, open to everyone. */
 export function LearnPage() {
   const { isAuthed } = useAuth();
@@ -16,9 +18,12 @@ export function LearnPage() {
   const started = Object.keys(progress).length > 0;
   // The first lesson this learner hasn't finished yet and can open.
   const nextUp = LESSONS.find(l => !progress[l.slug]?.completed && (isAuthed || l.free));
-  const [goTo, goLabel] = !started ? [LESSONS[0], 'Start lesson 1']
-    : nextUp ? [nextUp, `Continue with lesson ${nextUp.n}`]
-    : [LESSONS[0], 'Review the lessons'];
+  const primary: { to: string; state?: { from: string }; label: string } =
+    !started ? { to: lessonPath(LESSONS[0]), label: 'Start lesson 1' }
+    : nextUp ? { to: lessonPath(nextUp), label: `Continue with lesson ${nextUp.n}` }
+    // A visitor who has finished the free lessons: an account opens the rest, starting at the first locked one.
+    : !isAuthed && FIRST_LOCKED ? { to: '/register', state: { from: lessonPath(FIRST_LOCKED) }, label: 'Create a free account to keep going' }
+    : { to: lessonPath(LESSONS[0]), label: 'Review the lessons' };
 
   return (
     <div className="min-h-screen">
@@ -45,10 +50,10 @@ export function LearnPage() {
             <li className="flex items-center gap-1.5"><Gamepad2 className="w-4 h-4 text-quantum-neon" />A game in every lesson</li>
           </ul>
 
-          <Link to={lessonPath(goTo)}
+          <Link to={primary.to} state={primary.state}
             className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
             style={{ background: BRAND_FILL }}>
-            {goLabel} <ArrowRight className="w-4 h-4" />
+            {primary.label} <ArrowRight className="w-4 h-4" />
           </Link>
           {!isAuthed && (
             <p className="text-gray-400 text-sm mt-4">
