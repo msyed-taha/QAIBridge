@@ -35,9 +35,13 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
   const go = (i: number) => {
     setStep(i);
     setReached(r => Math.max(r, i));
-    // Bring the start of the new step into view if it is scrolled off the top.
+    // Bring the start of the new step into view if it is scrolled off the top:
+    // a smooth glide, or a jump for people who ask their device for less motion.
     const top = topRef.current;
-    if (top && top.getBoundingClientRect().top < 80) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (top && top.getBoundingClientRect().top < 80) {
+      const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      top.scrollIntoView({ behavior: lessMotion ? 'instant' : 'smooth', block: 'start' });
+    }
   };
 
   const primary = 'inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm hover:brightness-110 transition-all';
