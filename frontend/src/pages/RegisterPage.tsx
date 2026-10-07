@@ -45,6 +45,9 @@ function getStrength(pwd: string): StrengthInfo {
 
 interface Requirement { label: string; met: boolean }
 
+/** The step-3 fields that can still be missing when "Create Account" is pressed. */
+type Step3Field = 'username' | 'password' | 'confirm' | 'agree';
+
 function getRequirements(pwd: string): Requirement[] {
   return [
     { label: 'At least 8 characters',    met: pwd.length >= 8 },
@@ -110,6 +113,14 @@ export function RegisterPage() {
   const [loading,  setLoading]  = useState(false);
   const [resendIn, setResendIn] = useState(0);   // countdown seconds
   const [agreed,   setAgreed]   = useState(false); // 13+ and accepts the Terms / Privacy Policy
+  const [tried,    setTried]    = useState(false); // "Create Account" pressed at least once
+
+  const fieldRefs: Record<Step3Field, React.RefObject<HTMLInputElement>> = {
+    username: useRef<HTMLInputElement>(null),
+    password: useRef<HTMLInputElement>(null),
+    confirm:  useRef<HTMLInputElement>(null),
+    agree:    useRef<HTMLInputElement>(null),
+  };
 
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -129,6 +140,16 @@ export function RegisterPage() {
   const strength = getStrength(password);
   const reqs     = getRequirements(password);
   const allReqsMet = reqs.every(r => r.met);
+
+  // What step 3 still needs. "Create Account" can always be pressed: pressing it
+  // with something missing lists what is left, right above the button.
+  const missing: { field: Step3Field; text: string }[] = [];
+  if (username.length < 3) missing.push({ field: 'username', text: 'A username of at least 3 characters' });
+  if (!allReqsMet)         missing.push({ field: 'password', text: 'A password that meets all 4 rules under it' });
+  if (!confirm)            missing.push({ field: 'confirm', text: 'Your password typed again under Confirm Password' });
+  else if (confirm !== password) missing.push({ field: 'confirm', text: 'The same password in both password boxes' });
+  if (!agreed)             missing.push({ field: 'agree', text: 'A tick in the box to agree to the Terms of Use and Privacy Policy' });
+  const needs = (field: Step3Field) => tried && missing.some(m => m.field === field);
 
   // ── Step 1: Send OTP ────────────────────────────────────────────────────────
 
@@ -224,10 +245,11 @@ export function RegisterPage() {
   // ── Step 3: Register ────────────────────────────────────────────────────────
 
   const register = async () => {
-    if (!allReqsMet)             { setError('Password does not meet the requirements.'); return; }
-    if (password !== confirm)    { setError('Passwords do not match.'); return; }
-    if (username.length < 3)     { setError('Username must be at least 3 characters.'); return; }
-    if (!agreed)                 { setError('Please confirm you are 13 or older and agree to the Terms of Use and Privacy Policy.'); return; }
+    setTried(true);
+    if (missing.length) {
+      fieldRefs[missing[0].field].current?.focus();
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -249,6 +271,13 @@ export function RegisterPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  const errorBox = error && (
+    <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-5 flex items-center gap-2">
+      <XCircle className="w-4 h-4 flex-shrink-0" />
+      {error}
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="absolute top-1/4 right-1/3 w-96 h-96 bg-quantum-purple opacity-8 rounded-full blur-3xl pointer-events-none" />
@@ -268,13 +297,8 @@ export function RegisterPage() {
 
           <Steps current={step} />
 
-          {/* Error */}
-          {error && (
-            <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-5 flex items-center gap-2">
-              <XCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
+          {/* Error (on the last step it shows above "Create Account" instead) */}
+          {step !== 3 && errorBox}
 
           {/* ── STEP 1: Email ── */}
           {step === 1 && (
@@ -390,6 +414,7 @@ export function RegisterPage() {
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <input
+                    ref={fieldRefs.username}
                     type="text"
                     value={username}
                     onChange={e => { setUsername(e.target.value); setError(''); }}
@@ -397,7 +422,7 @@ export function RegisterPage() {
                     minLength={3}
                     maxLength={50}
                     autoFocus
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className={`w-full bg-quantum-900 border ${needs('username') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
                   />
                 </div>
               </div>
@@ -418,11 +443,12 @@ export function RegisterPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <input
+                    ref={fieldRefs.password}
                     type={showPwd ? 'text' : 'password'}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     placeholder="Min. 8 chars with A-Z, a-z, 0-9"
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors font-mono tracking-wider"
+                    className={`w-full bg-quantum-900 border ${needs('password') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors font-mono tracking-wider`}
                   />
                   <button
                     type="button"
@@ -433,10 +459,10 @@ export function RegisterPage() {
                   </button>
                 </div>
 
-                {/* Strength bar */}
-                {password && (
+                {/* Strength bar and the password rules (the rules also show once "Create Account" is pressed) */}
+                {(password || tried) && (
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-center justify-between">
+                    {password && <div className="flex items-center justify-between">
                       <div className="flex gap-1 flex-1 mr-3">
                         {[1,2,3,4,5].map(i => (
                           <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
@@ -446,7 +472,7 @@ export function RegisterPage() {
                       <span className="text-xs font-semibold" style={{ color: strength.color }}>
                         {strength.label}
                       </span>
-                    </div>
+                    </div>}
                     <div className="grid grid-cols-2 gap-1">
                       {reqs.map(r => (
                         <div key={r.label} className="flex items-center gap-1.5">
@@ -470,11 +496,12 @@ export function RegisterPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <input
+                    ref={fieldRefs.confirm}
                     type={showCfm ? 'text' : 'password'}
                     value={confirm}
                     onChange={e => { setConfirm(e.target.value); setError(''); }}
                     placeholder="Re-enter your password"
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className={`w-full bg-quantum-900 border ${needs('confirm') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
                     style={{
                       borderColor: confirm
                         ? confirm === password ? '#22c55e60' : '#ef444460'
@@ -495,8 +522,9 @@ export function RegisterPage() {
               </div>
 
               {/* Consent — required, and recorded by the server with the Terms version */}
-              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <label className={`flex items-start gap-2.5 cursor-pointer select-none rounded-md ${needs('agree') ? 'outline outline-1 outline-offset-4 outline-amber-500/70' : ''}`}>
                 <input
+                  ref={fieldRefs.agree}
                   type="checkbox"
                   checked={agreed}
                   onChange={e => { setAgreed(e.target.checked); setError(''); }}
@@ -511,9 +539,19 @@ export function RegisterPage() {
                 </span>
               </label>
 
+              {errorBox}
+              {tried && missing.length > 0 && (
+                <div role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                  <p className="font-semibold">Almost there. Still needed:</p>
+                  <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                    {missing.map(m => <li key={m.field}>{m.text}</li>)}
+                  </ul>
+                </div>
+              )}
+
               <button
                 onClick={register}
-                disabled={loading || !allReqsMet || password !== confirm || username.length < 3 || !agreed}
+                disabled={loading}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed mt-1"
                 style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
               >
