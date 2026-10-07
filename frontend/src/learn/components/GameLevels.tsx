@@ -71,7 +71,8 @@ export function CheckAnswer({ onCheck, result, disabled = false }: {
 /**
  * The frame every lesson game uses: "Level 1 of 3", the goal, one star per
  * level won, and "Next level" / "Play again". The lesson draws the level and
- * calls `win()` when a checked answer is right. Stars live only on this page for now.
+ * calls `win()` when a checked answer is right. Stars are saved as they're won,
+ * through LessonProgressContext, and the lesson keeps its best.
  */
 export function GameLevels({ title, levels, children }: {
   title: string;
