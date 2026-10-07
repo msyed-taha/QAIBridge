@@ -9,7 +9,7 @@ import { Panel, Segmented, Tip } from '../components/ui';
 import type { Option } from '../components/ui';
 import { allPatterns, patternsInMix, settingsFor, shareLabel } from '../patterns';
 import type { Setting } from '../patterns';
-import { ZERO_COLOR, ONE_COLOR } from '../colors';
+import { ACCENT_FILL, ZERO_COLOR, ONE_COLOR } from '../colors';
 import { joinWithAnd, replaceAt } from '../lists';
 
 /** Lesson 2 — Superposition. */
@@ -66,7 +66,7 @@ function Read() {
 
 const SETTINGS: Option<Setting>[] = [
   { value: '0', label: '0', fill: ZERO_COLOR },
-  { value: 'mix', label: 'Mix', fill: `linear-gradient(90deg, ${ZERO_COLOR}, ${ONE_COLOR})` },
+  { value: 'mix', label: 'Mix', fill: ACCENT_FILL },
   { value: '1', label: '1', fill: ONE_COLOR },
 ];
 
