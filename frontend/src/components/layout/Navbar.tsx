@@ -98,7 +98,7 @@ export function Navbar() {
 
   return (
     <header ref={headerRef} className="sticky top-0 z-50 w-full border-b border-quantum-700 bg-quantum-900/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4 xl:gap-8">
 
         {/* ── Logo ── */}
         <Link to={!isAuthed ? '/' : inAdminView ? '/admin' : '/app'} className="flex-shrink-0">
@@ -115,7 +115,7 @@ export function Navbar() {
                 key={path}
                 to={active ? path : '#'}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`relative whitespace-nowrap px-3 xl:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? 'text-white'
                     : active
@@ -149,7 +149,7 @@ export function Navbar() {
                 ref={toolsButtonRef}
                 onClick={() => setToolsOpen(o => !o)}
                 aria-expanded={toolsOpen}
-                className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-3 xl:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   onToolPage ? 'text-white bg-quantum-800' : 'text-gray-400 hover:text-white hover:bg-quantum-800'}`}
               >
                 Tools
@@ -186,14 +186,16 @@ export function Navbar() {
         </nav>
 
         {/* ── Right side ── */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2 lg:gap-3">
           {isAdmin && (
             <Link
               to={viewSwitch.to}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
+              title={viewSwitch.label}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
             >
               <viewSwitch.Icon className="w-4 h-4" />
-              {viewSwitch.label}
+              {/* Just the icon on tablets, where the bar is short of room */}
+              <span className="sr-only lg:not-sr-only">{viewSwitch.label}</span>
             </Link>
           )}
           {isAuthed ? (
@@ -211,7 +213,8 @@ export function Navbar() {
                   </span>
                 </div>
                 <span className="sr-only">Account menu: </span>
-                <span className="text-sm text-white font-medium">{user?.username}</span>
+                {/* Just the initial on tablets; a long name is cut short with "…" */}
+                <span className="sr-only lg:not-sr-only lg:max-w-[10rem] xl:max-w-[12rem] lg:truncate text-sm text-white font-medium">{user?.username}</span>
               </button>
 
               {userMenuOpen && (
@@ -242,14 +245,14 @@ export function Navbar() {
             <>
               <Link
                 to="/login"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-quantum-800 transition-all"
+                className="flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-gray-400 hover:text-white hover:bg-quantum-800 transition-all"
               >
                 <LogIn className="w-4 h-4" />
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-black transition-all hover:scale-105 hover:brightness-110"
+                className="flex items-center gap-2 px-3 xl:px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap text-black transition-all hover:scale-105 hover:brightness-110"
                 style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
               >
                 <Cpu className="w-4 h-4" />
