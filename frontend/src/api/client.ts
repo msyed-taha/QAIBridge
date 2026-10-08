@@ -19,6 +19,30 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
+/**
+ * A saved login lasts a week, and an account can be closed or switched off.
+ * When the server turns away the login this browser holds (a 401), the
+ * listener (AuthContext) signs out and says so. Only a 401 for the login still
+ * saved here counts, so a burst of failing requests, or a late reply from
+ * before a new sign-in, acts just once. Other failures, like the server being
+ * unreachable, never sign anyone out.
+ */
+let sessionEnded: (() => void) | null = null;
+
+/** Listens for the server rejecting the saved login. Returns a function that stops listening. */
+export function onSessionEnded(listener: () => void) {
+  sessionEnded = listener;
+  return () => { if (sessionEnded === listener) sessionEnded = null; };
+}
+
+apiClient.interceptors.response.use(undefined, (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    const saved = localStorage.getItem('qai_token');
+    if (saved && error.config?.headers?.Authorization === `Bearer ${saved}`) sessionEnded?.();
+  }
+  return Promise.reject(error);
+});
+
 export default apiClient;
 
 /**

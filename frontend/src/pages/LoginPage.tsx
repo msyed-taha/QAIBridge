@@ -17,7 +17,7 @@ export function LoginPage() {
   // Admin sign-in isn't advertised: it's only reached at /login?as=admin, or by
   // being sent here from an /admin page. Everyone else — admins included — uses
   // the normal form and can switch to the portal from the navbar.
-  const state       = location.state as { from?: string; as?: Mode } | null;
+  const state       = location.state as { from?: string; as?: Mode; sessionEnded?: boolean } | null;
   const mode: Mode  = state?.as === 'admin' || params.get('as') === 'admin' ? 'admin' : 'user';
   const redirectTo  = state?.from ?? '/app';
 
@@ -106,6 +106,13 @@ export function LoginPage() {
           {error && (
             <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">
               {error}
+            </div>
+          )}
+
+          {/* Sent here because the saved login expired or was turned away (see AuthContext) */}
+          {!error && state?.sessionEnded && (
+            <div role="status" className="bg-amber-500/10 border border-amber-500/40 rounded-xl px-4 py-3 text-amber-200 text-sm mb-6">
+              Your session has ended. Please sign in again.
             </div>
           )}
 
