@@ -54,7 +54,7 @@ export function LoginPage() {
         body:    JSON.stringify({ email, password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Login failed'));
+      if (!res.ok) throw new Error(detailToMessage(data.detail, 'Sign-in failed'));
 
       // The account's real role comes from the server. The mode only decides
       // where you land (an admin on the normal form gets the app) — and blocks
@@ -165,7 +165,7 @@ export function LoginPage() {
             >
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</>
-                : <><LogIn className="w-4 h-4" /> {isAdmin ? 'Sign in as Admin' : 'Sign In'}</>
+                : <><LogIn className="w-4 h-4" /> {isAdmin ? 'Sign in as admin' : 'Sign in'}</>
               }
             </button>
           </form>

@@ -25,7 +25,7 @@ export function LearnPage() {
     !started ? { to: lessonPath(LESSONS[0]), label: 'Start lesson 1' }
     : nextUp ? { to: lessonPath(nextUp), label: `Continue with lesson ${nextUp.n}` }
     // A visitor who has finished the free lessons: an account opens the rest, starting at the first locked one.
-    : !isAuthed && FIRST_LOCKED ? { to: '/register', state: { from: lessonPath(FIRST_LOCKED) }, label: 'Create a free account to keep going' }
+    : !isAuthed && FIRST_LOCKED ? { to: '/register', state: { from: lessonPath(FIRST_LOCKED) }, label: 'Create an account to keep going' }
     : { to: lessonPath(LESSONS[0]), label: 'Review the lessons' };
 
   return (
@@ -34,7 +34,7 @@ export function LearnPage() {
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section className="px-6 pt-14 pb-10 text-center">
         <div className="max-w-3xl mx-auto">
-          <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-4">Free quantum course</p>
+          <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-4">Quantum basics</p>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-5 leading-tight text-balance">
             Learn how{' '}
             <span className="text-transparent bg-clip-text" style={{ backgroundImage: ACCENT_FILL }}>
@@ -102,7 +102,7 @@ export function LearnPage() {
           <div className="glass-card rounded-2xl p-8 max-w-2xl mx-auto text-center">
             <h2 className="text-2xl font-bold text-white mb-2">Want all {LESSONS.length} lessons?</h2>
             <p className="text-gray-400 text-sm mb-6">
-              Create a free account to open lessons {FREE_LESSON_COUNT + 1}–{LESSONS.length}: gates, interference,
+              Create an account to open lessons {FREE_LESSON_COUNT + 1}–{LESSONS.length}: gates, interference,
               entanglement and the algorithms that make quantum computers useful.
             </p>
             <SignUpButtons from="/learn" />

@@ -346,14 +346,14 @@ export function ForgotPasswordPage() {
           {step === 'success' && (
             <div className="space-y-4">
               <p className="text-center text-gray-300 text-sm">
-                Your password has been successfully updated. You can now log in with your new password.
+                Your password has been successfully updated. You can now sign in with your new password.
               </p>
               <button
                 onClick={() => navigate(loginPath)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01]"
                 style={{ background: accent }}
               >
-                Back to {isAdmin ? 'Admin ' : ''}Login
+                Back to {isAdmin ? 'admin ' : ''}sign in
               </button>
             </div>
           )}
@@ -369,7 +369,7 @@ export function ForgotPasswordPage() {
               className="w-full mt-4 flex items-center justify-center gap-2 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-quantum-700 transition-all"
             >
               <ArrowLeft className="w-4 h-4" />
-              {step === 'email' ? 'Back to Login' : 'Back'}
+              {step === 'email' ? 'Back to sign in' : 'Back'}
             </button>
           )}
         </div>
@@ -378,7 +378,7 @@ export function ForgotPasswordPage() {
         {step !== 'success' && (
           <p className="text-center text-gray-700 text-xs mt-4">
             <Link to={loginPath} className="hover:text-gray-500 transition-colors">
-              ← Back to Login
+              ← Back to sign in
             </Link>
           </p>
         )}

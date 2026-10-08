@@ -177,14 +177,14 @@ export function About() {
       <section className="py-16 px-6 text-center border-t border-quantum-700">
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">See what quantum can do for your problem</h2>
-          <p className="text-gray-400 text-sm mb-8">Free to use. Questions? We read every message.</p>
+          <p className="text-gray-400 text-sm mb-8">Questions? We read every message.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto">
             <Link
               to={isAuthed ? '/app' : '/register'}
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-xl font-bold text-black text-sm hover:scale-105 hover:brightness-110 transition-all"
               style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
             >
-              {isAuthed ? 'Open the app' : 'Try it free'}
+              {isAuthed ? 'Open the app' : 'Get started'}
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link

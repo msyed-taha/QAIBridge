@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Cpu, LogOut, User, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
+import { Menu, X, Cpu, LogOut, ArrowRight, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 import { TOOLS, TOOL_GROUPS, isToolAt, toolsIn } from '../../tools';
@@ -235,7 +235,7 @@ export function Navbar() {
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-950/30 transition-colors border-t border-quantum-700"
                   >
                     <LogOut className="w-4 h-4" />
-                    Sign Out
+                    Sign out
                   </button>
                 </div>
               )}
@@ -248,15 +248,15 @@ export function Navbar() {
                 className="flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-gray-400 hover:text-white hover:bg-quantum-800 transition-all"
               >
                 <LogIn className="w-4 h-4" />
-                Sign In
+                Sign in
               </Link>
               <Link
                 to="/register"
                 className="flex items-center gap-2 px-3 xl:px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap text-black transition-all hover:scale-105 hover:brightness-110"
                 style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
               >
-                <Cpu className="w-4 h-4" />
-                Get Started
+                Get started
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </>
           )}
@@ -275,7 +275,7 @@ export function Navbar() {
       </div>
 
       {/* ── Mobile Dropdown ── (scrolls inside itself when taller than the screen,
-           so Sign Out stays reachable on small phones) */}
+           so Sign out stays reachable on small phones) */}
       {mobileOpen && (
         <div className="md:hidden max-h-[calc(100dvh_-_4rem_-_1px)] overflow-y-auto overscroll-contain border-t border-quantum-700 bg-quantum-900 px-4 py-3 space-y-1">
           {NAV_LINKS.map(link => {
@@ -346,19 +346,19 @@ export function Navbar() {
                   onClick={handleLogout}
                   className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/20 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" /> Sign Out
+                  <LogOut className="w-4 h-4" /> Sign out
                 </button>
               </>
             ) : (
               <>
                 <Link to="/login"
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 bg-quantum-800 border border-quantum-700">
-                  <LogIn className="w-4 h-4" /> Sign In
+                  <LogIn className="w-4 h-4" /> Sign in
                 </Link>
                 <Link to="/register"
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-black"
                   style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}>
-                  <User className="w-4 h-4" /> Create Account
+                  Get started <ArrowRight className="w-4 h-4" />
                 </Link>
               </>
             )}

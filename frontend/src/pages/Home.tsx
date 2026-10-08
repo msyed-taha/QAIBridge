@@ -159,7 +159,7 @@ export function Home() {
                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
                 style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
               >
-                Try it free
+                Get started
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <a
@@ -235,7 +235,7 @@ export function Home() {
                     </ul>
 
                     <Link to="/register" className="inline-flex items-center gap-1.5 text-quantum-neon text-sm font-semibold hover:text-teal-300 transition-colors">
-                      Try it free <ArrowRight className="w-4 h-4" />
+                      Get started <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
 
@@ -358,8 +358,8 @@ export function Home() {
             Ready to explore quantum computing?
           </h2>
           <p className="text-gray-500 text-base mb-8 leading-relaxed">
-            Create your free account and get instant access to the simulation kernel,
-            problem solver, and everything QAIbridge has to offer.
+            Create your account to start using the simulator, the problem solver
+            and the other tools.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
@@ -367,14 +367,14 @@ export function Home() {
               className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold text-black text-sm transition-all hover:scale-105 hover:brightness-110"
               style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
             >
-              Create Free Account
+              Get started
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/login"
               className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-sm bg-quantum-700 border border-quantum-500 hover:border-quantum-neon/50 transition-all hover:scale-105"
             >
-              Sign In to your account
+              Sign in
             </Link>
           </div>
         </div>

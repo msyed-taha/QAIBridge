@@ -45,7 +45,7 @@ function getStrength(pwd: string): StrengthInfo {
 
 interface Requirement { label: string; met: boolean }
 
-/** The step-3 fields that can still be missing when "Create Account" is pressed. */
+/** The step-3 fields that can still be missing when "Create account" is pressed. */
 type Step3Field = 'username' | 'password' | 'confirm' | 'agree';
 
 function getRequirements(pwd: string): Requirement[] {
@@ -113,7 +113,7 @@ export function RegisterPage() {
   const [loading,  setLoading]  = useState(false);
   const [resendIn, setResendIn] = useState(0);   // countdown seconds
   const [agreed,   setAgreed]   = useState(false); // 13+ and accepts the Terms / Privacy Policy
-  const [tried,    setTried]    = useState(false); // "Create Account" pressed at least once
+  const [tried,    setTried]    = useState(false); // "Create account" pressed at least once
 
   const fieldRefs: Record<Step3Field, React.RefObject<HTMLInputElement>> = {
     username: useRef<HTMLInputElement>(null),
@@ -141,7 +141,7 @@ export function RegisterPage() {
   const reqs     = getRequirements(password);
   const allReqsMet = reqs.every(r => r.met);
 
-  // What step 3 still needs. "Create Account" can always be pressed: pressing it
+  // What step 3 still needs. "Create account" can always be pressed: pressing it
   // with something missing lists what is left, right above the button.
   const missing: { field: Step3Field; text: string }[] = [];
   if (username.length < 3) missing.push({ field: 'username', text: 'A username of at least 3 characters' });
@@ -297,7 +297,7 @@ export function RegisterPage() {
 
           <Steps current={step} />
 
-          {/* Error (on the last step it shows above "Create Account" instead) */}
+          {/* Error (on the last step it shows above "Create account" instead) */}
           {step !== 3 && errorBox}
 
           {/* ── STEP 1: Email ── */}
@@ -459,7 +459,7 @@ export function RegisterPage() {
                   </button>
                 </div>
 
-                {/* Strength bar and the password rules (the rules also show once "Create Account" is pressed) */}
+                {/* Strength bar and the password rules (the rules also show once "Create account" is pressed) */}
                 {(password || tried) && (
                   <div className="mt-2 space-y-1.5">
                     {password && <div className="flex items-center justify-between">
@@ -558,7 +558,7 @@ export function RegisterPage() {
                 {loading ? (
                   <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Creating account…</>
                 ) : (
-                  <><CheckCircle className="w-4 h-4" /> Create Account</>
+                  <><CheckCircle className="w-4 h-4" /> Create account</>
                 )}
               </button>
             </div>

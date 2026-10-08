@@ -33,7 +33,7 @@ export function ContinueLearning() {
         {next ? (
           <>
             <p className="text-xs font-semibold text-quantum-neon uppercase tracking-widest mb-3">
-              {started ? 'Up next' : 'Free quantum course'}
+              {started ? 'Up next' : 'Quantum basics'}
             </p>
             <div className="flex items-start gap-4">
               <span className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"

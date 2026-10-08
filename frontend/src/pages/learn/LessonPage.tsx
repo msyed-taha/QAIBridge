@@ -128,7 +128,7 @@ function LockedLesson({ lesson }: { lesson: Lesson }) {
       </span>
       <h2 className="text-xl font-bold text-white mb-2">Sign in to open this lesson</h2>
       <p className="text-gray-400 text-sm max-w-md mx-auto mb-6">
-        Lessons 1–{FREE_LESSON_COUNT} are free for everyone. Create a free account to open all {LESSONS.length}.
+        Lessons 1–{FREE_LESSON_COUNT} are free for everyone. Create an account to open all {LESSONS.length}.
         You'll come straight back here.
       </p>
       <SignUpButtons from={lessonPath(lesson)} />

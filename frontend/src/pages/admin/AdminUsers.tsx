@@ -108,7 +108,7 @@ export function AdminUsers() {
                 <th className="text-left font-medium px-4 py-3">Role</th>
                 <th className="text-left font-medium px-4 py-3">Status</th>
                 <th className="text-left font-medium px-4 py-3">Joined</th>
-                <th className="text-left font-medium px-4 py-3">Last login</th>
+                <th className="text-left font-medium px-4 py-3">Last sign-in</th>
                 <th className="text-right font-medium px-4 py-3">Actions</th>
               </tr>
             </thead>

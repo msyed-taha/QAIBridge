@@ -20,12 +20,12 @@ export function LearnTeaser() {
 
   const primary = next
     ? { to: lessonPath(next), state: undefined, label: started ? `Continue with lesson ${next.n}` : 'Start lesson 1' }
-    : { to: '/register', state: FIRST_LOCKED && { from: lessonPath(FIRST_LOCKED) }, label: 'Create a free account to keep going' };
+    : { to: '/register', state: FIRST_LOCKED && { from: lessonPath(FIRST_LOCKED) }, label: 'Create an account to keep going' };
 
   return (
     <div className="glass-card rounded-2xl p-6 sm:p-10 grid gap-10 md:grid-cols-2 md:items-center">
       <div>
-        <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">Free quantum course</p>
+        <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">Quantum basics</p>
         <h2 className="text-3xl font-bold text-white mb-3">New to quantum? Start here.</h2>
         <p className="text-gray-400 text-base leading-relaxed">
           {LESSONS.length} short lessons, about {TOTAL_MINUTES} minutes in all. Read a little, watch it move, then play a
@@ -76,7 +76,7 @@ export function LearnTeaser() {
           })}
         </ol>
         <p className="mt-3 px-1 text-sm text-gray-500">
-          + {LESSONS.length - FREE_LESSON_COUNT} more lessons, from gates to Shor's algorithm, with a free account.
+          + {LESSONS.length - FREE_LESSON_COUNT} more lessons, from gates to Shor's algorithm, with an account.
         </p>
       </div>
     </div>
