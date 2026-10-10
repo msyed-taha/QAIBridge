@@ -1,13 +1,15 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, Hash, Shuffle, Database,
-  Cpu, BarChart2, Zap, ChevronRight, ArrowRight,
-  BookOpen, Atom, TrendingUp, Star, Brain, Code2, Upload,
+  BarChart2, Zap, ChevronRight, ArrowRight,
+  BookOpen, Brain, Code2, Upload, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { TOOL_GROUPS, toolsIn } from '../tools';
+import { TOOLS, TOOL_GROUPS, toolsIn } from '../tools';
 import type { Tool, ToolGroup } from '../tools';
+import { dashboardApi } from '../api/dashboard';
+import type { HistoryRun } from '../api/dashboard';
 import { ContinueLearning } from '../learn/components/ContinueLearning';
 
 // ── Ask the AI Advisor ────────────────────────────────────────────────────────
@@ -163,14 +165,80 @@ const PROBLEMS = [
 ];
 
 
-// ── Quantum advantage stats ───────────────────────────────────────────────────
+// ── Your recent runs ──────────────────────────────────────────────────────────
 
-const STATS = [
-  { label: 'Algorithms that really run', value: '6',        icon: Atom,       color: '#00ffcc' },
-  { label: 'Qubits (RAM-aware kernel)',  value: 'up to 28', icon: Cpu,        color: '#3b82f6' },
-  { label: 'Problem types',              value: '4 + 4',    icon: Star,       color: '#f97316' },
-  { label: 'Integrated modules',         value: '8',        icon: TrendingUp, color: '#cc44ff' },
-];
+const toolName = (path: string) => TOOLS.find(t => t.path === path)!.name;
+const withType = (path: string, run: HistoryRun) =>
+  run.summary?.algorithm ? `${path}?type=${encodeURIComponent(run.summary.algorithm)}` : path;
+
+// Where each kind of saved run was made, so it opens that tool again (on the same problem type),
+// and what its result badge says (only where the quantum answer was checked).
+const RUN_SOURCES: Record<HistoryRun['kind'], { tool: string; to: (run: HistoryRun) => string; checked?: [string, string] }> = {
+  sfod:      { tool: toolName('/module2'),   to: run => withType('/module2', run), checked: ['Quantum answer correct', 'Quantum answer wrong'] },
+  solve:     { tool: 'Problem Solver',       to: run => withType('/solve', run) },
+  transform: { tool: toolName('/module5'),   to: () => '/module5', checked: ['Matches your code', "Didn't match your code"] },
+  benchmark: { tool: toolName('/dashboard'), to: () => '/dashboard' },
+};
+
+const timeAgo = (iso: string | null) => {
+  if (!iso) return '';
+  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
+  const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  for (const [unit, size] of [['day', 86_400], ['hour', 3_600], ['minute', 60]] as const) {
+    if (seconds >= size) return format.format(-Math.floor(seconds / size), unit);
+  }
+  return 'just now';
+};
+
+/** The last 3 saved runs, each one click from its tool. Hidden until there is a run. */
+function RecentRuns() {
+  const [runs, setRuns] = useState<HistoryRun[]>([]);
+  useEffect(() => {
+    let live = true;
+    dashboardApi.history(3)
+      .then(r => { if (live) setRuns(r); })
+      .catch(() => { /* the rest of the page works without it */ });
+    return () => { live = false; };
+  }, []);
+  if (runs.length === 0) return null;
+
+  return (
+    <section className="px-6 pb-10">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Pick up where you left off</h2>
+          <Link to="/dashboard" className="inline-flex items-center gap-1 text-xs font-medium text-quantum-neon hover:text-teal-300 transition-colors">
+            All your runs <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <ul className="grid gap-3 md:grid-cols-3">
+          {runs.map(run => {
+            const source = RUN_SOURCES[run.kind] ?? RUN_SOURCES.benchmark;
+            const correct = run.summary?.quantum_correct;
+            const showCheck = source.checked && typeof correct === 'boolean' && (run.kind !== 'transform' || run.summary?.supported !== false);
+            return (
+              <li key={run.id}>
+                <Link to={source.to(run)} className="group flex h-full flex-col glass-card rounded-2xl p-4">
+                  <span className="text-xs text-gray-400">{source.tool} · {timeAgo(run.created_at)}</span>
+                  <span className="mt-1 text-sm font-semibold text-white break-words">{run.title}</span>
+                  {showCheck && (
+                    <span className={`mt-2 inline-flex items-center gap-1 text-xs ${correct ? 'text-green-300' : 'text-amber-300'}`}>
+                      {correct ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> : <XCircle className="w-3.5 h-3.5" aria-hidden="true" />}
+                      {correct ? source.checked![0] : source.checked![1]}
+                    </span>
+                  )}
+                  <span className="mt-auto pt-3 inline-flex items-center gap-1 text-xs font-medium text-quantum-neon/80 group-hover:text-quantum-neon transition-colors">
+                    Open again <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
+  );
+}
 
 // ── How it works steps ────────────────────────────────────────────────────────
 
@@ -179,21 +247,21 @@ const STEPS = [
     num: '01',
     icon: BookOpen,
     color: 'from-teal-500 to-cyan-400',
-    title: 'Choose a Problem',
-    desc: 'Select from Search, Factoring, Optimization, or Database. Enter your own real-world data.',
+    title: 'Choose a problem',
+    desc: 'Pick Search, Factoring, Optimization or Database above, and enter your own data.',
   },
   {
     num: '02',
     icon: Zap,
     color: 'from-purple-500 to-pink-400',
-    title: 'Run Both Algorithms',
-    desc: 'Click "Run Both & Compare" to execute Classical and Quantum algorithms simultaneously.',
+    title: 'Run both methods',
+    desc: 'Click "Run Both & Compare" to run the classical and the quantum method on the same input, side by side.',
   },
   {
     num: '03',
     icon: BarChart2,
     color: 'from-orange-500 to-yellow-400',
-    title: 'Analyse the Speedup',
+    title: 'See the difference',
     desc: 'See answers checked side by side, oracle queries vs comparisons, success probability and where quantum wins at scale.',
   },
 ];
@@ -203,9 +271,9 @@ const STEPS = [
 function ToolGroupCards({ group, columns = '' }: { group: ToolGroup; columns?: string }) {
   return (
     <div className="flex flex-col">
-      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
         {TOOL_GROUPS.find(g => g.id === group)?.label}
-      </h2>
+      </h3>
       <div className={`grid content-start gap-3 ${columns}`}>
         {toolsIn(group).map(t => <ToolCard key={t.path} tool={t} />)}
       </div>
@@ -222,7 +290,7 @@ function ToolCard({ tool }: { tool: Tool }) {
           style={{ background: `${tool.color}1f`, border: `1px solid ${tool.color}55` }}>
           <tool.icon className="w-4 h-4" style={{ color: tool.color }} />
         </span>
-        <h3 className="text-white font-bold text-sm">{tool.name}</h3>
+        <h4 className="text-white font-bold text-sm">{tool.name}</h4>
       </div>
       <p className="flex-1 text-gray-400 text-xs leading-relaxed">{tool.desc}</p>
       <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-quantum-neon/70 group-hover:text-quantum-neon transition-colors">
@@ -266,12 +334,14 @@ export function AppHome() {
         </div>
       </section>
 
+      <RecentRuns />
+
       {/* ── PROBLEM CARDS (compact) ───────────────────────────────────────── */}
       <section className="px-6 pb-10">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4 text-center">
-            Solve a Problem — Classical vs Quantum
-          </p>
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4 text-center">
+            Solve a problem: classical vs quantum
+          </h2>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {PROBLEMS.map(p => {
@@ -321,9 +391,9 @@ export function AppHome() {
       {/* ── ALL TOOLS ────────────────────────────────────────────────────── */}
       <section className="px-6 pb-10">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
             All tools
-          </p>
+          </h2>
           <div className="space-y-8">
             <ToolGroupCards group="solve" columns="sm:grid-cols-3" />
             {/* The rest side by side */}
@@ -334,36 +404,12 @@ export function AppHome() {
         </div>
       </section>
 
-      {/* ── STATS BAR ────────────────────────────────────────────────────── */}
-      <section className="px-6 pb-10">
-        <div className="max-w-5xl mx-auto">
-          <div
-            className="glass-card rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-quantum-700 overflow-hidden"
-          >
-            {STATS.map((s) => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="flex items-center gap-3 px-6 py-5">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${s.color}18`, border: `1px solid ${s.color}30` }}>
-                    <Icon className="w-4 h-4" style={{ color: s.color }} />
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-white font-mono leading-none">{s.value}</p>
-                    <p className="text-xs text-gray-400 mt-1">{s.label}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
       <section className="px-6 pb-12">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
-            How It Works
-          </p>
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
+            How it works
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {STEPS.map((step, i) => {
               const Icon = step.icon;
@@ -394,9 +440,9 @@ export function AppHome() {
       {/* ── CONTINUE LEARNING ────────────────────────────────────────────── */}
       <section className="px-6 pb-16 border-t border-quantum-700 pt-10">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">
             Learn
-          </p>
+          </h2>
           <ContinueLearning />
         </div>
       </section>
