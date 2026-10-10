@@ -374,10 +374,10 @@ export function ForgotPasswordPage() {
           )}
         </div>
 
-        {/* Footer link */}
-        {step !== 'success' && (
-          <p className="text-center text-gray-700 text-xs mt-4">
-            <Link to={loginPath} className="hover:text-gray-500 transition-colors">
+        {/* Way out to sign in, once the card's own Back button only goes back a step */}
+        {(step === 'otp' || step === 'password') && (
+          <p className="text-center text-xs mt-4">
+            <Link to={loginPath} className="text-gray-400 hover:text-white transition-colors">
               ← Back to sign in
             </Link>
           </p>
