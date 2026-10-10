@@ -26,7 +26,7 @@ from ..database import get_db
 from ..config import is_owner_email
 from ..legal import DELETED_ACCOUNT_RETENTION_DAYS
 from ..models.user import User, ROLE_ADMIN, ROLE_USER
-from ..auth.security import hash_password, verify_password
+from ..auth.security import hash_password, token_for, verify_password
 from ..auth.schemas import (
     UserOut,
     UpdateProfileRequest,
@@ -106,9 +106,13 @@ def change_password(
     if verify_password(req.new_password, me.hashed_password):
         raise HTTPException(400, "The new password must be different from your current one.")
 
+    # Every other device is signed out; this one gets a fresh token.
     me.hashed_password = hash_password(req.new_password)
+    me.token_version   = (me.token_version or 0) + 1
     db.commit()
-    return {"message": "Password changed successfully."}
+    db.refresh(me)
+    return {"message": "Password changed. You've been signed out on your other devices.",
+            "access_token": token_for(me)}
 
 
 # ── Delete account (OTP-confirmed, permanent) ────────────────────────────────

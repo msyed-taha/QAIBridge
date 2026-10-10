@@ -21,7 +21,7 @@ from .. import config
 from ..config import is_admin_email, is_owner_email
 from ..legal import TERMS_VERSION, purge_expired
 from ..models.user import User, ROLE_ADMIN, ROLE_USER
-from ..auth.security      import hash_password, verify_password, create_access_token, decode_access_token
+from ..auth.security      import hash_password, verify_password, decode_access_token, token_for, token_is_current
 from ..auth.schemas       import (
     RegisterRequest, LoginRequest, TokenResponse, UserOut, SendOtpRequest,
     VerifyOtpRequest, ForgotPasswordSendOtpRequest, ForgotPasswordVerifyOtpRequest,
@@ -55,6 +55,8 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found.")
+    if not token_is_current(payload, user):   # signed out everywhere, e.g. by a password change
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in has ended. Please sign in again.")
     return user
 
 
@@ -71,7 +73,7 @@ def user_from_token(token: str, db: Session) -> "User | None":
     except (TypeError, ValueError):
         return None
     user = db.query(User).filter(User.id == user_id).first()
-    return user if user and user.is_active else None
+    return user if user and user.is_active and token_is_current(payload, user) else None
 
 
 def get_optional_user(
@@ -181,6 +183,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         user.role            = ROLE_USER
         user.is_active       = True
         user.deleted_at      = None
+        user.token_version   = (user.token_version or 0) + 1   # sign-ins from before the deletion stay ended
     else:
         user = User(
             username=req.username,
@@ -196,7 +199,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
     otp_store.clear(str(req.email))   # clean up OTP entry
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
+    token = token_for(user)
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -218,7 +221,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
+    token = token_for(user)
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -270,7 +273,7 @@ def admin_setup(req: AdminSetupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
+    token = token_for(user)
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -332,10 +335,11 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(400, "User not found.")
 
-    # Update password
+    # Update password, and sign out every device
     user.hashed_password = hash_password(req.new_password)
+    user.token_version   = (user.token_version or 0) + 1
     db.commit()
 
     otp_store.clear(f"forgot-password:{req.email}")  # Clean up OTP entry
 
-    return {"message": "Password changed successfully. Please log in with your new password."}
+    return {"message": "Password changed. Please sign in with your new password."}

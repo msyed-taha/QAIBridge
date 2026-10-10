@@ -199,6 +199,8 @@ def update_user(
     if req.is_active is not None:
         if target.id == me.id and not req.is_active:
             raise HTTPException(400, "You cannot deactivate your own account.")
+        if target.is_active and not req.is_active:
+            target.token_version = (target.token_version or 0) + 1   # switching back on doesn't revive old sign-ins
         target.is_active = req.is_active
 
     db.commit()

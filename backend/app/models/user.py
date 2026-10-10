@@ -30,6 +30,10 @@ class User(Base):
     # sign-up, and which version (app/legal.py TERMS_VERSION) that was.
     terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
     terms_version     = Column(String(20), nullable=True)
+    # Goes into every sign-in token; adding 1 signs the account out on every
+    # device (see auth.security.token_for). Bumped by a password change or reset,
+    # an admin switching the account off, and restoring a deleted account.
+    token_version     = Column(Integer, nullable=False, default=0, server_default="0")
 
     @property
     def is_admin(self) -> bool:

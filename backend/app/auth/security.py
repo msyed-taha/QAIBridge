@@ -45,6 +45,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def token_for(user) -> str:
+    """A sign-in token for `user`, tied to its current token_version."""
+    return create_access_token({"sub": str(user.id), "role": user.role, "ver": user.token_version or 0})
+
+
+def token_is_current(payload: dict, user) -> bool:
+    """False once the account's token_version has moved on (tokens without "ver" count as 0)."""
+    return payload.get("ver", 0) == (user.token_version or 0)
+
+
 def decode_access_token(token: str) -> Optional[dict]:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

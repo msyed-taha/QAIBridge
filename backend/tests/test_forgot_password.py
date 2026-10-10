@@ -77,6 +77,18 @@ def test_forgot_password_flow_for_each_role(client, role):
         _cleanup(uid)
 
 
+def test_resetting_the_password_signs_out_every_device(client):
+    uid, email, pw = _mk_user(ROLE_USER)
+    try:
+        r = client.post("/api/auth/login", json={"email": email, "password": pw})
+        old = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert client.get("/api/auth/me", headers=old).status_code == 200
+        _reset_flow(client, email, "ResetPass789")
+        assert client.get("/api/auth/me", headers=old).status_code == 401
+    finally:
+        _cleanup(uid)
+
+
 def test_reset_password_requires_verified_otp(client):
     uid, email, _ = _mk_user(ROLE_USER)
     try:

@@ -28,8 +28,9 @@ export const accountApi = {
     return data;
   },
 
-  changePassword: async (body: ChangePasswordBody): Promise<{ message: string }> => {
-    const { data } = await apiClient.post<{ message: string }>('/api/account/change-password', body);
+  /** Other devices are signed out; `access_token` keeps this one signed in. */
+  changePassword: async (body: ChangePasswordBody): Promise<{ message: string; access_token: string }> => {
+    const { data } = await apiClient.post<{ message: string; access_token: string }>('/api/account/change-password', body);
     return data;
   },
 

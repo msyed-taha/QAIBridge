@@ -61,7 +61,7 @@ function PasswordField({ id, label, value, onChange, autoComplete, problem, inpu
 }
 
 export function AccountPage() {
-  const { user, isAdmin, logout, updateUser } = useAuth();
+  const { user, isAdmin, login, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const id = useId();
 
@@ -136,11 +136,13 @@ export function AccountPage() {
     if (firstMissing) { pwRefs[firstMissing].current?.focus(); return; }
     setSavingPw(true);
     try {
-      await accountApi.changePassword({
+      const { message, access_token } = await accountApi.changePassword({
         current_password: curPw, new_password: newPw, confirm_new_password: confirmPw,
       });
+      // The old sign-in has ended everywhere; this device carries on with the new one.
+      if (user) login(access_token, user);
       setCurPw(''); setNewPw(''); setConfirmPw(''); setPwTried(false);
-      setPwMsg({ kind: 'ok', text: 'Password changed.' });
+      setPwMsg({ kind: 'ok', text: message });
     } catch (err) {
       setPwMsg({ kind: 'err', text: getApiErrorMessage(err, 'Could not change password') });
     } finally {

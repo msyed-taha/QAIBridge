@@ -227,6 +227,20 @@ def test_admin_cannot_change_a_self_deleted_account(client):
         _cleanup(admin.id, target.id)
 
 
+def test_switching_an_account_off_and_on_ends_its_old_sign_ins(client):
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    target, t_email, t_pw = _mk_user(role=ROLE_USER)
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        old = {"Authorization": f"Bearer {_token(client, t_email, t_pw)}"}
+        assert client.patch(f"/api/admin/users/{target.id}", json={"is_active": False}, headers=h).status_code == 200
+        assert client.patch(f"/api/admin/users/{target.id}", json={"is_active": True}, headers=h).status_code == 200
+        assert client.get("/api/auth/me", headers=old).status_code == 401           # not revived
+        assert client.post("/api/auth/login", json={"email": t_email, "password": t_pw}).status_code == 200
+    finally:
+        _cleanup(admin.id, target.id)
+
+
 def test_admin_deletes_a_user(client):
     admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
     target, _, _ = _mk_user(role=ROLE_USER)

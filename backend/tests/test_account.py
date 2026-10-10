@@ -138,6 +138,33 @@ def test_usernames_are_unique_whatever_the_capitals(client, monkeypatch):
 
 # ── POST /change-password ───────────────────────────────────────────────────
 
+def test_changing_password_signs_out_other_devices(client):
+    uid, email, pw = _mk_user()
+    try:
+        laptop = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+        import time; time.sleep(1)   # a second sign-in (tokens are per second)
+        phone = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+        r = client.post("/api/account/change-password", headers=laptop, json={
+            "current_password": pw, "new_password": "NewPass456", "confirm_new_password": "NewPass456"})
+        assert r.status_code == 200, r.text
+        fresh = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert client.get("/api/account/me", headers=fresh).status_code == 200     # this device stays in
+        assert client.get("/api/account/me", headers=laptop).status_code == 401    # its old token ended
+        assert client.get("/api/account/me", headers=phone).status_code == 401     # the other device too
+    finally:
+        _cleanup(uid)
+
+
+def test_tokens_from_before_sign_in_versions_still_work(client):
+    from app.auth.security import create_access_token
+    uid, email, pw = _mk_user()
+    try:
+        old_style = {"Authorization": f"Bearer {create_access_token({'sub': str(uid), 'role': 'user'})}"}
+        assert client.get("/api/account/me", headers=old_style).status_code == 200
+    finally:
+        _cleanup(uid)
+
+
 def test_change_password_happy_path(client):
     uid, email, pw = _mk_user()
     try:
@@ -241,6 +268,7 @@ def test_signing_up_again_restores_a_deleted_account(client, monkeypatch):
 
         u = _get(uid)
         assert u.is_active and u.deleted_at is None and u.username == new_name and u.role == ROLE_USER
+        assert client.get("/api/account/me", headers=h).status_code == 401   # sign-ins from before the deletion stay ended
         assert client.post("/api/auth/login", json={"email": email, "password": pw}).status_code == 401
         assert client.post("/api/auth/login", json={"email": email, "password": "ReturnPass123"}).status_code == 200
         # and it's an ordinary account again: a second sign-up is refused
