@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * "How to use this module" — a plain-language, step-by-step panel shown at the
+ * "How to use this tool" — a plain-language, step-by-step panel shown at the
  * top of a module page so a first-time user knows exactly what to click and
  * what they'll get back. Mirrors the existing glossary panel's look.
  */
@@ -25,7 +25,7 @@ export function HowToUse({ steps, outcome, defaultOpen = true }: Props) {
         className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white border border-quantum-neon/30 bg-quantum-neon/5 rounded-full px-3 py-1.5 transition-colors mb-3"
       >
         <HelpCircle className="w-3.5 h-3.5 text-quantum-neon" />
-        How to use this module
+        How to use this tool
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -42,7 +42,7 @@ export function HowToUse({ steps, outcome, defaultOpen = true }: Props) {
             ))}
           </ol>
           {outcome && (
-            <p className="text-gray-500 text-xs mt-4 pt-3 border-t border-quantum-700 leading-relaxed">
+            <p className="text-gray-400 text-xs mt-4 pt-3 border-t border-quantum-700 leading-relaxed">
               <span className="text-gray-400 font-semibold">What you'll see: </span>
               {outcome}
             </p>

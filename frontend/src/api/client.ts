@@ -76,7 +76,7 @@ export function detailToMessage(detail: unknown, fallback = 'Request failed'): s
  */
 export function friendlyError(e: unknown, fallback = 'Something went wrong'): string {
   if (e instanceof TypeError && /fetch|network/i.test(e.message)) {
-    return "Can't reach the server. Make sure the backend is running on port 8000 (run-backend.ps1).";
+    return "Can't reach QAIbridge right now. Check your internet connection and try again.";
   }
   return e instanceof Error && e.message ? e.message : fallback;
 }
@@ -88,7 +88,7 @@ export function getApiErrorMessage(e: unknown, fallback = 'Request failed'): str
     if (resp?.data?.detail !== undefined) return detailToMessage(resp.data.detail, fallback);
   }
   if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === 'ERR_NETWORK') {
-    return "Can't reach the server. Make sure the backend is running on port 8000 (run-backend.ps1).";
+    return "Can't reach QAIbridge right now. Check your internet connection and try again.";
   }
   return e instanceof Error ? e.message : fallback;
 }

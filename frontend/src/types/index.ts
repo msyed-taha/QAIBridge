@@ -44,7 +44,15 @@ export interface SimulationResult {
     is_safe: boolean;
     warning: string | null;
   };
+  /** Preset runs only: the simulator's exact chances against the textbook answer. */
+  check?: TheoryCheck | null;
 }
+
+export type TheoryCheck =
+  | { kind: 'outcomes' | 'marked'; expected: Record<string, number>; measured: Record<string, number>;
+      max_error: number; passed: boolean }
+  | { kind: 'uniform'; expected: number; max_error: number; passed: boolean }
+  | { kind: 'norm'; total: number; max_error: number; passed: boolean };
 
 export interface MemoryCheckResponse {
   n_qubits: number;
@@ -54,14 +62,9 @@ export interface MemoryCheckResponse {
   total_ram_gb: number;
   is_safe: boolean;
   warning: string | null;
-}
-
-export interface RamTableRow {
-  n_qubits: number;
-  state_vector_size: number;
   required_bytes: number;
-  required_mb: number;
-  required_gb: number;
+  /** The most one run may use right now: 85 % of free RAM, never above the 5 GB cap. */
+  limit_bytes: number;
 }
 
 // ── Module 6 – Neural Angle Optimizer Types ──────────────────────────────────

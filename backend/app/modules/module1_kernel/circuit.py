@@ -37,6 +37,15 @@ MAX_REPORTED_STATES = 1024
 MAX_REPORTED_PHASES = 256
 
 
+def _sig(x: float, digits: int = 8) -> float:
+    """Round to significant digits, so a 28-qubit chance of 3.7e-9 isn't reported as 0."""
+    return float(f"{float(x):.{digits}g}")
+
+
+class SimulationCancelled(Exception):
+    """Raised between gates when the caller asked the run to stop (e.g. the user left the page)."""
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Data Types
 # ──────────────────────────────────────────────────────────────────────────────
@@ -287,19 +296,24 @@ class QuantumCircuit:
 
     def execute(self, sv: QuantumStateVector,
                 on_barrier: Optional[Callable[[str, QuantumStateVector], None]] = None,
-                on_progress: Optional[Callable[[int, int], None]] = None) -> QuantumStateVector:
+                on_progress: Optional[Callable[[int, int], None]] = None,
+                should_stop: Optional[Callable[[], bool]] = None) -> QuantumStateVector:
         """
         Apply every operation to an existing state vector.
 
         on_barrier(label, sv) fires at each BARRIER (e.g. to record the
         success probability after every Grover iteration); on_progress(done,
-        total) fires roughly every 2 % of the operations (WebSocket progress).
+        total) fires roughly every 2 % of the operations (WebSocket progress);
+        should_stop() is asked before every operation and, once it says yes,
+        the run ends with SimulationCancelled.
         """
         if sv.n_qubits != self.n_qubits:
             raise ValueError("State vector and circuit have different qubit counts.")
         total = len(self._ops)
         step = max(1, total // 50)
         for i, op in enumerate(self._ops):
+            if should_stop is not None and should_stop():
+                raise SimulationCancelled(f"Stopped after {i} of {total} gates.")
             if op.gate == "BARRIER":
                 if on_barrier is not None:
                     on_barrier(op.label, sv)
@@ -319,7 +333,8 @@ class QuantumCircuit:
         return sv
 
     def run(self, shots: int = 1024,
-            on_progress: Optional[Callable[[int, int], None]] = None) -> SimulationResult:
+            on_progress: Optional[Callable[[int, int], None]] = None,
+            should_stop: Optional[Callable[[], bool]] = None) -> SimulationResult:
         """
         Execute the circuit on a fresh QuantumStateVector.
 
@@ -335,7 +350,7 @@ class QuantumCircuit:
 
         sv = QuantumStateVector(self.n_qubits, check_ram=False)
         t0 = time.perf_counter()
-        self.execute(sv, on_progress=on_progress)
+        self.execute(sv, on_progress=on_progress, should_stop=should_stop)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
         n = self.n_qubits
@@ -343,7 +358,7 @@ class QuantumCircuit:
         top = sv.top_states(min(MAX_REPORTED_STATES, sv.dim))
         top = [(i, p) for i, p in top if p > 1e-9]
 
-        probabilities = {f"|{i:0{n}b}>": round(p, 8) for i, p in sorted(top)}
+        probabilities = {f"|{i:0{n}b}>": _sig(p) for i, p in sorted(top)}
 
         phases = [
             {
@@ -359,8 +374,8 @@ class QuantumCircuit:
             amp = sv._state[i]
             amplitudes.append({
                 "state": f"|{i:0{n}b}>", "index": int(i),
-                "real": round(float(amp.real), 8), "imag": round(float(amp.imag), 8),
-                "probability": round(float(p), 8), "magnitude": round(float(abs(amp)), 8),
+                "real": _sig(amp.real), "imag": _sig(amp.imag),
+                "probability": _sig(p), "magnitude": _sig(abs(amp)),
                 "phase_deg": round(math.degrees(cmath.phase(amp)), 4),
             })
 
@@ -373,7 +388,7 @@ class QuantumCircuit:
             "norm":           round(sv.norm_squared(), 10),
             "is_entangled":   entangled,
             "max_prob_state": f"|{best_i:0{n}b}>",
-            "max_prob":       round(best_p, 8),
+            "max_prob":       _sig(best_p),
         }
 
         return SimulationResult(
@@ -588,6 +603,23 @@ class CircuitLibrary:
     @staticmethod
     def qft_circuit(n_qubits: int = 4) -> QuantumCircuit:
         circ = QuantumCircuit(n_qubits, f"QFT-{n_qubits}q", max_gates=100_000)
+        circ.qft()
+        return circ
+
+    @staticmethod
+    def qft_pattern(n_qubits: int = 4, period: int = 4) -> QuantumCircuit:
+        """
+        QFT of a pattern that repeats every `period` steps: H on all but the
+        last log2(period) qubits gives an even mix of 0, period, 2·period, …,
+        and the QFT turns that into `period` equally likely, evenly spaced
+        peaks (multiples of 2^n / period) — the step at the heart of Shor.
+        """
+        k = int(period).bit_length() - 1
+        if period < 2 or 2 ** k != period or k > n_qubits:
+            raise ValueError(f"The period must be a power of two between 2 and 2^{n_qubits}.")
+        circ = QuantumCircuit(n_qubits, f"QFT-pattern-{n_qubits}q", max_gates=100_000)
+        for q in range(n_qubits - k):
+            circ.h(q)
         circ.qft()
         return circ
 

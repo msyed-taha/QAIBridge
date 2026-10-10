@@ -1,8 +1,10 @@
 import apiClient from './client';
 import type {
   GateOperation, SimulationResult,
-  MemoryCheckResponse, RamTableRow, ApiResponse,
+  MemoryCheckResponse, ApiResponse,
 } from '../types';
+
+export type KernelPreset = 'bell' | 'ghz' | 'grover' | 'qft' | 'qft_pattern' | 'ansatz';
 
 const BASE = '/api/kernel';
 
@@ -21,9 +23,9 @@ export const kernelApi = {
     return data.result;
   },
 
-  /** Run a preset circuit */
+  /** Run a preset circuit (the result carries a `check` against the textbook answer) */
   preset: async (
-    preset: 'bell' | 'ghz' | 'grover' | 'qft' | 'ansatz',
+    preset: KernelPreset,
     n_qubits = 2,
     shots = 1024,
     layers = 2,
@@ -43,10 +45,12 @@ export const kernelApi = {
     return data;
   },
 
-  /** Full RAM table (1–MAX_QUBITS qubits) */
-  ramTable: async (): Promise<RamTableRow[]> => {
-    const { data } = await apiClient.get<{ table: RamTableRow[] }>(`${BASE}/ram-table`);
-    return data.table;
+  /** Opens the live simulation socket (token passed as a query parameter). */
+  socket: (): WebSocket => {
+    const token = localStorage.getItem('qai_token') ?? '';
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const id = Math.random().toString(36).slice(2);
+    return new WebSocket(`${proto}://${window.location.host}${BASE}/ws/${id}?token=${encodeURIComponent(token)}`);
   },
 
   /** Supported gate names */
