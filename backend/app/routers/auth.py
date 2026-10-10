@@ -170,7 +170,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if existing and existing.deleted_at is None:
         raise HTTPException(400, "An account with this email already exists.")
 
-    taken = db.query(User).filter(User.username == req.username).first()
+    taken = db.query(User).filter(func.lower(User.username) == req.username.lower()).first()
     if taken and taken is not existing:
         raise HTTPException(400, "This username is already taken.")
 
@@ -256,7 +256,7 @@ def admin_setup(req: AdminSetupRequest, db: Session = Depends(get_db)):
 
     if db.query(User).filter(func.lower(User.email) == req.email).first():
         raise HTTPException(400, "An account with this email already exists.")
-    if db.query(User).filter(User.username == req.username).first():
+    if db.query(User).filter(func.lower(User.username) == req.username.lower()).first():
         raise HTTPException(400, "This username is already taken.")
 
     user = User(

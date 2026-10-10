@@ -139,7 +139,7 @@ def create_user(req: AdminCreateUserRequest, db: Session = Depends(get_db)):
     if is_owner_email(req.email):
         # Otherwise another admin could pick the owner's password and take the account over.
         raise HTTPException(403, "This email is reserved for the owner, who must sign up themselves.")
-    if db.query(User).filter(User.username == req.username).first():
+    if db.query(User).filter(func.lower(User.username) == req.username.lower()).first():
         raise HTTPException(400, "This username is already taken.")
     if req.role == ROLE_ADMIN and not is_admin_email(req.email):
         raise HTTPException(

@@ -106,6 +106,36 @@ def test_update_username_rejects_duplicate_and_too_short(client):
         _cleanup(uid1, uid2)
 
 
+def test_username_is_trimmed_before_it_is_checked(client):
+    uid, email, pw = _mk_user()
+    try:
+        h = {"Authorization": f"Bearer {_token(client, email, pw)}"}
+        # "  ab  " is 2 characters once trimmed: too short, not saved as "ab"
+        assert client.patch("/api/account/profile", headers=h, json={"username": "  ab  "}).status_code == 422
+        name = f"trim_{uuid.uuid4().hex[:8]}"
+        r = client.patch("/api/account/profile", headers=h, json={"username": f"  {name}  "})
+        assert r.status_code == 200 and r.json()["username"] == name
+    finally:
+        _cleanup(uid)
+
+
+def test_usernames_are_unique_whatever_the_capitals(client, monkeypatch):
+    uid1, e1, p1 = _mk_user()
+    uid2, e2, p2 = _mk_user()
+    try:
+        other = _get(uid2).username
+        h1 = {"Authorization": f"Bearer {_token(client, e1, p1)}"}
+        assert client.patch("/api/account/profile", headers=h1, json={"username": other.upper()}).status_code == 400
+        # changing only the capitals of your own name is fine
+        mine = _get(uid1).username
+        assert client.patch("/api/account/profile", headers=h1, json={"username": mine.upper()}).status_code == 200
+        # and sign-up refuses a lookalike too
+        r = _signup(client, monkeypatch, f"look_{uuid.uuid4().hex[:8]}@example.com", other.upper(), "LookPass123")
+        assert r.status_code == 400 and "taken" in r.json()["detail"]
+    finally:
+        _cleanup(uid1, uid2)
+
+
 # ── POST /change-password ───────────────────────────────────────────────────
 
 def test_change_password_happy_path(client):

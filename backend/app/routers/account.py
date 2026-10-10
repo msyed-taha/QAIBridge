@@ -76,11 +76,11 @@ def update_profile(
     db: Session = Depends(get_db),
     me: User = Depends(get_current_user),
 ):
-    new_username = req.username.strip()
+    new_username = req.username   # already trimmed (schemas.Username)
     if new_username != me.username:
         taken = (
             db.query(User)
-            .filter(User.username == new_username, User.id != me.id)
+            .filter(func.lower(User.username) == new_username.lower(), User.id != me.id)
             .first()
         )
         if taken:

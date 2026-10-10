@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 from typing import Annotated, Optional
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field, computed_field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, EmailStr, Field, computed_field, field_validator, model_validator
 
 from ..config import is_admin_email, is_owner_email
 
@@ -13,6 +13,10 @@ from ..config import is_admin_email, is_owner_email
 # An email address in a request, in lower case: "Ali@Gmail.com" and "ali@gmail.com"
 # are the same account, whichever way it is typed.
 Email = Annotated[EmailStr, AfterValidator(lambda v: v.lower())]
+
+# A username in a request, without spaces at either end, then 3–50 characters
+# (so "  ab  " is too short rather than being saved as "ab").
+Username = Annotated[str, BeforeValidator(lambda v: v.strip() if isinstance(v, str) else v), Field(min_length=3, max_length=50)]
 
 
 # ── Password strength validation ──────────────────────────────────────────────
@@ -44,7 +48,7 @@ class VerifyOtpRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: str      = Field(..., min_length=3, max_length=50)
+    username: Username
     email:    Email
     password: str      = Field(..., min_length=8)
     # "I am 13 or older and agree to the Terms of Use and Privacy Policy"
@@ -70,7 +74,7 @@ class LoginRequest(BaseModel):
 
 class AdminCreateUserRequest(BaseModel):
     """An admin creating an account directly from the dashboard (no email OTP)."""
-    username:  str      = Field(..., min_length=3, max_length=50)
+    username:  Username
     email:     Email
     password:  str      = Field(..., min_length=8)
     role:      str      = Field(default="user", pattern=r"^(user|admin)$")
@@ -84,7 +88,7 @@ class AdminCreateUserRequest(BaseModel):
 
 class AdminSetupRequest(BaseModel):
     """One-time creation of the very first administrator (only works when none exist)."""
-    username: str      = Field(..., min_length=3, max_length=50)
+    username: Username
     email:    Email
     password: str      = Field(..., min_length=8)
 
@@ -98,7 +102,7 @@ class AdminSetupRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     """Change your own display name."""
-    username: str = Field(..., min_length=3, max_length=50)
+    username: Username
 
 
 class ChangePasswordRequest(BaseModel):
