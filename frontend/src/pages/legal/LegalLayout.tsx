@@ -25,7 +25,7 @@ export function LegalLayout({ title, intro, sections }: { title: string; intro: 
       <div className="max-w-3xl mx-auto">
         <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">Legal</p>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">{title}</h1>
-        <p className="text-gray-500 text-sm mb-8">
+        <p className="text-gray-400 text-sm mb-8">
           Effective <time dateTime={LEGAL.effectiveDateIso}>{LEGAL.effectiveDate}</time>
         </p>
 

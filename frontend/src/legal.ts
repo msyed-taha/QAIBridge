@@ -3,8 +3,8 @@
 //  * The retention periods must match backend/app/legal.py (enforced there).
 export const LEGAL = {
   operator: 'QAIbridge',
-  effectiveDate: '1 October 2026',
-  effectiveDateIso: '2026-10-01',
+  effectiveDate: '7 October 2026',
+  effectiveDateIso: '2026-10-07',
   minimumAge: 13,
   deletedAccountDays: 30,
   contactMessageMonths: 12,

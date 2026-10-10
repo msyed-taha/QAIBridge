@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from .models.contact import ContactMessage
 from .models.user import User
 
-TERMS_VERSION = "2026-10-01"   # keep equal to EFFECTIVE_DATE in frontend/src/legal.ts
+TERMS_VERSION = "2026-10-07"   # keep equal to EFFECTIVE_DATE in frontend/src/legal.ts
 
 DELETED_ACCOUNT_RETENTION_DAYS = 30
 CONTACT_MESSAGE_RETENTION_DAYS = 365
