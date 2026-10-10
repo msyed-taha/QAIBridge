@@ -7,23 +7,23 @@ import { useAuth } from '../../context/AuthContext';
 import { TOOLS, TOOL_GROUPS, isToolAt, toolsIn } from '../../tools';
 
 // `section`: also highlighted on the pages under it (/learn/… for Learn).
-type NavLink = { path: string; label: string; active: boolean; section?: boolean };
+type NavLink = { path: string; label: string; section?: boolean };
 const isNavActive = (link: NavLink, pathname: string) =>
   pathname === link.path || (!!link.section && pathname.startsWith(link.path + '/'));
 
 // Public nav (not logged in) — landing pages and the Learn course. The tools require login.
 const PUBLIC_NAV: NavLink[] = [
-  { path: '/',      label: 'Home',  active: true },
-  { path: '/learn', label: 'Learn', active: true, section: true },
-  { path: '/about', label: 'About', active: true },
+  { path: '/',      label: 'Home' },
+  { path: '/learn', label: 'Learn', section: true },
+  { path: '/about', label: 'About' },
 ];
 
 // Authenticated nav (logged in as a normal user)
 const AUTH_NAV: NavLink[] = [
-  { path: '/app',       label: 'Home',        active: true },
-  { path: '/learn',     label: 'Learn',       active: true, section: true },
-  { path: '/solve',     label: 'Solve',       active: true },
-  { path: '/dashboard', label: 'Dashboard',   active: true },
+  { path: '/app',       label: 'Home' },
+  { path: '/learn',     label: 'Learn', section: true },
+  { path: '/solve',     label: 'Solve' },
+  { path: '/dashboard', label: 'Dashboard' },
 ];
 
 // The Tools menu: two columns of groups (the tools themselves live in tools.ts).
@@ -32,9 +32,9 @@ const groupLabel = (id: string) => TOOL_GROUPS.find(g => g.id === id)?.label;
 
 // Admin nav (logged in as an administrator) — a different view of the site
 const ADMIN_NAV: NavLink[] = [
-  { path: '/admin',       label: 'Dashboard', active: true },
-  { path: '/admin/users', label: 'Users',     active: true },
-  { path: '/admin/messages', label: 'Messages', active: true },
+  { path: '/admin',       label: 'Dashboard' },
+  { path: '/admin/users', label: 'Users' },
+  { path: '/admin/messages', label: 'Messages' },
 ];
 
 // Closes an open menu once the person is done with it: a click or tap outside
@@ -108,19 +108,15 @@ export function Navbar() {
         {/* ── Desktop Nav ── */}
         <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS.map(link => {
-            const { path, label, active } = link;
+            const { path, label } = link;
             const isActive = isNavActive(link, pathname);
             return (
               <Link
                 key={path}
-                to={active ? path : '#'}
+                to={path}
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative whitespace-nowrap px-3 xl:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? 'text-white'
-                    : active
-                    ? 'text-gray-400 hover:text-white hover:bg-quantum-800'
-                    : 'text-gray-600 cursor-default pointer-events-none'
+                  isActive ? 'text-white' : 'text-gray-400 hover:text-white hover:bg-quantum-800'
                 }`}
               >
                 {isActive && (
@@ -135,11 +131,6 @@ export function Navbar() {
                   style={isActive ? { backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' } : {}}>
                   {label}
                 </span>
-                {!active && (
-                  <span className="ml-1.5 text-[10px] bg-quantum-700 text-gray-500 px-1.5 py-0.5 rounded align-middle">
-                    Soon
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -279,23 +270,18 @@ export function Navbar() {
       {mobileOpen && (
         <div className="md:hidden max-h-[calc(100dvh_-_4rem_-_1px)] overflow-y-auto overscroll-contain border-t border-quantum-700 bg-quantum-900 px-4 py-3 space-y-1">
           {NAV_LINKS.map(link => {
-            const { path, label, active } = link;
+            const { path, label } = link;
             const isActive = isNavActive(link, pathname);
             return (
               <Link
                 key={path}
-                to={active ? path : '#'}
+                to={path}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive ? 'bg-quantum-800 text-white'
-                  : active  ? 'text-gray-400 hover:bg-quantum-800 hover:text-white'
-                  : 'text-gray-600 pointer-events-none'
+                className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive ? 'bg-quantum-800 text-white' : 'text-gray-400 hover:bg-quantum-800 hover:text-white'
                 }`}
               >
-                <span>{label}</span>
-                {!active && (
-                  <span className="text-[10px] bg-quantum-700 text-gray-500 px-1.5 py-0.5 rounded">Soon</span>
-                )}
+                {label}
               </Link>
             );
           })}
