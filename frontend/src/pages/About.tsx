@@ -33,6 +33,16 @@ const FEATURES = [
   },
 ];
 
+// Short facts under "What is QAIbridge?" (moved here from the home page).
+const FACTS = [
+  'No quantum physics background needed',
+  'No quantum hardware needed',
+  'Its own simulation kernel, not Qiskit',
+  'Quantum answers checked against classical ones',
+  'Spots when circuit training gets stuck, and restarts it',
+  "Your code and files aren't kept after your run",
+];
+
 const AUDIENCE = [
   { icon: GraduationCap, title: 'Students', desc: 'Learn how quantum algorithms work by running them, not just reading about them.' },
   { icon: FlaskConical, title: 'Researchers', desc: 'Test ideas quickly and compare quantum methods against solid classical baselines.' },
@@ -78,6 +88,28 @@ export function About() {
             QAIbridge helps you find out whether quantum computing can solve your problem,
             and shows you the answer with real runs, side by side with the classical one.
           </p>
+        </div>
+      </section>
+
+      {/* ── WHAT IS IT ────────────────────────────────────────────────── */}
+      <section className="py-16 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">What is QAIbridge?</h2>
+          <p className="text-gray-300 text-base leading-relaxed max-w-3xl mx-auto">
+            QAIbridge is a research and education platform that lets you <span className="text-white font-medium">simulate quantum algorithms</span>,
+            compare them against classical solutions, and understand why quantum computing could transform fields
+            like cryptography, database search and combinatorial optimisation. Its simulator is built from scratch:
+            it doesn't rely on IBM Qiskit or a cloud quantum computer.
+          </p>
+
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10 text-left max-w-2xl mx-auto">
+            {FACTS.map(f => (
+              <li key={f} className="flex items-start gap-2.5">
+                <CheckCircle className="w-4 h-4 text-quantum-neon flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <span className="text-gray-300 text-sm">{f}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

@@ -1,61 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowDown, Cpu, BarChart2, BookOpen, Brain, Users, GraduationCap, FlaskConical, Code2, CheckCircle, MessageSquare, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ArrowDown, Cpu, BarChart2, Brain, Users, Code2, CheckCircle, MessageSquare, ShieldCheck } from 'lucide-react';
 import { QubitSphere } from '../components/home/QubitSphere';
 import { LearnTeaser } from '../learn/components/LearnTeaser';
-
-const CAPABILITIES = [
-  {
-    icon: Cpu,
-    color: 'from-teal-500 to-cyan-400',
-    title: 'Quantum Simulation',
-    desc: 'Run quantum circuits on 20+ qubits (up to 28, RAM permitting) using a custom-built state-vector engine — no Qiskit inside, no cloud QPU required.',
-  },
-  {
-    icon: BarChart2,
-    color: 'from-blue-500 to-indigo-400',
-    title: 'Performance Benchmarking',
-    desc: 'Compare Classical vs Quantum algorithms side by side across Search, Factoring, Optimization, and Database problems.',
-  },
-  {
-    icon: Brain,
-    color: 'from-purple-500 to-pink-400',
-    title: 'AI-Powered Optimization',
-    desc: 'Neural networks learn quantum gate angles — including QAOA\'s γ and β — and a live monitor escapes barren plateaus.',
-  },
-  {
-    icon: BookOpen,
-    color: 'from-green-500 to-emerald-400',
-    title: 'Visual Circuit Builder',
-    desc: 'Drag-and-drop quantum circuit canvas for learning gate logic visually — no physics background needed.',
-  },
-];
-
-const WHO_FOR = [
-  {
-    icon: GraduationCap,
-    title: 'Students',
-    desc: 'Learn quantum computing concepts through hands-on simulation without needing a physics degree.',
-  },
-  {
-    icon: FlaskConical,
-    title: 'Researchers',
-    desc: 'Benchmark quantum algorithms against classical baselines and visualise theoretical speedups at scale.',
-  },
-  {
-    icon: Code2,
-    title: 'Developers',
-    desc: 'Explore quantum circuit design, code transpilation, and AI-driven optimization in one platform.',
-  },
-];
-
-const FEATURES = [
-  'No quantum physics background required',
-  'Runs entirely on local CPU — no QPU hardware',
-  'Custom simulation kernel — no Qiskit dependency',
-  'Classical & Quantum comparison for every problem',
-  'AI agent solves the Barren Plateau automatically',
-  'Full Docker support for easy deployment',
-];
 
 // Short, verifiable claims under the hero buttons.
 const HERO_PROOF = [
@@ -260,81 +206,6 @@ export function Home() {
                       </a>
                     </div>
                   </figure>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── WHAT IS IT ──────────────────────────────────────────────────── */}
-      <section className="py-16 px-6 bg-quantum-800/30 border-y border-quantum-700">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">What is QAIbridge?</h2>
-          <p className="text-gray-400 text-base leading-relaxed max-w-3xl mx-auto">
-            QAIbridge is a research and education platform that lets you <span className="text-white font-medium">simulate quantum algorithms</span>,
-            compare them against classical solutions, and understand why quantum computing will
-            revolutionise fields like cryptography, database search, and combinatorial optimisation.
-            Built from scratch with a proprietary simulation kernel — no dependency on IBM Qiskit or any cloud QPU.
-          </p>
-
-          {/* Feature checklist */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10 text-left max-w-2xl mx-auto">
-            {FEATURES.map(f => (
-              <div key={f} className="flex items-start gap-2.5">
-                <CheckCircle className="w-4 h-4 text-quantum-neon flex-shrink-0 mt-0.5" />
-                <span className="text-gray-400 text-sm">{f}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── WHAT CAN YOU DO ─────────────────────────────────────────────── */}
-      <section className="py-16 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-3">What can you do on QAIbridge?</h2>
-            <p className="text-gray-500 text-sm max-w-xl mx-auto">
-              Once you create your account, you get full access to all platform modules.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {CAPABILITIES.map(c => {
-              const Icon = c.icon;
-              return (
-                <div key={c.title} data-tilt className="glass-card rounded-2xl p-6">
-                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-4`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-base mb-2">{c.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{c.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── WHO IS IT FOR ───────────────────────────────────────────────── */}
-      <section className="py-16 px-6 bg-quantum-800/30 border-y border-quantum-700">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-3">Who is QAIbridge for?</h2>
-            <p className="text-gray-500 text-sm">Anyone curious about quantum computing — no prior experience needed.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {WHO_FOR.map(w => {
-              const Icon = w.icon;
-              return (
-                <div key={w.title} data-tilt className="glass-card text-center p-6 rounded-2xl">
-                  <div className="w-12 h-12 rounded-2xl bg-quantum-700 border border-quantum-600 flex items-center justify-center mx-auto mb-4">
-                    <Icon className="w-6 h-6 text-quantum-neon" />
-                  </div>
-                  <h3 className="text-white font-bold text-base mb-2">{w.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{w.desc}</p>
                 </div>
               );
             })}
