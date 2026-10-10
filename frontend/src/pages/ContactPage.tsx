@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, User as UserIcon, Send, Loader2, CheckCircle, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +9,7 @@ const MIN_MESSAGE = 10;
 const MAX_MESSAGE = 5000;
 
 const inputCls =
-  'w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 ' +
+  'w-full bg-quantum-900 border rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 ' +
   'focus:outline-none focus:border-quantum-neon/50 transition-colors';
 
 export function ContactPage() {
@@ -24,11 +24,32 @@ export function ContactPage() {
   const [error,   setError]   = useState<string | null>(null);
   const [done,    setDone]    = useState<string | null>(null);
 
-  const tooShort = message.trim().length < MIN_MESSAGE;
+  // "Send" was pressed with something missing: say what, beside the field.
+  const [tried, setTried] = useState(false);
+  const id = useId();
+  const refs = { name: useRef<HTMLInputElement>(null), email: useRef<HTMLInputElement>(null), message: useRef<HTMLTextAreaElement>(null) };
+  const problems = {
+    name:    !name.trim() ? 'Please add your name.' : null,
+    email:   !/^\S+@\S+\.\S+$/.test(email.trim()) ? 'Please add a valid email address, so we can reply.' : null,
+    message: message.trim().length < MIN_MESSAGE ? `Please write at least ${MIN_MESSAGE} characters.` : null,
+  };
+  type Field = keyof typeof problems;
+  const shown = (field: Field) => (tried ? problems[field] : null);
+  const fieldProps = (field: Field) => ({
+    id: `${id}-${field}`,
+    'aria-invalid': !!shown(field),
+    'aria-describedby': shown(field) ? `${id}-${field}-problem` : undefined,
+  });
+  const border = (field: Field) => (shown(field) ? 'border-amber-500/70' : 'border-quantum-700');
+  const problemNote = (field: Field) =>
+    shown(field) && <p id={`${id}-${field}-problem`} className="text-amber-300 text-xs mt-1.5">{shown(field)}</p>;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setTried(true);
+    const firstMissing = (Object.keys(problems) as Field[]).find(f => problems[f]);
+    if (firstMissing) { refs[firstMissing].current?.focus(); return; }
     setSending(true);
     try {
       setDone(await contactApi.send({ name, email, subject, message, website }));
@@ -64,47 +85,52 @@ export function ContactPage() {
                   <MessageSquare className="w-6 h-6 text-white" />
                 </div>
                 <h1 className="text-2xl font-extrabold text-white mb-1">Contact us</h1>
-                <p className="text-gray-500 text-sm">Questions, feedback or partnerships — we read every message.</p>
+                <p className="text-gray-400 text-sm">Questions, feedback or partnerships — we read every message.</p>
               </div>
 
               {error && (
-                <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-5">{error}</div>
+                <div role="alert" className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-5">{error}</div>
               )}
 
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submit} noValidate className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-400 font-medium mb-1.5">Your name</label>
+                    <label htmlFor={`${id}-name`} className="block text-xs text-gray-400 font-medium mb-1.5">Your name</label>
                     <div className="relative">
-                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-                      <input value={name} onChange={e => setName(e.target.value)} required maxLength={100}
-                        placeholder="Ayesha Khan" className={`${inputCls} pl-10`} />
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
+                      <input {...fieldProps('name')} ref={refs.name} value={name} onChange={e => setName(e.target.value)} maxLength={100}
+                        autoComplete="name" placeholder="Ayesha Khan" className={`${inputCls} ${border('name')} pl-10`} />
                     </div>
+                    {problemNote('name')}
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 font-medium mb-1.5">Your email</label>
+                    <label htmlFor={`${id}-email`} className="block text-xs text-gray-400 font-medium mb-1.5">Your email</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                        placeholder="you@example.com" className={`${inputCls} pl-10`} />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
+                      <input {...fieldProps('email')} ref={refs.email} type="email" value={email} onChange={e => setEmail(e.target.value)}
+                        autoComplete="email" placeholder="you@example.com" className={`${inputCls} ${border('email')} pl-10`} />
                     </div>
+                    {problemNote('email')}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-1.5">
-                    Subject <span className="text-gray-600">(optional)</span>
+                  <label htmlFor={`${id}-subject`} className="block text-xs text-gray-400 font-medium mb-1.5">
+                    Subject <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
-                  <input value={subject} onChange={e => setSubject(e.target.value)} maxLength={150}
-                    placeholder="What is this about?" className={inputCls} />
+                  <input id={`${id}-subject`} value={subject} onChange={e => setSubject(e.target.value)} maxLength={150}
+                    placeholder="What is this about?" className={`${inputCls} border-quantum-700`} />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-1.5">Message</label>
-                  <textarea value={message} onChange={e => setMessage(e.target.value)} required
-                    minLength={MIN_MESSAGE} maxLength={MAX_MESSAGE} rows={6}
-                    placeholder="How can we help?" className={`${inputCls} resize-y`} />
-                  <p className="text-right text-[11px] text-gray-600 mt-1">{message.length} / {MAX_MESSAGE}</p>
+                  <label htmlFor={`${id}-message`} className="block text-xs text-gray-400 font-medium mb-1.5">Message</label>
+                  <textarea {...fieldProps('message')} ref={refs.message} value={message} onChange={e => setMessage(e.target.value)}
+                    maxLength={MAX_MESSAGE} rows={6}
+                    placeholder="How can we help?" className={`${inputCls} ${border('message')} resize-y`} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div>{problemNote('message')}</div>
+                    <p className="text-right text-xs text-gray-400 mt-1.5 flex-shrink-0">{message.length} / {MAX_MESSAGE}</p>
+                  </div>
                 </div>
 
                 {/* Honeypot: hidden from people and screen readers; bots tend to fill it in. */}
@@ -114,7 +140,7 @@ export function ContactPage() {
 
                 <button
                   type="submit"
-                  disabled={sending || tooShort}
+                  disabled={sending}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ background: 'linear-gradient(90deg, #00ffcc, #00ccaa)' }}
                 >
@@ -122,10 +148,7 @@ export function ContactPage() {
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                     : <><Send className="w-4 h-4" /> Send message</>}
                 </button>
-                {tooShort && message.length > 0 && (
-                  <p className="text-center text-xs text-gray-600">Please write at least {MIN_MESSAGE} characters.</p>
-                )}
-                <p className="text-center text-xs text-gray-600">
+                <p className="text-center text-xs text-gray-400">
                   We use your details only to reply to you. See our{' '}
                   <Link to="/privacy" className="text-gray-400 underline underline-offset-2 hover:text-quantum-neon">Privacy Policy</Link>.
                 </p>

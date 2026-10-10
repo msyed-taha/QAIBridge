@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, LogIn, Loader2, Zap, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +29,7 @@ export function LoginPage() {
   const [needsSetup, setNeedsSetup] = useState(false);
 
   const isAdmin = mode === 'admin';
+  const id = useId();
 
   // Does any admin exist yet? If not, the admin sign-in offers a one-time setup form.
   useEffect(() => {
@@ -98,13 +99,13 @@ export function LoginPage() {
             <h1 className="text-2xl font-extrabold text-white mb-1">
               {isAdmin ? 'Administrator sign in' : 'Welcome back'}
             </h1>
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-400 text-sm">
               {isAdmin ? 'Manage users and monitor the platform' : 'Sign in to your QAIbridge account'}
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">
+            <div role="alert" className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">
               {error}
             </div>
           )}
@@ -118,32 +119,35 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
+              <label htmlFor={`${id}-email`} className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                 <input
+                  id={`${id}-email`}
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
                   placeholder="you@example.com"
-                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 font-medium mb-1.5">Password</label>
+              <label htmlFor={`${id}-password`} className="block text-xs text-gray-400 font-medium mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                 <input
+                  id={`${id}-password`}
                   type={showPwd ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                 />
                 <RevealPasswordButton shown={showPwd} onToggle={() => setShowPwd(s => !s)} />
               </div>
@@ -171,7 +175,7 @@ export function LoginPage() {
           </form>
 
           {!isAdmin && (
-            <p className="text-center text-gray-600 text-sm mt-6">
+            <p className="text-center text-gray-400 text-sm mt-6">
               Don't have an account?{' '}
               <Link to="/register" state={state?.from ? { from: state.from } : undefined} className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
                 Create one
@@ -179,19 +183,19 @@ export function LoginPage() {
             </p>
           )}
           {isAdmin && (
-            <p className="text-center text-gray-600 text-xs mt-6 leading-relaxed">
-              Sign in with the admin account's <span className="text-gray-500">email address</span>.
-              New admin accounts are created by an existing admin from <span className="text-gray-500">Admin → Users → New account</span>.
+            <p className="text-center text-gray-400 text-xs mt-6 leading-relaxed">
+              Sign in with the admin account's <span className="text-gray-300">email address</span>.
+              New admin accounts are created by an existing admin from <span className="text-gray-300">Admin → Users → New account</span>.
               <br />
-              <Link to="/login" className="text-gray-500 hover:text-gray-300 transition-colors">Not an admin? Regular sign in</Link>
+              <Link to="/login" className="text-gray-300 underline underline-offset-2 hover:text-white transition-colors">Not an admin? Regular sign in</Link>
             </p>
           )}
           </>
           )}
         </div>
 
-        <p className="text-center text-gray-700 text-xs mt-4">
-          <Link to="/" className="hover:text-gray-500 transition-colors">← Back to home</Link>
+        <p className="text-center text-xs mt-4">
+          <Link to="/" className="text-gray-400 hover:text-white transition-colors">← Back to home</Link>
         </p>
       </div>
     </div>

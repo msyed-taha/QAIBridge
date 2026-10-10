@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useId, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Zap, Eye, EyeOff, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { Mail, Lock, User, Zap, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { RevealPasswordButton } from '../components/shared/RevealPasswordButton';
 import { useAuth } from '../context/AuthContext';
 import { detailToMessage } from '../api/client';
 
@@ -62,7 +63,9 @@ function getRequirements(pwd: string): Requirement[] {
 function Steps({ current }: { current: number }) {
   const steps = ['Email', 'Verify email', 'Set password'];
   return (
-    <div className="flex items-center justify-center gap-2 mb-8">
+    <div className="mb-8">
+    <p className="sr-only">Step {current} of {steps.length}: {steps[current - 1]}</p>
+    <div className="flex items-center justify-center gap-2" aria-hidden="true">
       {steps.map((label, i) => {
         const idx     = i + 1;
         const done    = idx < current;
@@ -74,13 +77,13 @@ function Steps({ current }: { current: number }) {
                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                 style={
                   done   ? { background: '#00ffcc',  color: '#000' } :
-                  active ? { background: '#cc44ff',  color: '#fff' } :
-                           { background: '#1f2937', color: '#6b7280' }
+                  active ? { background: '#cc44ff',  color: '#000' } :
+                           { background: '#1f2937', color: '#9ca3af' }
                 }
               >
                 {done ? '✓' : idx}
               </div>
-              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-white' : done ? 'text-quantum-neon' : 'text-gray-600'}`}>
+              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-white' : done ? 'text-quantum-neon' : 'text-gray-400'}`}>
                 {label}
               </span>
             </div>
@@ -90,6 +93,7 @@ function Steps({ current }: { current: number }) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
@@ -102,6 +106,7 @@ export function RegisterPage() {
   const from       = (useLocation().state as { from?: string } | null)?.from;
 
   const [step,     setStep]     = useState<1 | 2 | 3>(1);
+  const id = useId();
   const [email,    setEmail]    = useState('');
   const [otp,      setOtp]      = useState(['', '', '', '', '']);
   const [username, setUsername] = useState('');
@@ -292,7 +297,7 @@ export function RegisterPage() {
               <Zap className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-2xl font-extrabold text-white mb-1">Create your account</h1>
-            <p className="text-gray-500 text-sm">Start exploring quantum computing today</p>
+            <p className="text-gray-400 text-sm">Start exploring quantum computing today</p>
           </div>
 
           <Steps current={step} />
@@ -304,20 +309,23 @@ export function RegisterPage() {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">Email Address</label>
+                <label htmlFor={`${id}-email`} className="block text-xs text-gray-400 font-medium mb-1.5">Email address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-email`}
+                    aria-describedby={`${id}-email-hint`}
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={e => { setEmail(e.target.value); setError(''); }}
                     onKeyDown={e => e.key === 'Enter' && email && sendOtp()}
                     placeholder="you@example.com"
                     autoFocus
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                   />
                 </div>
-                <p className="text-xs text-gray-600 mt-1.5">
+                <p id={`${id}-email-hint`} className="text-xs text-gray-400 mt-1.5">
                   A 5-digit verification code will be sent to this address.
                 </p>
               </div>
@@ -331,7 +339,7 @@ export function RegisterPage() {
                 {loading ? (
                   <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Sending code…</>
                 ) : (
-                  <><Mail className="w-4 h-4" /> Send Verification Code</>
+                  <><Mail className="w-4 h-4" /> Send verification code</>
                 )}
               </button>
             </div>
@@ -355,13 +363,15 @@ export function RegisterPage() {
                     ref={otpRefs[i]}
                     type="text"
                     inputMode="numeric"
+                    autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                    aria-label={`Digit ${i + 1} of 5`}
                     maxLength={1}
                     value={digit}
                     onChange={e => handleOtpChange(i, e.target.value)}
                     onKeyDown={e => handleOtpKeyDown(i, e)}
                     className="w-12 h-14 text-center text-2xl font-bold text-white bg-quantum-900 border-2 rounded-xl focus:outline-none transition-all"
                     style={{
-                      borderColor: digit ? '#00ffcc' : '#374151',
+                      borderColor: digit ? '#00ffcc' : '#6b7280',
                       boxShadow: digit ? '0 0 0 2px #00ffcc20' : 'none',
                     }}
                   />
@@ -377,19 +387,19 @@ export function RegisterPage() {
                 {loading ? (
                   <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Verifying…</>
                 ) : (
-                  <><CheckCircle className="w-4 h-4" /> Verify Code</>
+                  <><CheckCircle className="w-4 h-4" /> Verify code</>
                 )}
               </button>
 
-              <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center justify-between text-xs text-gray-400">
                 <button onClick={() => { setStep(1); setOtp(['','','','','']); setError(''); }}
-                  className="hover:text-gray-400 transition-colors">
+                  className="hover:text-white transition-colors">
                   ← Change email
                 </button>
                 <button
                   onClick={resendOtp}
                   disabled={resendIn > 0 || loading}
-                  className="flex items-center gap-1 hover:text-gray-400 transition-colors disabled:opacity-40 disabled:cursor-default"
+                  className="flex items-center gap-1 hover:text-white transition-colors disabled:opacity-60 disabled:cursor-default"
                 >
                   <RefreshCw className="w-3 h-3" />
                   {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
@@ -410,10 +420,12 @@ export function RegisterPage() {
 
               {/* Username */}
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">Username</label>
+                <label htmlFor={`${id}-username`} className="block text-xs text-gray-400 font-medium mb-1.5">Username</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-username`}
+                    autoComplete="username"
                     ref={fieldRefs.username}
                     type="text"
                     value={username}
@@ -422,7 +434,7 @@ export function RegisterPage() {
                     minLength={3}
                     maxLength={50}
                     autoFocus
-                    className={`w-full bg-quantum-900 border ${needs('username') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
+                    className={`w-full bg-quantum-900 border ${needs('username') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
                   />
                 </div>
               </div>
@@ -430,33 +442,29 @@ export function RegisterPage() {
               {/* Password */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-gray-400 font-medium">Password</label>
+                  <label htmlFor={`${id}-password`} className="text-xs text-gray-400 font-medium">Password</label>
                   <button
                     type="button"
                     onClick={() => { const p = generateStrongPassword(); setPassword(p); setConfirm(p); }}
-                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-quantum-neon transition-colors"
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-quantum-neon transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
                     Suggest strong password
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-password`}
+                    autoComplete="new-password"
                     ref={fieldRefs.password}
                     type={showPwd ? 'text' : 'password'}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     placeholder="Min. 8 chars with A-Z, a-z, 0-9"
-                    className={`w-full bg-quantum-900 border ${needs('password') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors font-mono tracking-wider`}
+                    className={`w-full bg-quantum-900 border ${needs('password') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors font-mono tracking-wider`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPwd(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
-                  >
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <RevealPasswordButton shown={showPwd} onToggle={() => setShowPwd(p => !p)} />
                 </div>
 
                 {/* Strength bar and the password rules (the rules also show once "Create account" is pressed) */}
@@ -478,9 +486,9 @@ export function RegisterPage() {
                         <div key={r.label} className="flex items-center gap-1.5">
                           {r.met
                             ? <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />
-                            : <XCircle    className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                            : <XCircle    className="w-3 h-3 text-gray-500 flex-shrink-0" />
                           }
-                          <span className={`text-[10px] ${r.met ? 'text-green-400' : 'text-gray-600'}`}>
+                          <span className={`text-xs ${r.met ? 'text-green-400' : 'text-gray-400'}`}>
                             {r.label}
                           </span>
                         </div>
@@ -492,29 +500,25 @@ export function RegisterPage() {
 
               {/* Confirm password */}
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">Confirm Password</label>
+                <label htmlFor={`${id}-confirm`} className="block text-xs text-gray-400 font-medium mb-1.5">Confirm password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-confirm`}
+                    autoComplete="new-password"
                     ref={fieldRefs.confirm}
                     type={showCfm ? 'text' : 'password'}
                     value={confirm}
                     onChange={e => { setConfirm(e.target.value); setError(''); }}
                     placeholder="Re-enter your password"
-                    className={`w-full bg-quantum-900 border ${needs('confirm') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
+                    className={`w-full bg-quantum-900 border ${needs('confirm') ? 'border-amber-500/70' : 'border-quantum-700'} rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors`}
                     style={{
                       borderColor: confirm
                         ? confirm === password ? '#22c55e60' : '#ef444460'
                         : undefined
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowCfm(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
-                  >
-                    {showCfm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <RevealPasswordButton shown={showCfm} onToggle={() => setShowCfm(p => !p)} />
                 </div>
                 {confirm && confirm !== password && (
                   <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
@@ -565,7 +569,7 @@ export function RegisterPage() {
           )}
 
           {/* Footer */}
-          <p className="text-center text-gray-600 text-sm mt-6">
+          <p className="text-center text-gray-400 text-sm mt-6">
             Already have an account?{' '}
             <Link to="/login" state={from ? { from } : undefined} className="text-quantum-neon hover:text-teal-300 font-medium transition-colors">
               Sign in
@@ -573,8 +577,8 @@ export function RegisterPage() {
           </p>
         </div>
 
-        <p className="text-center text-gray-700 text-xs mt-4">
-          <Link to="/" className="hover:text-gray-500 transition-colors">← Back to home</Link>
+        <p className="text-center text-xs mt-4">
+          <Link to="/" className="text-gray-400 hover:text-white transition-colors">← Back to home</Link>
         </p>
       </div>
     </div>

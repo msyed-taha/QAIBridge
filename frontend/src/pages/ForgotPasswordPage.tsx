@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Loader2, Zap, CheckCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { detailToMessage, friendlyError } from '../api/client';
@@ -15,6 +15,7 @@ export function ForgotPasswordPage() {
     ? 'linear-gradient(90deg,#f59e0b,#f97316)'
     : 'linear-gradient(90deg, #00ffcc, #00ccaa)';
 
+  const id = useId();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -137,9 +138,9 @@ export function ForgotPasswordPage() {
             {step !== 'success' && (
               <>
                 <h1 className="text-2xl font-extrabold text-white mb-1">
-                  {isAdmin ? 'Reset administrator password' : 'Reset Password'}
+                  {isAdmin ? 'Reset administrator password' : 'Reset your password'}
                 </h1>
-                <p className="text-gray-500 text-sm">
+                <p className="text-gray-400 text-sm">
                   {step === 'email' && (isAdmin ? "Enter the admin account's email to receive a 5-digit code" : 'Enter your email to receive a 5-digit code')}
                   {step === 'otp' && 'Enter the 5-digit code from your email'}
                   {step === 'password' && 'Create a new password'}
@@ -151,15 +152,15 @@ export function ForgotPasswordPage() {
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-400 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="w-8 h-8 text-white" />
                 </div>
-                <h1 className="text-2xl font-extrabold text-white mb-1">Password Reset</h1>
-                <p className="text-gray-500 text-sm">Your password has been successfully changed</p>
+                <h1 className="text-2xl font-extrabold text-white mb-1">Password changed</h1>
+                <p className="text-gray-400 text-sm">Your password has been changed.</p>
               </>
             )}
           </div>
 
           {/* Error */}
           {error && (
-            <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">
+            <div role="alert" className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">
               {error}
             </div>
           )}
@@ -174,16 +175,18 @@ export function ForgotPasswordPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
+                <label htmlFor={`${id}-email`} className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-email`}
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="you@example.com"
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                   />
                 </div>
               </div>
@@ -218,22 +221,25 @@ export function ForgotPasswordPage() {
             >
               {/* Same wording whether or not the account exists, so the page can't be used to probe emails. */}
               <div className="flex gap-2.5 bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-xs text-gray-400 leading-relaxed">
-                <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-gray-500" />
+                <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-gray-400" aria-hidden="true" />
                 <span>
                   If an account exists for <span className="text-gray-200">{email}</span>, you'll receive a
                   5-digit code there shortly. Check your spam folder if it doesn't arrive.
                 </span>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">5-digit code</label>
+                <label htmlFor={`${id}-code`} className="block text-xs text-gray-400 font-medium mb-1.5">5-digit code</label>
                 <input
+                  id={`${id}-code`}
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 5))}
                   required
                   placeholder="00000"
                   maxLength={5}
-                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors text-center font-mono text-lg tracking-widest"
+                  className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors text-center font-mono text-lg tracking-widest"
                 />
               </div>
 
@@ -264,56 +270,58 @@ export function ForgotPasswordPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">New Password</label>
+                <label htmlFor={`${id}-new`} className="block text-xs text-gray-400 font-medium mb-1.5">New password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-new`}
+                    aria-describedby={`${id}-rules`}
                     type={showNew ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => checkPasswordStrength(e.target.value)}
                     required
                     autoComplete="new-password"
                     placeholder="••••••••"
-                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+                    className="w-full bg-quantum-900 border border-quantum-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors"
                   />
                   <RevealPasswordButton shown={showNew} onToggle={() => setShowNew(s => !s)} />
                 </div>
 
-                {/* Password strength indicators */}
-                {newPassword && (
-                  <div className="mt-3 space-y-2 text-xs">
-                    <div className={`flex items-center gap-2 ${passwordStrength.length ? 'text-green-400' : 'text-gray-500'}`}>
-                      <div className={`w-2 h-2 rounded-full ${passwordStrength.length ? 'bg-green-400' : 'bg-gray-600'}`} />
-                      At least 8 characters
-                    </div>
-                    <div className={`flex items-center gap-2 ${passwordStrength.uppercase ? 'text-green-400' : 'text-gray-500'}`}>
-                      <div className={`w-2 h-2 rounded-full ${passwordStrength.uppercase ? 'bg-green-400' : 'bg-gray-600'}`} />
-                      One uppercase letter
-                    </div>
-                    <div className={`flex items-center gap-2 ${passwordStrength.lowercase ? 'text-green-400' : 'text-gray-500'}`}>
-                      <div className={`w-2 h-2 rounded-full ${passwordStrength.lowercase ? 'bg-green-400' : 'bg-gray-600'}`} />
-                      One lowercase letter
-                    </div>
-                    <div className={`flex items-center gap-2 ${passwordStrength.digit ? 'text-green-400' : 'text-gray-500'}`}>
-                      <div className={`w-2 h-2 rounded-full ${passwordStrength.digit ? 'bg-green-400' : 'bg-gray-600'}`} />
-                      One digit
-                    </div>
+                {/* Password rules, ticked off while typing (shown from the start, so the button's
+                    needs are never a mystery) */}
+                <div id={`${id}-rules`} className="mt-3 space-y-2 text-xs">
+                  <div className={`flex items-center gap-2 ${passwordStrength.length ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.length ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    At least 8 characters
                   </div>
-                )}
+                  <div className={`flex items-center gap-2 ${passwordStrength.uppercase ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.uppercase ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One uppercase letter
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordStrength.lowercase ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.lowercase ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One lowercase letter
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordStrength.digit ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${passwordStrength.digit ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One digit
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 font-medium mb-1.5">Confirm Password</label>
+                <label htmlFor={`${id}-confirm`} className="block text-xs text-gray-400 font-medium mb-1.5">Confirm password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" aria-hidden="true" />
                   <input
+                    id={`${id}-confirm`}
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`w-full bg-quantum-900 border rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-700 focus:outline-none transition-colors ${
+                    className={`w-full bg-quantum-900 border rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none transition-colors ${
                       confirmPassword && !passwordsMatch ? 'border-red-600 focus:border-red-500' : 'border-quantum-700 focus:border-quantum-neon/50'
                     }`}
                   />
@@ -335,7 +343,7 @@ export function ForgotPasswordPage() {
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" /> Change Password
+                    <Lock className="w-4 h-4" /> Change password
                   </>
                 )}
               </button>
