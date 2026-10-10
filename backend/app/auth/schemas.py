@@ -3,11 +3,16 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, computed_field, field_validator, model_validator
 
 from ..config import is_admin_email, is_owner_email
+
+
+# An email address in a request, in lower case: "Ali@Gmail.com" and "ali@gmail.com"
+# are the same account, whichever way it is typed.
+Email = Annotated[EmailStr, AfterValidator(lambda v: v.lower())]
 
 
 # ── Password strength validation ──────────────────────────────────────────────
@@ -30,17 +35,17 @@ def _validate_password(v: str) -> str:
 # ── Request models ────────────────────────────────────────────────────────────
 
 class SendOtpRequest(BaseModel):
-    email: EmailStr
+    email: Email
 
 
 class VerifyOtpRequest(BaseModel):
-    email: EmailStr
+    email: Email
     otp:   str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
 
 
 class RegisterRequest(BaseModel):
     username: str      = Field(..., min_length=3, max_length=50)
-    email:    EmailStr
+    email:    Email
     password: str      = Field(..., min_length=8)
     # "I am 13 or older and agree to the Terms of Use and Privacy Policy"
     accept_terms: bool = Field(False, validate_default=True)   # missing counts as "not accepted"
@@ -59,14 +64,14 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email:    EmailStr
+    email:    Email
     password: str
 
 
 class AdminCreateUserRequest(BaseModel):
     """An admin creating an account directly from the dashboard (no email OTP)."""
     username:  str      = Field(..., min_length=3, max_length=50)
-    email:     EmailStr
+    email:     Email
     password:  str      = Field(..., min_length=8)
     role:      str      = Field(default="user", pattern=r"^(user|admin)$")
     is_active: bool      = True
@@ -80,7 +85,7 @@ class AdminCreateUserRequest(BaseModel):
 class AdminSetupRequest(BaseModel):
     """One-time creation of the very first administrator (only works when none exist)."""
     username: str      = Field(..., min_length=3, max_length=50)
-    email:    EmailStr
+    email:    Email
     password: str      = Field(..., min_length=8)
 
     @field_validator("password")
@@ -114,16 +119,16 @@ class DeleteAccountVerifyRequest(BaseModel):
 
 
 class ForgotPasswordSendOtpRequest(BaseModel):
-    email: EmailStr
+    email: Email
 
 
 class ForgotPasswordVerifyOtpRequest(BaseModel):
-    email: EmailStr
+    email: Email
     otp:   str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
 
 
 class ResetPasswordRequest(BaseModel):
-    email:                EmailStr
+    email:                Email
     otp:                  str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
     new_password:         str = Field(..., min_length=8)
     confirm_new_password: str = Field(..., min_length=8)

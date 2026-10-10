@@ -123,7 +123,7 @@ def send_otp_endpoint(req: SendOtpRequest, db: Session = Depends(get_db)):
     # themselves, in which case signing up again restores it (within 30 days;
     # after that it has been erased and this is a brand-new account).
     purge_expired(db)
-    existing = db.query(User).filter(User.email == req.email).first()
+    existing = db.query(User).filter(func.lower(User.email) == req.email).first()
     if existing and existing.deleted_at is None:
         raise HTTPException(400, "An account with this email already exists.")
 
@@ -166,7 +166,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(403, "Please verify your email with the code we sent first.")
 
     purge_expired(db)   # an account deleted over 30 days ago is erased, never restored
-    existing = db.query(User).filter(User.email == req.email).first()
+    existing = db.query(User).filter(func.lower(User.email) == req.email).first()
     if existing and existing.deleted_at is None:
         raise HTTPException(400, "An account with this email already exists.")
 
@@ -206,7 +206,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate and return a JWT token."""
 
-    user = db.query(User).filter(User.email == req.email).first()
+    user = db.query(User).filter(func.lower(User.email) == req.email).first()
     # A self-deleted account answers exactly like an email that was never registered.
     if not user or user.deleted_at is not None or not verify_password(req.password, user.hashed_password):
         raise HTTPException(401, "Invalid email or password.")
@@ -254,7 +254,7 @@ def admin_setup(req: AdminSetupRequest, db: Session = Depends(get_db)):
     if not is_admin_email(req.email):
         raise HTTPException(403, "This email address is not on the administrator allowlist (backend/.env ADMIN_EMAILS).")
 
-    if db.query(User).filter(User.email == req.email).first():
+    if db.query(User).filter(func.lower(User.email) == req.email).first():
         raise HTTPException(400, "An account with this email already exists.")
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(400, "This username is already taken.")
@@ -284,7 +284,7 @@ def forgot_password_send_otp(req: ForgotPasswordSendOtpRequest, db: Session = De
     is registered, so this endpoint can't be used to enumerate accounts —
     only actually emails an OTP if the account exists.
     """
-    user = db.query(User).filter(User.email == req.email).first()
+    user = db.query(User).filter(func.lower(User.email) == req.email).first()
     if user and user.deleted_at is None:   # a deleted account is restored by signing up again
         otp = otp_store.generate(f"forgot-password:{req.email}")
         try:
@@ -328,7 +328,7 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
         raise HTTPException(400, "Passwords do not match.")
 
     # Find user
-    user = db.query(User).filter(User.email == req.email).first()
+    user = db.query(User).filter(func.lower(User.email) == req.email).first()
     if not user:
         raise HTTPException(400, "User not found.")
 

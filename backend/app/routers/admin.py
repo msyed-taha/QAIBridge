@@ -134,7 +134,7 @@ def create_user(req: AdminCreateUserRequest, db: Session = Depends(get_db)):
     Create an account directly, bypassing the email-OTP signup flow. `role` can
     be "user" or "admin". This is how additional admins are made after the first.
     """
-    if db.query(User).filter(User.email == req.email).first():
+    if db.query(User).filter(func.lower(User.email) == req.email).first():
         raise HTTPException(400, "An account with this email already exists.")
     if is_owner_email(req.email):
         # Otherwise another admin could pick the owner's password and take the account over.
