@@ -5,9 +5,9 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator, model_validator
 
-from ..config import is_owner_email
+from ..config import is_admin_email, is_owner_email
 
 
 # ── Password strength validation ──────────────────────────────────────────────
@@ -145,6 +145,15 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @model_validator(mode="after")
+    def _role_the_server_honours(self) -> "UserOut":
+        # The admin role only counts with an allowlisted email (get_current_admin),
+        # so the website isn't told an account is an admin when the server won't
+        # treat it as one: it would show an admin portal where every page fails.
+        if self.role == "admin" and not is_admin_email(self.email):
+            self.role = "user"
+        return self
 
     @computed_field
     @property

@@ -238,6 +238,39 @@ def test_admin_deletes_a_user(client):
         _cleanup(admin.id, target.id)
 
 
+def test_deleting_a_user_removes_their_data_but_keeps_their_messages(client):
+    from datetime import datetime, timezone
+    from app.models.benchmark import BenchmarkRun
+    from app.models.contact import ContactMessage
+    from app.models.learn import LearnProgress
+
+    admin, a_email, a_pw = _mk_user(role=ROLE_ADMIN)
+    target, t_email, _ = _mk_user(role=ROLE_USER)
+    db = SessionLocal()
+    db.add_all([
+        LearnProgress(user_id=target.id, lesson="superposition", stars=3, quiz_score=3, completed_at=datetime.now(timezone.utc)),
+        BenchmarkRun(user_id=target.id, kind="sfod", title="A saved run", summary={}),
+        ContactMessage(name="Test", email=t_email, message="A message sent while signed in.", user_id=target.id),
+    ])
+    db.commit()
+    db.close()
+    try:
+        h = {"Authorization": f"Bearer {_token(client, a_email, a_pw)}"}
+        assert client.delete(f"/api/admin/users/{target.id}", headers=h).status_code == 204
+        db = SessionLocal()
+        assert db.query(LearnProgress).filter(LearnProgress.user_id == target.id).count() == 0
+        assert db.query(BenchmarkRun).filter(BenchmarkRun.user_id == target.id).count() == 0
+        [msg] = db.query(ContactMessage).filter(ContactMessage.email == t_email).all()
+        assert msg.user_id is None          # the message stays in the inbox, unlinked
+        db.close()
+    finally:
+        db = SessionLocal()
+        db.query(ContactMessage).filter(ContactMessage.email == t_email).delete()
+        db.commit()
+        db.close()
+        _cleanup(admin.id, target.id)
+
+
 # ── 4. Self-lockout guards ──────────────────────────────────────────────────
 
 def test_admin_cannot_demote_deactivate_or_delete_self(client):
@@ -257,8 +290,11 @@ def test_role_admin_in_db_is_not_enough_without_allowlisted_email(client):
     """A row flipped to role='admin' straight in the DB must still be denied."""
     outsider, email, pw = _mk_user(role=ROLE_ADMIN, email=f"outsider_{uuid.uuid4().hex[:8]}@outsider-not-admin.com")
     try:
-        tok = _token(client, email, pw)
-        h = {"Authorization": f"Bearer {tok}"}
+        r = client.post("/api/auth/login", json={"email": email, "password": pw})
+        # ...and the website is told it's a normal user, so it shows no admin portal
+        assert r.status_code == 200 and r.json()["user"]["role"] == "user"
+        h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert client.get("/api/auth/me", headers=h).json()["role"] == "user"
         assert client.get("/api/admin/stats", headers=h).status_code == 403
         assert client.get("/api/admin/users", headers=h).status_code == 403
     finally:
