@@ -122,10 +122,10 @@ export function Home() {
             </div>
 
             {/* Proof points */}
-            <ul className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 mt-8 text-xs sm:text-sm text-gray-500">
+            <ul className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 mt-8 text-xs sm:text-sm text-gray-400">
               {HERO_PROOF.map(({ icon: Icon, text }) => (
                 <li key={text} className="flex items-center gap-1.5">
-                  <Icon className="w-4 h-4 text-quantum-neon" />
+                  <Icon className="w-4 h-4 text-quantum-neon" aria-hidden="true" />
                   {text}
                 </li>
               ))}
@@ -140,7 +140,7 @@ export function Home() {
           <div className="text-center mb-16">
             <p className="text-quantum-neon text-xs font-semibold uppercase tracking-widest mb-3">See it in action</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Real results, straight from the app</h2>
-            <p className="text-gray-500 text-sm max-w-xl mx-auto">
+            <p className="text-gray-400 text-sm max-w-xl mx-auto">
               Every screenshot below is a real run on QAIbridge. Nothing is mocked up.
             </p>
           </div>
@@ -191,9 +191,9 @@ export function Home() {
                         <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
                         <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
                         <span className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
-                        <span className="ml-3 text-[11px] text-gray-500 font-mono truncate">QAIbridge · {s.label}</span>
+                        <span className="ml-3 text-xs text-gray-400 font-mono truncate" aria-hidden="true">QAIbridge · {s.label}</span>
                       </div>
-                      <a href={s.image.src} target="_blank" rel="noreferrer" title="Open full size">
+                      <a href={s.image.src} target="_blank" rel="noreferrer" title="Open full size in a new tab">
                         <img
                           src={s.image.src}
                           width={s.image.width}
@@ -203,6 +203,7 @@ export function Home() {
                           decoding="async"
                           className="block w-full h-auto"
                         />
+                        <span className="sr-only"> (opens full size in a new tab)</span>
                       </a>
                     </div>
                   </figure>
@@ -221,14 +222,14 @@ export function Home() {
       </section>
 
       {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 text-center">
-        <div className="max-w-2xl mx-auto">
+      <section className="relative overflow-hidden py-20 px-6 text-center">
+        <div className="relative max-w-2xl mx-auto">
           <div className="absolute left-1/2 -translate-x-1/2 w-96 h-32 bg-teal-500 opacity-5 rounded-full blur-3xl pointer-events-none" />
-          <Users className="w-10 h-10 text-quantum-neon mx-auto mb-5 opacity-80" />
+          <Users className="w-10 h-10 text-quantum-neon mx-auto mb-5 opacity-80" aria-hidden="true" />
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
             Ready to explore quantum computing?
           </h2>
-          <p className="text-gray-500 text-base mb-8 leading-relaxed">
+          <p className="text-gray-400 text-base mb-8 leading-relaxed">
             Create your account to start using the simulator, the problem solver
             and the other tools.
           </p>

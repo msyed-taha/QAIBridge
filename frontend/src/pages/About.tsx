@@ -53,7 +53,7 @@ const AUDIENCE = [
 const TRUST = [
   {
     icon: ShieldCheck, title: 'Checked against IBM Qiskit',
-    desc: "Our simulator gives the same results as IBM's Qiskit on more than 200 test circuits.",
+    desc: "Our simulator gives the same results as IBM's Qiskit on more than 70 test circuits, including Grover, Shor, QFT and QAOA.",
   },
   {
     icon: CheckCircle, title: 'Every answer double-checked',
@@ -140,7 +140,7 @@ export function About() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">What you can do</h2>
-            <p className="text-gray-500 text-sm">Nothing to install, and no quantum hardware needed.</p>
+            <p className="text-gray-400 text-sm">Nothing to install, and no quantum hardware needed.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -152,13 +152,13 @@ export function About() {
                     <Icon className="w-5 h-5 text-white" />
                   </div>
                   <h3 className="text-white font-semibold text-base mb-2">{f.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                  <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
                 </div>
               );
             })}
           </div>
 
-          <p className="flex items-start sm:items-center justify-center gap-2 text-gray-500 text-sm mt-6 text-center">
+          <p className="flex items-start sm:items-center justify-center gap-2 text-gray-400 text-sm mt-6 text-center">
             <Sparkles className="w-4 h-4 text-quantum-purple flex-shrink-0 mt-0.5 sm:mt-0" />
             <span>Plus research tools: AI that tunes quantum circuits, and a converter that turns classical neural networks into quantum ones.</span>
           </p>
@@ -176,7 +176,7 @@ export function About() {
                 <div key={a.title} data-tilt className="glass-card rounded-2xl p-5">
                   <Icon className="w-6 h-6 text-quantum-neon mb-3" />
                   <h3 className="text-white font-semibold text-base mb-1.5">{a.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{a.desc}</p>
+                  <p className="text-gray-400 text-sm leading-relaxed">{a.desc}</p>
                 </div>
               );
             })}
@@ -196,7 +196,7 @@ export function About() {
                   <Icon className="w-5 h-5 text-quantum-neon flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-white font-semibold text-sm mb-1.5">{t.title}</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed">{t.desc}</p>
+                    <p className="text-gray-400 text-sm leading-relaxed">{t.desc}</p>
                   </div>
                 </div>
               );

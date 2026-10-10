@@ -105,7 +105,7 @@ export function QAIBridgeLogo({ size = 40, showText = true }: Props) {
               bridge
             </span>
           </span>
-          <span className="text-[10px] text-gray-500 mt-0.5 tracking-wide">
+          <span className="text-[10px] text-gray-400 mt-0.5 tracking-wide">
             Quantum Simulation Platform
           </span>
         </div>
