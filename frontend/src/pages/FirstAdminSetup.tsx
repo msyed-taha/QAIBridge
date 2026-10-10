@@ -1,18 +1,15 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Loader2, ShieldCheck, Rocket } from 'lucide-react';
 import { detailToMessage, friendlyError } from '../api/client';
+import { RevealPasswordButton } from '../components/shared/RevealPasswordButton';
+import { PasswordChecklist, passwordOk } from '../components/shared/PasswordRules';
 
 interface Props {
   /** Called with the login token + user after the first admin is created. */
   onCreated: (token: string, user: { id: number; username: string; email: string; role: 'user' | 'admin' }) => void;
 }
 
-const PW_RULES = [
-  { test: (p: string) => p.length >= 8, label: '8+ characters' },
-  { test: (p: string) => /[A-Z]/.test(p), label: 'uppercase' },
-  { test: (p: string) => /[a-z]/.test(p), label: 'lowercase' },
-  { test: (p: string) => /\d/.test(p), label: 'a digit' },
-];
+const FIELD = 'w-full bg-quantum-900 border rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-quantum-neon/50 transition-colors';
 
 /**
  * One-time first-administrator creation. Shown on the Admin login tab only
@@ -22,15 +19,36 @@ export function FirstAdminSetup({ onCreated }: Props) {
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd]   = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  // The button was pressed with something missing: say what, beside the field.
+  const [tried, setTried]       = useState(false);
 
-  const pwOk = PW_RULES.every(r => r.test(password));
-  const canSubmit = username.trim().length >= 3 && email.includes('@') && pwOk;
+  const id = useId();
+  const refs = { username: useRef<HTMLInputElement>(null), email: useRef<HTMLInputElement>(null), password: useRef<HTMLInputElement>(null) };
+  const problems = {
+    username: username.trim().length < 3 ? 'At least 3 characters.' : null,
+    email:    !/^\S+@\S+\.\S+$/.test(email.trim()) ? 'A valid email address.' : null,
+    password: !passwordOk(password) ? 'A password that meets all 4 rules below.' : null,
+  };
+  const shown = (field: keyof typeof problems) => (tried ? problems[field] : null);
+  const fieldProps = (field: keyof typeof problems) => ({
+    id: `${id}-${field}`,
+    ref: refs[field],
+    'aria-invalid': !!shown(field),
+    'aria-describedby': shown(field) ? `${id}-${field}-problem` : undefined,
+  });
+  const problemNote = (field: keyof typeof problems) =>
+    shown(field) && <p id={`${id}-${field}-problem`} className="text-amber-300 text-xs mt-1.5">{shown(field)}</p>;
+  const border = (field: keyof typeof problems) => (shown(field) ? 'border-amber-500/70' : 'border-quantum-700');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setTried(true);
+    const firstMissing = (Object.keys(problems) as (keyof typeof problems)[]).find(f => problems[f]);
+    if (firstMissing) { refs[firstMissing].current?.focus(); return; }
     setLoading(true);
     try {
       const res = await fetch('/api/auth/admin-setup', {
@@ -55,61 +73,61 @@ export function FirstAdminSetup({ onCreated }: Props) {
           <Rocket className="w-6 h-6 text-white" />
         </div>
         <h1 className="text-2xl font-extrabold text-white mb-1">Create the first administrator</h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-gray-400 text-sm">
           No admin account exists yet. Set one up to manage the platform.
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">{error}</div>
+        <div role="alert" className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm mb-6">{error}</div>
       )}
 
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div>
-          <label className="block text-xs text-gray-400 font-medium mb-1.5">Username</label>
+          <label htmlFor={`${id}-username`} className="block text-xs text-gray-400 font-medium mb-1.5">Username</label>
           <input
+            {...fieldProps('username')}
             value={username}
             onChange={e => setUsername(e.target.value)}
-            required
-            minLength={3}
-            className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-quantum-neon/50 transition-colors"
+            maxLength={50}
+            autoComplete="username"
+            className={`${FIELD} ${border('username')}`}
           />
+          {problemNote('username')}
         </div>
         <div>
-          <label className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
+          <label htmlFor={`${id}-email`} className="block text-xs text-gray-400 font-medium mb-1.5">Email</label>
           <input
+            {...fieldProps('email')}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            required
+            autoComplete="email"
             placeholder="you@example.com"
-            className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
+            className={`${FIELD} ${border('email')}`}
           />
+          {problemNote('email')}
         </div>
         <div>
-          <label className="block text-xs text-gray-400 font-medium mb-1.5">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            placeholder="••••••••"
-            className="w-full bg-quantum-900 border border-quantum-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-quantum-neon/50 transition-colors"
-          />
-          {password && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]">
-              {PW_RULES.map(r => (
-                <span key={r.label} className={r.test(password) ? 'text-green-400' : 'text-gray-500'}>
-                  {r.test(password) ? '✓' : '○'} {r.label}
-                </span>
-              ))}
-            </div>
-          )}
+          <label htmlFor={`${id}-password`} className="block text-xs text-gray-400 font-medium mb-1.5">Password</label>
+          <div className="relative">
+            <input
+              {...fieldProps('password')}
+              type={showPwd ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="new-password"
+              className={`${FIELD} ${border('password')} pr-10`}
+            />
+            <RevealPasswordButton shown={showPwd} onToggle={() => setShowPwd(s => !s)} />
+          </div>
+          {problemNote('password')}
+          {(password || tried) && <PasswordChecklist password={password} />}
         </div>
 
         <button
           type="submit"
-          disabled={loading || !canSubmit}
+          disabled={loading}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-black transition-all hover:brightness-110 hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
           style={{ background: 'linear-gradient(90deg,#f59e0b,#f97316)' }}
         >

@@ -36,7 +36,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
             to="/app"
             className="inline-block px-4 py-2 rounded-lg bg-quantum-neon text-black font-semibold text-sm hover:brightness-110 transition-all"
           >
-            Go to your dashboard
+            Go to the home page
           </Link>
         </div>
       </div>
