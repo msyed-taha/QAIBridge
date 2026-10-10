@@ -4,10 +4,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Cpu, LogOut, ArrowRight, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
+import { adminApi, onMessagesChanged } from '../../api/admin';
 import { TOOLS, TOOL_GROUPS, isToolAt, toolsIn } from '../../tools';
 
 // `section`: also highlighted on the pages under it (/learn/… for Learn).
-type NavLink = { path: string; label: string; section?: boolean };
+// `showsUnread`: carries the number of unread Contact-form messages.
+type NavLink = { path: string; label: string; section?: boolean; showsUnread?: boolean };
 const isNavActive = (link: NavLink, pathname: string) =>
   pathname === link.path || (!!link.section && pathname.startsWith(link.path + '/'));
 
@@ -34,7 +36,7 @@ const groupLabel = (id: string) => TOOL_GROUPS.find(g => g.id === id)?.label;
 const ADMIN_NAV: NavLink[] = [
   { path: '/admin',       label: 'Dashboard' },
   { path: '/admin/users', label: 'Users' },
-  { path: '/admin/messages', label: 'Messages' },
+  { path: '/admin/messages', label: 'Messages', showsUnread: true },
 ];
 
 // Closes an open menu once the person is done with it: a click or tap outside
@@ -63,6 +65,39 @@ function useDismiss(open: boolean, setOpen: (open: boolean) => void,
   }, [open, setOpen, area, button]);
 }
 
+// Admins in the portal: how many Contact-form messages are unread. Checked on
+// every page, when the browser tab comes back into view, and after a message is
+// read, un-read or deleted.
+function useUnreadMessages(enabled: boolean, pageKey: string) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    const load = () => adminApi.unreadCount()
+      .then(n => { if (live) setCount(n); })
+      .catch(() => { /* keep the last count */ });
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    load();
+    document.addEventListener('visibilitychange', onVisible);
+    const stopListening = onMessagesChanged(load);
+    return () => {
+      live = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      stopListening();
+    };
+  }, [enabled, pageKey]);
+  return enabled ? count : 0;
+}
+
+// The count beside "Messages" (99+ past that), read out as "3 unread".
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span className="relative ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-amber-400 text-black text-xs font-bold leading-none">
+      {count > 99 ? '99+' : count}<span className="sr-only"> unread</span>
+    </span>
+  );
+}
+
 export function Navbar() {
   const { pathname, key }          = useLocation();
   const navigate                   = useNavigate();
@@ -87,6 +122,7 @@ export function Navbar() {
   // Admins see the portal nav only inside /admin; everywhere else they get the normal app.
   const inAdminView = isAdmin && pathname.startsWith('/admin');
   const NAV_LINKS = !isAuthed ? PUBLIC_NAV : inAdminView ? ADMIN_NAV : AUTH_NAV;
+  const unread = useUnreadMessages(inAdminView, key);
   const viewSwitch = inAdminView
     ? { to: '/app',   label: 'Open the app', Icon: Cpu }
     : { to: '/admin', label: 'Admin portal', Icon: ShieldCheck };
@@ -131,6 +167,7 @@ export function Navbar() {
                   style={isActive ? { backgroundImage: 'linear-gradient(90deg, #00ffcc, #cc44ff)' } : {}}>
                   {label}
                 </span>
+                {link.showsUnread && unread > 0 && <UnreadBadge count={unread} />}
               </Link>
             );
           })}
@@ -282,6 +319,7 @@ export function Navbar() {
                 }`}
               >
                 {label}
+                {link.showsUnread && unread > 0 && <UnreadBadge count={unread} />}
               </Link>
             );
           })}

@@ -135,9 +135,12 @@ def test_admin_inbox(client):
     email = f"inbox_{uuid.uuid4().hex[:8]}@example.com"
     try:
         h = _auth(client, a_email, a_pw)
+        unread = lambda: client.get("/api/admin/messages/unread-count", headers=h).json()["unread"]
         before = client.get("/api/admin/stats", headers=h).json()["unread_messages"]
+        assert unread() == before
         client.post("/api/contact", json=_body(email))
         assert client.get("/api/admin/stats", headers=h).json()["unread_messages"] == before + 1
+        assert unread() == before + 1
 
         msg = next(m for m in client.get("/api/admin/messages", headers=h).json() if m["email"] == email)
         assert not msg["is_read"]
@@ -146,10 +149,16 @@ def test_admin_inbox(client):
         r = client.patch(f"/api/admin/messages/{msg['id']}", json={"is_read": True}, headers=h)
         assert r.status_code == 200 and r.json()["is_read"]
         assert all(m["id"] != msg["id"] for m in client.get("/api/admin/messages?unread=true", headers=h).json())
+        assert unread() == before
+
+        # marked unread again, then deleted while unread: the count follows
+        client.patch(f"/api/admin/messages/{msg['id']}", json={"is_read": False}, headers=h)
+        assert unread() == before + 1
 
         assert client.delete(f"/api/admin/messages/{msg['id']}", headers=h).status_code == 204
         assert client.delete(f"/api/admin/messages/{msg['id']}", headers=h).status_code == 404
         assert _messages_from(email) == []
+        assert unread() == before
     finally:
         _cleanup(email, admin_id)
 
@@ -160,5 +169,7 @@ def test_normal_users_cannot_read_the_inbox(client):
         h = _auth(client, email, pw)
         assert client.get("/api/admin/messages", headers=h).status_code == 403
         assert client.get("/api/admin/messages").status_code == 403
+        assert client.get("/api/admin/messages/unread-count", headers=h).status_code == 403
+        assert client.get("/api/admin/messages/unread-count").status_code == 403
     finally:
         _cleanup(email, uid)

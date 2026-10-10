@@ -3,6 +3,17 @@ import type { AdminStats, AdminUser, ContactMessage, Role } from '../types';
 
 const BASE = '/api/admin';
 
+// The admin menu shows how many messages are unread. Reading, un-reading or
+// deleting one here tells it to check again.
+const MESSAGES_CHANGED = 'qai:messages-changed';
+const messagesChanged = () => window.dispatchEvent(new Event(MESSAGES_CHANGED));
+
+/** Calls `listener` whenever a message is read, un-read or deleted. Returns a function that stops listening. */
+export function onMessagesChanged(listener: () => void) {
+  window.addEventListener(MESSAGES_CHANGED, listener);
+  return () => window.removeEventListener(MESSAGES_CHANGED, listener);
+}
+
 export interface UserFilters {
   search?: string;
   role?:   Role;
@@ -47,14 +58,22 @@ export const adminApi = {
     return data;
   },
 
+  /** How many Contact-form messages are still unread. */
+  unreadCount: async (): Promise<number> => {
+    const { data } = await apiClient.get<{ unread: number }>(`${BASE}/messages/unread-count`);
+    return data.unread;
+  },
+
   /** Mark a message read or unread. */
   markMessage: async (id: number, is_read: boolean): Promise<ContactMessage> => {
     const { data } = await apiClient.patch<ContactMessage>(`${BASE}/messages/${id}`, { is_read });
+    messagesChanged();
     return data;
   },
 
   /** Delete a message. */
   deleteMessage: async (id: number): Promise<void> => {
     await apiClient.delete(`${BASE}/messages/${id}`);
+    messagesChanged();
   },
 };

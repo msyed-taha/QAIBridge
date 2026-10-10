@@ -13,6 +13,7 @@ Routes:
   PATCH  /api/admin/users/{user_id}  – change is_active and/or role
   DELETE /api/admin/users/{user_id}  – delete a user
   GET    /api/admin/messages         – Contact-form messages, newest first
+  GET    /api/admin/messages/unread-count – how many are unread (for the admin menu)
   PATCH  /api/admin/messages/{id}    – mark a message read / unread
   DELETE /api/admin/messages/{id}    – delete a message
 
@@ -260,6 +261,16 @@ def list_messages(
     if unread is not None:
         q = q.filter(ContactMessage.is_read.is_(not unread))
     return [ContactMessageOut.model_validate(m) for m in q.order_by(ContactMessage.created_at.desc(), ContactMessage.id.desc()).all()]
+
+
+class UnreadCount(BaseModel):
+    unread: int
+
+
+@router.get("/messages/unread-count", response_model=UnreadCount)
+def unread_count(db: Session = Depends(get_db)):
+    """Just the number of unread messages: the admin menu checks it on every page."""
+    return UnreadCount(unread=db.query(func.count(ContactMessage.id)).filter(ContactMessage.is_read.is_(False)).scalar() or 0)
 
 
 @router.patch("/messages/{message_id}", response_model=ContactMessageOut)
