@@ -106,13 +106,13 @@ export function GameLevels({ title, levels, children }: {
         <h3 className="text-white font-bold text-lg">{title}</h3>
         <span className="flex items-center gap-0.5" role="img" aria-label={`${stars} of ${levels.length} stars`}>
           {levels.map((_, i) => (
-            <Star key={i} className={`w-5 h-5 ${i < stars ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
+            <Star key={i} className={`w-5 h-5 ${i < stars ? 'text-amber-400 fill-amber-400' : 'text-gray-500'}`} />
           ))}
         </span>
       </div>
       <p className="text-sm text-gray-400 mb-4">
         Level {level + 1} of {levels.length}
-        {bestStars > 0 && <span className="text-gray-500"> · Your best: {bestStars} of {levels.length} stars</span>}
+        {bestStars > 0 && <span className="text-gray-400"> · Your best: {bestStars} of {levels.length} stars</span>}
       </p>
       <p className="text-gray-200 mb-6">{levels[level].goal}</p>
 

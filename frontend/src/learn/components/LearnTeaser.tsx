@@ -75,7 +75,7 @@ export function LearnTeaser() {
             );
           })}
         </ol>
-        <p className="mt-3 px-1 text-sm text-gray-500">
+        <p className="mt-3 px-1 text-sm text-gray-400">
           + {LESSONS.length - FREE_LESSON_COUNT} more lessons, from gates to Shor's algorithm, with an account.
         </p>
       </div>

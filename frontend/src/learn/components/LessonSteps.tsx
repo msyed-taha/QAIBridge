@@ -60,7 +60,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
                   <span className="block h-1.5 rounded-full mb-2 transition-colors"
                     style={{ background: i <= step ? ACCENT_FILL : 'rgba(119,119,238,.25)' }} />
                   <span className={`flex items-center gap-1.5 text-sm transition-colors group-focus-visible:underline ${
-                    current ? 'text-white font-semibold' : i <= reached ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                    current ? 'text-white font-semibold' : i <= reached ? 'text-gray-200 hover:text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                     {done && !current ? <Check className="w-4 h-4 text-quantum-neon" /> : <p.icon className="w-4 h-4" />}
                     {p.label}
                   </span>
@@ -73,6 +73,8 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
 
       {PARTS.map((p, i) => (
         <section key={p.id} hidden={i !== step} aria-label={p.label} className="glass-card rounded-2xl p-6 sm:p-8">
+          {/* The step's name as a heading, so the lesson's headings go title → step → section */}
+          <h2 className="sr-only">{p.label}</h2>
           {parts[p.id]}
         </section>
       ))}

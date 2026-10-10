@@ -159,7 +159,7 @@ function Stars({ count }: { count: number }) {
   return (
     <span className="inline-flex items-center gap-0.5" role="img" aria-label={`${count} of 3 stars`}>
       {[0, 1, 2].map(i => (
-        <Star key={i} className={`w-3.5 h-3.5 ${i < count ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
+        <Star key={i} className={`w-3.5 h-3.5 ${i < count ? 'text-amber-400 fill-amber-400' : 'text-gray-500'}`} />
       ))}
     </span>
   );
