@@ -28,9 +28,9 @@ from .memory_manager import MAX_QUBITS
 
 MAX_SOURCE_CHARS = 200_000
 MAX_GATES = 5_000
-# Gates × 2^qubits a single run may cost: about two minutes at 28 qubits.
+# Gates × 2^qubits a single run may cost: 600 gates at 28 qubits, 2–5 minutes depending on the gates.
 MAX_WORK = 600 * 2 ** 28
-SECONDS_PER_GATE_AT_28 = 0.21          # measured on the development machine
+SECONDS_PER_GATE_AT_28 = 0.5           # slowest gate type, measured on the development machine
 MAX_GATE_NESTING = 64
 
 _UNSUPPORTED_KEYWORDS = {

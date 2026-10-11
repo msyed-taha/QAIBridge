@@ -14,12 +14,20 @@ export function formatBytes(bytes: number): string {
   return `${shown} ${UNITS[u]}`;
 }
 
-/** 50%, 94.53%, 99.9988% (never rounds a near-certain chance up to 100%), 0.0244%, < 0.01%. */
+/** 1 in 2,048 · 1 in 14 million · 1 in 3.2 billion */
+function oneIn(p: number): string {
+  const n = 1 / p;
+  if (n < 1e6) return `1 in ${Math.round(n).toLocaleString()}`;
+  const [v, unit] = n < 1e9 ? [n / 1e6, 'million'] : [n / 1e9, 'billion'];
+  return `1 in ${v < 10 ? v.toFixed(1) : Math.round(v)} ${unit}`;
+}
+
+/** 50%, 94.53%, 99.9988% (never rounds a near-certain chance up to 100%), 0.0244%, and below 0.01% "1 in 14 million". */
 export function formatChance(p: number): string {
   if (p >= 1 - 1e-12) return '100%';
   if (p <= 0) return '0%';
   const pct = p * 100;
-  if (pct < 0.01) return '< 0.01%';
+  if (pct < 0.01) return oneIn(p);
   if (pct < 10) return `${Number(pct.toPrecision(3))}%`;
   let digits = 2;
   while (digits < 8 && Number(pct.toFixed(digits)) >= 100) digits++;

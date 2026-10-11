@@ -2,7 +2,7 @@ import type { SimulationResult } from '../../types';
 import { formatChance, ket } from './format';
 
 const MAX_ROWS = 16;
-const SHOWN_FROM = 1e-4;          // rows below 0.01 % are noise next to the peaks
+const SHOWN_FROM = 1e-4;          // rows under 1/10,000 of the most likely one are noise next to the peaks
 
 /**
  * The most likely outcomes as a table: each outcome's exact chance (a bar and a
@@ -13,8 +13,10 @@ export function OutcomeTable({ result, shots }: { result: SimulationResult; shot
   const labels = result.labels ?? Array.from({ length: n }, (_, i) => `q${i}`);
   const order = labels.length <= 4 ? labels.join(', ') : `${labels.slice(0, 3).join(', ')} and so on`;
   const all = Object.entries(result.probabilities).sort(([, a], [, b]) => b - a);
-  const rows = all.filter(([, p]) => p >= SHOWN_FROM).slice(0, MAX_ROWS);
-  const top = rows[0]?.[1] ?? 1;
+  const top = all[0]?.[1] ?? 1;
+  const rows = all.filter(([, p]) => p >= top * SHOWN_FROM).slice(0, MAX_ROWS);
+  // When every chance is far below 1 in 1,024, the measurements almost never repeat an outcome.
+  const thin = top * shots < 1;
   const possible = (2 ** n).toLocaleString();
 
   return (
@@ -56,6 +58,8 @@ export function OutcomeTable({ result, shots }: { result: SimulationResult; shot
           ? <>The {rows.length} most likely of {possible} possible outcomes. </>
           : <>Every outcome with a chance, out of {possible} possible. </>}
         "Seen" counts how often each came up in {shots.toLocaleString()} measurements.
+        {thin && <> With chances this small, the measurements almost never land on the same outcome twice, so these
+          were rarely or never seen.</>}{' '}
         Read each outcome left to right as {order}. (Qiskit writes the same outcome right to left.)
       </p>
     </div>

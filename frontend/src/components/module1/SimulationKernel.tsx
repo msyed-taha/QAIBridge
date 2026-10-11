@@ -76,7 +76,7 @@ function NormLine({ check, n }: { check: Extract<TheoryCheck, { kind: 'norm' }>;
         : <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" aria-hidden="true" />}
       <span>
         {check.passed ? <>All 2<sup>{n}</sup> chances add up to 100%</> : <>The chances add up to {check.total}, not 100%</>}
-        {' '}(off by <Tiny x={check.max_error} />).
+        {' '}{check.max_error === 0 ? <>(to 10 decimal places).</> : <>(off by <Tiny x={check.max_error} />).</>}
       </span>
     </p>
   );
