@@ -11,6 +11,7 @@ import type { LessonRecorder } from '../../learn/useLearnProgress';
 import { NO_PROGRESS } from '../../learn/progress';
 import { ACCENT_FILL } from '../../learn/colors';
 import { SignUpButtons } from './SignUpButtons';
+import { usePageDetails } from '../../components/ai/pageDetails';
 
 /** One lesson: a short header, the lesson's steps, and previous / next.
  *  Signed-out visitors see a sign-in prompt instead on non-free lessons. */
@@ -19,6 +20,9 @@ export function LessonPage() {
   const { isAuthed, loading } = useAuth();
   const lesson = lessonBySlug(slug);
   const { progress, record } = useLearnProgress();
+  const locked = !!lesson && !isAuthed && !lesson.free;
+  usePageDetails('lesson', lesson && !locked
+    ? `Lesson ${lesson.n} of ${LESSONS.length}: ${lesson.title}. ${lesson.summary}` : null);
   const lessonSlug = lesson?.slug;
   const best = (lessonSlug && progress[lessonSlug]) || NO_PROGRESS;
   // The game and the quiz save into this lesson's progress through this.
@@ -42,7 +46,6 @@ export function LessonPage() {
     );
   }
 
-  const locked = !isAuthed && !lesson.free;
   const Body = LESSON_BODIES[lesson.slug];
   const index = LESSONS.indexOf(lesson);
   const prev = LESSONS[index - 1];

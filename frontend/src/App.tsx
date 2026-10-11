@@ -9,6 +9,7 @@ import { Navbar }          from './components/layout/Navbar';
 import { Footer }          from './components/layout/Footer';
 import { AppBackground }   from './components/layout/AppBackground';
 import { TiltCards }       from './components/layout/TiltCards';
+import { AssistantProvider } from './components/ai/AskQAIbridge';
 // Public pages are small and load with the site, so visitors see them instantly.
 import { Home }            from './pages/Home';
 import { About }           from './pages/About';
@@ -100,6 +101,7 @@ export default function App() {
       <ScrollToTop />
       <AuthProvider>
         <ErrorBoundary>
+          <AssistantProvider>
           {/* No background colour here, so the backdrop behind it shows through. */}
           <div className="min-h-screen flex flex-col text-white">
             <AppBackground />
@@ -151,6 +153,7 @@ export default function App() {
             </main>
             <Footer />
           </div>
+          </AssistantProvider>
         </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>

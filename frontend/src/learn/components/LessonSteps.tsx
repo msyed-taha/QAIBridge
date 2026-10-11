@@ -5,9 +5,18 @@ import { BookOpen, Eye, Gamepad2, ListChecks, Check, ArrowLeft, ArrowRight } fro
 import type { LucideIcon } from 'lucide-react';
 import { lessonPath } from '../lessons';
 import { ACCENT_FILL, BRAND_FILL } from '../colors';
+import { usePageDetails } from '../../components/ai/pageDetails';
 import type { Lesson } from '../lessons';
 
 export type PartId = 'read' | 'see' | 'play' | 'test';
+
+// What each step is, for Ask QAIbridge.
+const STEP_MEANING: Record<PartId, string> = {
+  read: 'a short reading',
+  see: 'an interactive picture',
+  play: 'a small game',
+  test: 'a short quiz',
+};
 
 // The four steps every lesson has, in order.
 export const PARTS: { id: PartId; label: string; icon: LucideIcon }[] = [
@@ -30,6 +39,7 @@ export function LessonSteps({ parts }: { parts: Record<PartId, ReactNode> }) {
   const [reached, setReached] = useState(0);
   const next = useContext(NextLessonContext);
   const last = PARTS.length - 1;
+  usePageDetails('lesson-step', `They are on step ${step + 1} of ${PARTS.length}, "${PARTS[step].label}": ${STEP_MEANING[PARTS[step].id]}.`);
 
   const go = (i: number) => {
     setStep(i);

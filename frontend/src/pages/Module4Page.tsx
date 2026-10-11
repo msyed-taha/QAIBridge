@@ -8,6 +8,7 @@ import { advisorApi, type Advice, type AdvisorMode } from '../api/advisor';
 import { aiApi, type AIStatus } from '../api/ai';
 import { getApiErrorMessage } from '../api/client';
 import { AIStatusLine, WrittenByAI } from '../components/ai/AIStatus';
+import { usePageDetails } from '../components/ai/pageDetails';
 
 // Recommended algorithm → the SFOD task that solves it on the user's own data (FE-3)
 const SOLVE_TARGET: Record<string, { type: string; label: string }> = {
@@ -78,12 +79,11 @@ function Fact({ label, value, on }: { label: string; value: string; on?: boolean
 export function Module4Page() {
   const location = useLocation();
   const navigate = useNavigate();
-  // A question asked on the app home page arrives as router state and is analysed straight away.
-  const [handoff] = useState(() => {
-    const p = (location.state as { problem?: unknown } | null)?.problem;
-    return typeof p === 'string' && p.trim() ? p : null;
-  });
-  const [text, setText]                 = useState(handoff ?? '');
+  // A question handed over (from the app home page, or by Ask QAIbridge) arrives as router state
+  // and is analysed straight away, even when this page is already open.
+  const handed = (location.state as { problem?: unknown } | null)?.problem;
+  const incoming = typeof handed === 'string' && handed.trim() ? handed : null;
+  const [text, setText]                 = useState(incoming ?? '');
   const [file, setFile]                 = useState<File | null>(null);
   const [mode, setMode]                 = useState<AdvisorMode>('auto');
   const [aiStatus, setAiStatus]         = useState<AIStatus | null>(null);
@@ -97,7 +97,7 @@ export function Module4Page() {
   const [revealResult, setRevealResult] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const handedOff = useRef(false);
+  const handledKey = useRef<string | null>(null);
   const ids = { text: useId(), mode: useId(), hint: useId() };
 
   const ACCEPTED = '.pdf,.docx,.doc,.csv,.txt,.md,.json,.tex,.rtf';
@@ -144,11 +144,13 @@ export function Module4Page() {
   }, [mode]);
 
   useEffect(() => {
-    if (!handoff || handedOff.current) return;
-    handedOff.current = true;
+    if (!incoming || handledKey.current === location.key) return;
+    handledKey.current = location.key;
+    setText(incoming);
+    setFile(null);
     navigate(location.pathname, { replace: true, state: null });   // so a reload doesn't ask it again
-    analyze(handoff, null, true);
-  }, [handoff, analyze, navigate, location.pathname]);
+    analyze(incoming, null, true);
+  }, [incoming, location.key, analyze, navigate, location.pathname]);
 
   useEffect(() => {
     if (!revealResult || !result || loading) return;
@@ -167,6 +169,13 @@ export function Module4Page() {
 
   const isQuantum = result?.approach === 'Quantum';
   const top = result?.recommendations[0];
+  usePageDetails('advisor', result && top
+    ? `Their problem: ${result.input_preview}\nRecommendation: ${result.approach} approach, ${top.algorithm_name} `
+      + `(${top.complexity}, ${top.speedup} speed-up), model confidence ${result.top_confidence}%. `
+      + `Read as ${result.detected_features.category_label}, size N = ${result.detected_features.data_size}. `
+      + `Reasons: ${result.approach_reason}`
+      + (result.explanation ? `\nExplanation shown: ${result.explanation}` : '')
+    : offTopic ? `They asked something that isn't a computing problem; the page answered: ${offTopic}` : null);
 
   // ── RENDER ────────────────────────────────────────────────────────────────
 

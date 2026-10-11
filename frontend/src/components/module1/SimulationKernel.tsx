@@ -12,6 +12,7 @@ import { AmplitudesView } from './AmplitudesView';
 import { QubitsView } from './QubitsView';
 import { ResultDownloads } from './ResultDownloads';
 import { SaveBar, useSavedCircuit } from '../work/SaveBar';
+import { usePageDetails } from '../ai/pageDetails';
 import { workApi } from '../../api/work';
 import { formatBytes, formatChance, formatDuration, ket } from './format';
 
@@ -94,6 +95,14 @@ function NormLine({ check, n }: { check: Extract<TheoryCheck, { kind: 'norm' }>;
   );
 }
 
+/** A circuit handed to this page by the Circuit Builder or by Ask QAIbridge. */
+interface Handed { qasm: string; from: 'builder' | 'assistant' }
+
+function handedOver(state: unknown): Handed | null {
+  const s = state as { qasm?: unknown; from?: unknown } | null;
+  return typeof s?.qasm === 'string' ? { qasm: s.qasm, from: s.from === 'assistant' ? 'assistant' : 'builder' } : null;
+}
+
 export function SimulationKernel() {
   const [source, setSource]       = useState('');
   const [loaded, setLoaded]       = useState<Loaded | null>(null);
@@ -146,12 +155,10 @@ export function SimulationKernel() {
   const saved = useSavedCircuit(content);
   const { attach, detach } = saved;
 
-  // What to open: a saved circuit (?c=<id>), a circuit sent from the Circuit Builder, or an example.
+  // What to open: a saved circuit (?c=<id>), a circuit handed over (Circuit Builder, Ask QAIbridge), or an example.
   const location = useLocation();
-  const [sent] = useState(() => {
-    const qasm = (location.state as { qasm?: unknown } | null)?.qasm;
-    return typeof qasm === 'string' ? qasm : null;
-  });
+  const [handed, setHanded] = useState(() => handedOver(location.state));
+  const [sent] = useState(() => handed?.qasm ?? null);
   const [openId] = useState(() => Number(params.get('c')) || 0);
   const opened = useRef(false);
   useEffect(() => {
@@ -175,6 +182,21 @@ export function SimulationKernel() {
         loadExample('ghz', 5);
       });
   }, [openId, sent, loadExample, attach, navigate]);
+
+  // A circuit handed over while the page is already open (Ask QAIbridge can do that): it starts a new, unsaved circuit.
+  const arriving = handedOver(location.state);
+  const arrivedKey = useRef(location.key);
+  useEffect(() => {
+    if (!arriving || location.key === arrivedKey.current) return;
+    arrivedKey.current = location.key;
+    detach();
+    setSource(arriving.qasm);
+    setLoaded(null);
+    setResult(null);
+    setRunError(null);
+    setHanded(arriving);
+    setParams({}, { replace: true });
+  }, [arriving, location.key, detach, setParams]);
 
   const newCircuit = () => {
     detach();
@@ -343,6 +365,22 @@ export function SimulationKernel() {
     window.setTimeout(() => { if (socketRef.current === ws) ws.close(); }, 3000);
   };
 
+  // What Ask QAIbridge is told about this page: the circuit, and the last result that belongs to it.
+  const fresh = result && ranSource === source ? result : null;
+  const askDetails = useMemo(() => {
+    const lines = [`Their OpenQASM circuit${current ? ` (the "${current.id}" example, ${current.n} qubits)` : ''}:\n${source.slice(0, 2500)}`];
+    if (problem) lines.push(`Problem shown${problem.line ? ` on line ${problem.line}` : ''}: ${problem.message}`);
+    if (fresh) {
+      const top = Object.entries(fresh.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([state, p]) => `${ket(state)} ${formatChance(p)}`).join(', ');
+      lines.push(`Last run: ${fresh.n_qubits} qubits, ${fresh.gate_count} gates, ${ranShots} measurements. `
+        + `Most likely outcomes: ${top}.${fresh.is_entangled ? ' The qubits are entangled.' : ''}`
+        + (fresh.check ? ` Check against the textbook answer: ${fresh.check.passed ? 'passed' : 'failed'}.` : ''));
+    }
+    return lines.join('\n');
+  }, [source, current, problem, fresh, ranShots]);
+  usePageDetails('simulator', source.trim() ? askDetails : null);
+
   const r = result;
   const canStep = !!r && r.n_qubits <= MAX_STEP_QUBITS && r.gate_count <= MAX_STEPS;
 
@@ -413,9 +451,11 @@ export function SimulationKernel() {
               </select>
             </div>
           </div>
-          {sent && source === sent && (
+          {handed && source === handed.qasm && (
             <p className="text-sm text-gray-300">
-              Opened from the <Link to="/circuit" className="underline hover:text-white">Circuit Builder</Link>.
+              {handed.from === 'assistant'
+                ? <>Written by Ask QAIbridge. Check it, then press <strong>Run</strong>.</>
+                : <>Opened from the <Link to="/circuit" className="underline hover:text-white">Circuit Builder</Link>.</>}
             </p>
           )}
           {current && (

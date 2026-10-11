@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { HowToUse } from '../components/shared/HowToUse';
 import { AIStatusLine, WrittenByAI } from '../components/ai/AIStatus';
+import { usePageDetails } from '../components/ai/pageDetails';
 import { CodeBlock } from '../components/shared/CodeBlock';
 import { GroverViews, ShorViews, SideBySide, TspViews } from '../components/module2/SfodResultViews';
 import { LogicView, QaoaProblemView } from '../components/module5/TransformerViews';
@@ -139,6 +140,16 @@ export function Module5Page() {
       setBusy(null);
     }
   };
+
+  usePageDetails('code-to-quantum', [
+    `Their classical code:\n${code.slice(0, 1500)}`,
+    spec ? `Understood as: ${TYPE_LABEL[spec.problem_type] ?? spec.problem_type} → ${spec.quantum_algorithm} `
+      + `(read by ${spec.engine === 'llm' ? 'the AI' : 'the built-in reader'}). ${spec.explanation}` : '',
+    result ? (result.supported
+      ? `Result: ${result.verification?.match ? 'verified, the quantum answer matches the classical one' : 'not verified'}. `
+        + result.stages.map(st => `${st.title}: ${st.detail}`).join(' ')
+      : `Result: no quantum speed-up. ${result.reason ?? ''}`) : '',
+  ].filter(Boolean).join('\n'));
 
   const reached = result ? (result.supported ? 6 : 1) : spec ? 1 : 0;
   const details = result?.details;

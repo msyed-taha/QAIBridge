@@ -14,6 +14,7 @@ import { HowToUse } from '../components/shared/HowToUse';
 import { angleLabel, builderQasm } from '../components/module3/qasm';
 import { SaveBar, useSavedCircuit } from '../components/work/SaveBar';
 import { workApi, type SavedCircuit } from '../api/work';
+import { usePageDetails } from '../components/ai/pageDetails';
 
 // ── Gates ─────────────────────────────────────────────────────────────────────
 
@@ -619,6 +620,23 @@ export function Module3Page() {
     commit(gates.map(g => (g.id === next.id ? next : g)));
   };
 
+  // What Ask QAIbridge is told about this page.
+  const askDetails = useMemo(() => {
+    const lines = [mode === 'challenge'
+      ? `Challenge level ${levelIdx + 1}: ${level.title}. Goal: ${level.goal} (They are trying to solve it themselves.)`
+      : 'Free build.'];
+    lines.push(`Their circuit (OpenQASM):\n${qasm}`);
+    if (result) {
+      const top = result.states.filter(s => s.probability > 1e-6).sort((a, b) => b.probability - a.probability).slice(0, 8)
+        .map(s => `${s.label} ${(s.probability * 100).toFixed(1)}%`).join(', ');
+      lines.push(`Chances: ${top}.` + (result.is_entangled
+        ? ` Entangled qubits: ${result.entangled_qubits.map(q => `q${q}`).join(', ')}.` : ' No entanglement.'));
+    }
+    if (selected) lines.push(`Selected gate: ${describeGate(selected)}.`);
+    return lines.join('\n');
+  }, [mode, levelIdx, level, qasm, result, selected]);
+  usePageDetails('builder', askDetails);
+
   const earnedBadges = BADGES.filter(b => b.need.every(id => progress[id]));
   const totalStars = Object.values(progress).reduce((a, b) => a + b, 0);
   const maxProb = result ? Math.max(...result.states.map(s => s.probability), 0.01) : 1;
@@ -1023,7 +1041,7 @@ export function Module3Page() {
       </div>
 
       {/* Toasts */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-[calc(100vw-2rem)]" aria-live="polite">
+      <div className="fixed bottom-20 right-4 z-50 space-y-2 max-w-[calc(100vw-2rem)]" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-xl text-sm border ${
             t.tone === 'good' ? 'bg-emerald-950 border-emerald-600 text-emerald-200'

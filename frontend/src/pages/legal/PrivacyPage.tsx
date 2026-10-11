@@ -63,7 +63,8 @@ const sections: LegalSection[] = [
         <p>
           We <strong>do not use cookies</strong>. We use your browser’s local storage for: a sign-in token that
           keeps you signed in (it expires after {L.tokenDays} days); a copy of your basic profile (username, email
-          and role) so pages load quickly; the circuit you are drawing in the Circuit Builder, so it survives a reload; and, if you use the
+          and role) so pages load quickly; the circuit you are drawing in the Circuit Builder, so it survives a reload; the Ask QAIbridge chat (in that
+          browser tab's session storage, removed when you close the tab); and, if you use the
           Learn lessons without signing in, your progress in them (when you sign in, it moves to your account and is
           removed from the browser). These are strictly necessary for features you ask for, so we do not ask for consent. Signing out removes the
           sign-in token and profile copy, and you can clear everything in your browser settings.
@@ -112,7 +113,7 @@ const sections: LegalSection[] = [
         <ul>
           <li><strong>Hosting and database providers</strong>, which store and run the Service.</li>
           <li><strong>Google (Gmail)</strong>, which sends our verification emails. It receives your email address and the content of the email.</li>
-          <li><strong>Anthropic (Claude), our AI provider, when you use an AI feature.</strong> It receives only the text that feature needs, for example the code or description you give Code to Quantum, and sends back an answer. Anthropic acts as our processor: by default it does not use data sent through its API to train its models, and it keeps it only for a limited time. Every AI feature also has a built-in version that works without the AI; in Code to Quantum, choose “Built-in” and your code does not leave our servers.</li>
+          <li><strong>Anthropic (Claude), our AI provider, when you use an AI feature.</strong> It receives only the text that feature needs, for example the code or description you give Code to Quantum, or, for Ask QAIbridge, your question, the last few messages of the chat and a short description of the page you are on (such as your circuit and its result), and sends back an answer. Anthropic acts as our processor: by default it does not use data sent through its API to train its models, and it keeps it only for a limited time. Every AI feature also has a built-in version that works without the AI; in Code to Quantum, choose “Built-in” and your code does not leave our servers.</li>
         </ul>
         <p>We may also disclose personal data:</p>
         <ul>
