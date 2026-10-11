@@ -35,7 +35,7 @@ const sections: LegalSection[] = [
       <ul>
         <li>{L.operator} provides tools to learn about, simulate and compare quantum and classical algorithms. <strong>Quantum computations are simulated on ordinary computers</strong>; they do not run on quantum hardware.</li>
         <li>The Service is currently free. If we introduce paid features, we will tell you in advance, and you will pay only if you choose them.</li>
-        <li>We may change, add or remove features, set usage limits (for example on problem sizes or how many simulations can run at once), or suspend or end the Service. Where reasonable, we will give you notice.</li>
+        <li>We may change, add or remove features, set usage limits (for example on problem sizes, how many simulations can run at once or how many AI requests you can make each day), or suspend or end the Service. Where reasonable, we will give you notice.</li>
         <li>We do not promise that the Service will be uninterrupted, error-free or available at any particular time.</li>
       </ul>
     ),
@@ -50,6 +50,7 @@ const sections: LegalSection[] = [
           <li>break any law, including Pakistan’s Prevention of Electronic Crimes Act, 2016, or help anyone else to do so;</li>
           <li>access, or try to access, accounts, data or systems you are not authorised to use, or test or scan the Service’s security without our written permission;</li>
           <li>try to escape, disable or get around the code sandbox, usage limits or any other security measure;</li>
+          <li>try to make the AI features ignore their instructions, produce harmful content or work for purposes unrelated to the Service;</li>
           <li>overload or disrupt the Service, for example with excessive automated requests, scraping or denial-of-service attacks;</li>
           <li>upload or run malware or other harmful code, or use the Service to mine cryptocurrency;</li>
           <li>submit anything illegal, anything that infringes someone else’s rights (including intellectual property and privacy), or other people’s personal data without their permission;</li>
@@ -94,6 +95,7 @@ const sections: LegalSection[] = [
       <ul>
         <li>All results are simulations for education and research. They can contain errors and may differ from what real quantum hardware would produce.</li>
         <li>Recommendations, such as those from the AI Advisor, are estimates, not guarantees.</li>
+        <li>Text written by the AI (marked “Written by AI”) can be wrong. Where it can, the simulator checks the result; read the AI’s explanations with care.</li>
         <li>Nothing on the Service is financial, investment, legal, engineering, security or other professional advice. Example data, such as the stock figures in the portfolio example, is for illustration only.</li>
         <li>Do not rely on the Service for decisions where a mistake could cause harm or loss; check results independently.</li>
       </ul>
@@ -104,8 +106,8 @@ const sections: LegalSection[] = [
     title: 'Third-party services',
     body: (
       <p>
-        The Service relies on other companies, for example for hosting, for sending email (Google’s Gmail) and,
-        when it is switched on, for the AI engine. We are not responsible for services we do not control, and your
+        The Service relies on other companies, for example for hosting, for sending email (Google’s Gmail) and
+        for the AI features (Anthropic). We are not responsible for services we do not control, and your
         use of them may also be covered by their own terms. Our <Link to="/privacy">Privacy Policy</Link> explains
         what data they receive.
       </p>

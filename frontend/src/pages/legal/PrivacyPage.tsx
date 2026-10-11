@@ -10,6 +10,8 @@ const RETENTION: [string, string][] = [
   ['Saved circuits and projects', 'Until you delete them, or your account is erased.'],
   ['Challenge stars', 'While your account exists. They are erased together with your account.'],
   ['Content you submit for processing', 'Not kept after your request is finished (apart from the run summaries above).'],
+  ['AI usage records', 'While your account exists. When your account is erased, they stay only as totals that are no longer linked to you.'],
+  ['AI answers kept to avoid paying twice', 'Up to 24 hours, in server memory only.'],
   ['Verification codes', `${L.codeMinutes} minutes.`],
   ['Contact-form messages', `Up to ${L.contactMessageMonths} months, then erased automatically.`],
   ['IP addresses used for spam protection', `Up to ${L.spamIpMinutes} minutes, in memory only.`],
@@ -44,7 +46,7 @@ const sections: LegalSection[] = [
           <li><strong>Account details:</strong> your email address, username and password. Your password is stored only as a one-way bcrypt hash, so nobody, including us, can read it.</li>
           <li><strong>Verification codes:</strong> when you sign up, reset your password or delete your account, we email you a 5-digit code. Codes are kept only in server memory, expire after {L.codeMinutes} minutes and allow at most {L.codeAttempts} attempts.</li>
           <li><strong>Messages you send us:</strong> your name, email address, optional subject and message from the Contact form. If you are signed in, we link the message to your account.</li>
-          <li><strong>Content you submit for processing:</strong> problem descriptions, files you upload (such as PDF, Word, CSV or text files), code you paste or run, and data you enter (such as numbers, lists, city names or records). We use this content only to produce your result and <strong>do not keep it</strong> once your request is finished, apart from the short run summaries described below. Code you run is executed in a temporary folder that is deleted straight afterwards.</li>
+          <li><strong>Content you submit for processing:</strong> problem descriptions, files you upload (such as PDF, Word, CSV or text files), code you paste or run, and data you enter (such as numbers, lists, city names or records). We use this content only to produce your result and <strong>do not keep it</strong> once your request is finished, apart from the short run summaries described below. Code you run is executed in a temporary folder that is deleted straight afterwards. When you use an AI feature, the text it needs is also sent to our AI provider (see <a href="#sharing">Who we share data with</a>).</li>
         </ul>
 
         <h3>Data created when you use the Service</h3>
@@ -53,6 +55,7 @@ const sections: LegalSection[] = [
           <li><strong>Run history</strong> (signed-in users): a summary of each run, such as the problem type, algorithm, problem size, timings, number of steps and whether the answers were correct, plus a short title that may include a small part of your input (for example, the number you factored or your database query). Benchmarks also keep their measured results. You can view and delete your runs on your Dashboard.</li>
           <li><strong>Learning progress</strong> (signed-in users): which Learn lessons you have finished, your best quiz score, and how many stars you earned in each lesson's game. We use it only to show your progress back to you.</li>
           <li><strong>Saved work</strong> (signed-in users): the circuits you save from the Circuit Builder or the Quantum Simulator (their name, the circuit itself and, for the Circuit Builder, where each gate sits), the projects you group them into, and the stars you earn in the Circuit Builder’s challenge levels. We use them only to show your work back to you. You can rename, move and delete them on My work.</li>
+          <li><strong>AI usage records</strong> (signed-in users): for each AI request, which tool made it, the AI model, how much text was processed (counted in “tokens”), what it cost and how long it took. These records <strong>never contain the text you sent or the answer</strong>. We use them to keep the AI features within their daily limits and budget. To avoid paying twice, an AI answer is also kept in server memory for up to 24 hours and reused if exactly the same request arrives again.</li>
           <li><strong>Technical data:</strong> your IP address, held in memory for up to {L.spamIpMinutes} minutes to protect the Contact form from spam. Our servers may also keep basic logs (IP address, date and time, page requested and errors) for security and troubleshooting.</li>
         </ul>
 
@@ -84,6 +87,7 @@ const sections: LegalSection[] = [
           <li><strong>To create and run your account and provide the features you use.</strong> This is necessary to perform our agreement with you (our Terms of Use).</li>
           <li><strong>To verify your email address and keep your account secure</strong>, for example with verification codes, password hashing and rate limits. This is necessary for our agreement with you and in our legitimate interest in keeping the Service safe.</li>
           <li><strong>To show you your results, run history, learning progress and saved work.</strong> Necessary to perform our agreement with you.</li>
+          <li><strong>To provide the AI features you use, and keep them within their limits.</strong> Necessary to perform our agreement with you, and in our legitimate interest in controlling costs and preventing misuse.</li>
           <li><strong>To answer your messages.</strong> Our legitimate interest in responding to you.</li>
           <li><strong>To prevent abuse, investigate problems and enforce our Terms.</strong> Our legitimate interest in protecting the Service and its users.</li>
           <li><strong>To comply with the law</strong> and respond to lawful requests from authorities. A legal obligation.</li>
@@ -108,7 +112,7 @@ const sections: LegalSection[] = [
         <ul>
           <li><strong>Hosting and database providers</strong>, which store and run the Service.</li>
           <li><strong>Google (Gmail)</strong>, which sends our verification emails. It receives your email address and the content of the email.</li>
-          <li><strong>An AI provider, only if the AI engine is switched on.</strong> When the Code to Quantum tool’s AI engine is enabled, code you submit to it is sent to the AI provider we use (for example Anthropic, or a service compatible with OpenAI’s) to be analysed. The page always shows which engine is active. With the offline engine, your code does not leave our servers.</li>
+          <li><strong>Anthropic (Claude), our AI provider, when you use an AI feature.</strong> It receives only the text that feature needs, for example the code or description you give Code to Quantum, and sends back an answer. Anthropic acts as our processor: by default it does not use data sent through its API to train its models, and it keeps it only for a limited time. Every AI feature also has a built-in version that works without the AI; in Code to Quantum, choose “Built-in” and your code does not leave our servers.</li>
         </ul>
         <p>We may also disclose personal data:</p>
         <ul>
