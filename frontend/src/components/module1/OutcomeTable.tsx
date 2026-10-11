@@ -21,6 +21,11 @@ export function OutcomeTable({ result, shots }: { result: SimulationResult; shot
 
   return (
     <div>
+      <p className="text-sm text-gray-300 mb-2 leading-relaxed">
+        <span className="text-gray-400">How to read this: </span>
+        each row is one way the qubits can end up when you measure them, read left to right as {order}.
+        Chance is the simulator's exact answer; Seen is how often it came up in {shots.toLocaleString()} test measurements.
+      </p>
       <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">The most likely outcomes, their chance, and how often each was measured</caption>
@@ -55,12 +60,11 @@ export function OutcomeTable({ result, shots }: { result: SimulationResult; shot
       </div>
       <p className="text-xs text-gray-400 mt-3 leading-relaxed">
         {rows.length < all.length || result.truncated
-          ? <>The {rows.length} most likely of {possible} possible outcomes. </>
-          : <>Every outcome with a chance, out of {possible} possible. </>}
-        "Seen" counts how often each came up in {shots.toLocaleString()} measurements.
+          ? <>The {rows.length} most likely of {possible} possible outcomes.</>
+          : <>Every outcome with a chance, out of {possible} possible.</>}
         {thin && <> With chances this small, the measurements almost never land on the same outcome twice, so these
-          were rarely or never seen.</>}{' '}
-        Read each outcome left to right as {order}. (Qiskit writes the same outcome right to left.)
+          were rarely or never seen.</>}
+        {' '}Qiskit writes the same outcomes right to left.
       </p>
     </div>
   );

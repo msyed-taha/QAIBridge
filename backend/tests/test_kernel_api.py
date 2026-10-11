@@ -240,3 +240,38 @@ def test_closing_the_page_stops_the_run_on_the_server(client, token, monkeypatch
         ws.send_json({"action": "qasm", "payload": {"source": _example(client, token, "qft_pattern", 22)}})
         _until(ws, "progress")                       # the run has started
     assert stopped.wait(10), "the run kept going after the page left"
+
+
+# ── Step by step ─────────────────────────────────────────────────────────────
+
+def _steps(client, token, source: str):
+    return client.post("/api/kernel/qasm/steps", headers=_auth(token), json={"source": source})
+
+
+def test_step_by_step_shows_the_chances_after_every_gate(client, token):
+    r = _steps(client, token, BELL)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["labels"] == ["q[0]", "q[1]"]
+    start, h, cx = body["steps"]
+    assert start["gate"] is None and start["probs"] == [1, 0, 0, 0]
+    assert (h["gate"], h["qubits"], h["line"]) == ("H", [0], 5) and h["probs"] == [0.5, 0, 0.5, 0]
+    assert (cx["gate"], cx["qubits"], cx["line"]) == ("CNOT", [0, 1], 6) and cx["probs"] == [0.5, 0, 0, 0.5]
+
+
+def test_step_by_step_says_when_a_gate_only_turns_hidden_phases(client, token):
+    src = 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[1];\nh q[0];\nz q[0];\nh q[0];\nz q[0];\n'
+    steps = _steps(client, token, src).json()["steps"]
+    assert [s["phase_only"] for s in steps] == [False, False, True, False, False]   # the last z acts on a sure 1
+    assert steps[3]["probs"] == [0, 1]           # the hidden turn decided where the mix went
+
+
+def test_a_broadcast_gate_is_one_step_per_qubit_on_the_same_line(client, token):
+    steps = _steps(client, token, 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\nh q;\n').json()["steps"]
+    assert [(s["qubits"], s["line"]) for s in steps[1:]] == [([0], 4), ([1], 4), ([2], 4)]
+
+
+def test_step_by_step_is_kept_to_small_circuits(client, token):
+    r = _steps(client, token, _example(client, token, "ghz", 9))
+    assert r.status_code == 422 and "up to 8 qubits" in r.json()["detail"]
+    assert client.post("/api/kernel/qasm/steps", json={"source": BELL}).status_code in (401, 403)

@@ -58,6 +58,20 @@ export type TheoryCheck =
 
 export interface QasmProblem { message: string; line: number | null }
 
+/** One gate of a step-by-step replay; step 0 is the start (no gate). */
+export interface CircuitStep {
+  gate: string | null;
+  qubits: number[];
+  params: number[];
+  line: number | null;
+  /** Every outcome's chance after this gate, in outcome order (|00…0⟩ first). */
+  probs: number[];
+  /** No chance moved, but hidden phases did: they decide what cancels out later. */
+  phase_only: boolean;
+}
+
+export interface CircuitSteps { n_qubits: number; labels: string[]; steps: CircuitStep[] }
+
 export type QasmInspect =
   | { ok: true; n_qubits: number; gate_count: number; depth: number; required_bytes: number;
       labels: string[]; example: string | null }

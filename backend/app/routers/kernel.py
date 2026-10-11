@@ -5,6 +5,7 @@ Routes (all but /ram-table and /gates need a signed-in user):
   GET   /api/kernel/examples/{id}     – An example circuit as OpenQASM text (2–28 qubits)
   POST  /api/kernel/qasm/inspect      – Read OpenQASM text: its size, or the line of the first problem
   POST  /api/kernel/qasm              – Run OpenQASM text (examples are checked against the maths)
+  POST  /api/kernel/qasm/steps        – Replay a small circuit gate by gate (chances after every gate)
   POST  /api/kernel/export/qiskit     – Export a circuit as runnable Qiskit code
   GET   /api/kernel/memory            – RAM check for a given qubit count
   GET   /api/kernel/ram-table         – Full qubit → RAM table
@@ -20,6 +21,7 @@ import contextlib
 import threading
 from typing import Callable, List, Optional, Dict
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, ValidationError
 
@@ -27,6 +29,7 @@ from ..database import SessionLocal
 from ..models.user import User
 from ..modules.module1_kernel import (
     QuantumCircuit,
+    QuantumStateVector,
     SimulationCancelled,
     check_memory,
     ram_table,
@@ -73,6 +76,8 @@ class InspectRequest(BaseModel):
 
 
 CHECK_TOLERANCE = 1e-6      # how far a chance may sit from the textbook value
+MAX_STEP_QUBITS = 8         # step by step sends every outcome's chance after every gate,
+MAX_STEPS = 200             # so it is kept to small circuits
 
 
 def _build_custom(req: SimulateRequest) -> QuantumCircuit:
@@ -196,6 +201,39 @@ def inspect_qasm(req: InspectRequest, _user: User = Depends(get_current_user)) -
         "labels": program.labels,
         "example": match_example(program),
     }
+
+
+@router.post("/qasm/steps")
+def qasm_steps(req: InspectRequest, _user: User = Depends(get_current_user)) -> Dict:
+    """
+    Replay a small circuit one gate at a time: every outcome's chance after each gate,
+    the line the gate came from, and whether the gate only turned hidden phases.
+    """
+    try:
+        program = parse_qasm(req.source)
+    except QasmError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    n, ops = program.n_qubits, program.circuit.operations
+    if n > MAX_STEP_QUBITS or len(ops) > MAX_STEPS:
+        raise HTTPException(status_code=422, detail=(
+            f"Step by step works for circuits up to {MAX_STEP_QUBITS} qubits and {MAX_STEPS} gates. "
+            f"This one has {n} qubits and {len(ops):,} gates."))
+    sv = QuantumStateVector(n, check_ram=False)
+    amps = sv.state
+    probs = np.abs(amps) ** 2
+    steps = [{"gate": None, "qubits": [], "params": [], "line": None,
+              "probs": [round(float(p), 6) for p in probs], "phase_only": False}]
+    for op, line in zip(ops, program.lines):
+        sv.apply_gate(op.gate, op.qubits, op.params)
+        new_amps = sv.state
+        new_probs = np.abs(new_amps) ** 2
+        moved = float(np.max(np.abs(new_probs - probs))) > 1e-9
+        # A turn of the whole state at once (|⟨old|new⟩| = 1) can never be noticed, so it doesn't count.
+        turned = 1 - abs(complex(np.vdot(amps, new_amps))) > 1e-9
+        steps.append({"gate": op.gate, "qubits": op.qubits, "params": [round(x, 6) for x in op.params], "line": line,
+                      "probs": [round(float(p), 6) for p in new_probs], "phase_only": turned and not moved})
+        amps, probs = new_amps, new_probs
+    return {"n_qubits": n, "labels": program.labels, "steps": steps}
 
 
 @router.post("/qasm")

@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { GateOperation, SimulationResult, ApiResponse, QasmInspect } from '../types';
+import type { GateOperation, SimulationResult, ApiResponse, QasmInspect, CircuitSteps } from '../types';
 
 export type ExampleId = 'ghz' | 'qft_pattern' | 'layered' | 'random';
 
@@ -29,6 +29,12 @@ export const kernelApi = {
   /** Read OpenQASM text without running it: its size, or the first problem and its line */
   inspect: async (source: string): Promise<QasmInspect> => {
     const { data } = await apiClient.post<QasmInspect>(`${BASE}/qasm/inspect`, { source });
+    return data;
+  },
+
+  /** Replay a small circuit one gate at a time (up to 8 qubits and 200 gates) */
+  steps: async (source: string): Promise<CircuitSteps> => {
+    const { data } = await apiClient.post<CircuitSteps>(`${BASE}/qasm/steps`, { source });
     return data;
   },
 

@@ -8,6 +8,8 @@ interface Props {
   onFile: (file: File) => void;
   /** 1-based line to mark as the problem, if any. */
   errorLine: number | null;
+  /** 1-based line to mark as "this is where we are" (step by step), if any. */
+  activeLine?: number | null;
   labelledBy: string;
   describedBy: string;
   disabled?: boolean;
@@ -19,7 +21,7 @@ interface Props {
  * is easy to find, and the problem line is marked), no spell-check, no wrapping.
  */
 export const QasmEditor = forwardRef<HTMLTextAreaElement, Props>(function QasmEditor(
-  { id, value, onChange, onFile, errorLine, labelledBy, describedBy, disabled, placeholder }, ref,
+  { id, value, onChange, onFile, errorLine, activeLine, labelledBy, describedBy, disabled, placeholder }, ref,
 ) {
   const gutterRef = useRef<HTMLDivElement>(null);
   const lines = Math.max(1, value.split('\n').length);
@@ -37,7 +39,10 @@ export const QasmEditor = forwardRef<HTMLTextAreaElement, Props>(function QasmEd
       <div ref={gutterRef} aria-hidden="true"
         className="select-none overflow-hidden py-3 pl-3 pr-2 text-right font-mono text-sm leading-6 text-gray-400 bg-quantum-800/60 border-r border-quantum-700">
         {Array.from({ length: lines }, (_, i) => (
-          <div key={i} className={i + 1 === errorLine ? 'text-red-200 bg-red-500/30 -mr-2 pr-2 rounded-l' : undefined}>{i + 1}</div>
+          <div key={i} className={
+            i + 1 === errorLine ? 'text-red-200 bg-red-500/30 -mr-2 pr-2 rounded-l'
+            : i + 1 === activeLine ? 'text-black bg-quantum-neon font-semibold -mr-2 pr-2 rounded-l'
+            : undefined}>{i + 1}</div>
         ))}
       </div>
       <textarea
@@ -63,6 +68,16 @@ export const QasmEditor = forwardRef<HTMLTextAreaElement, Props>(function QasmEd
     </div>
   );
 });
+
+/** Scroll a line into view (without moving the cursor) if it is out of sight. */
+export function scrollToLine(box: HTMLTextAreaElement | null, line: number) {
+  if (!box) return;
+  const lineHeight = parseFloat(getComputedStyle(box).lineHeight) || 24;
+  const top = (line - 1) * lineHeight;
+  if (top < box.scrollTop || top + lineHeight > box.scrollTop + box.clientHeight - 16) {
+    box.scrollTop = Math.max(0, top - box.clientHeight / 3);
+  }
+}
 
 /** Put the cursor on a line (selecting it) and scroll it into view. */
 export function goToLine(box: HTMLTextAreaElement | null, line: number) {

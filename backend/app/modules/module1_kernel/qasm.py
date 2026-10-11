@@ -202,6 +202,7 @@ class QasmProgram:
     labels: List[str]
     version: str
     measured: List[int] = field(default_factory=list)
+    lines: List[int] = field(default_factory=list)          # the source line of each gate, in order
 
     @property
     def n_qubits(self) -> int:
@@ -634,4 +635,5 @@ def parse_qasm(source: str) -> QasmProgram:
             circuit._add(kernel, qubits, angles)
         except (ValueError, IndexError, RuntimeError) as e:     # should never happen; keep the line anyway
             raise QasmError(str(e), line)
-    return QasmProgram(circuit=circuit, labels=p.labels, version=p.version, measured=sorted(p.measured))
+    return QasmProgram(circuit=circuit, labels=p.labels, version=p.version, measured=sorted(p.measured),
+                       lines=[line for *_, line in p.ops])

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, Play, Square, Upload, XCircle } from 'lucide-react';
 import type { QasmInspect, QasmProblem, SimulationResult, TheoryCheck } from '../../types';
@@ -6,7 +6,8 @@ import { kernelApi, type ExampleId } from '../../api/kernel';
 import { getApiErrorMessage } from '../../api/client';
 import { HowToUse } from '../shared/HowToUse';
 import { OutcomeTable } from './OutcomeTable';
-import { QasmEditor, goToLine } from './QasmEditor';
+import { QasmEditor, goToLine, scrollToLine } from './QasmEditor';
+import { MAX_STEPS, MAX_STEP_QUBITS, StepThrough } from './StepThrough';
 import { formatBytes, formatChance, formatDuration, ket } from './format';
 
 interface Example { id: ExampleId; name: string; expect: ReactNode }
@@ -31,6 +32,8 @@ class RunProblem extends Error {
 }
 
 interface Progress { percent: number; step: string; detail: string }
+type Tab = 'outcomes' | 'steps';
+const TABS: { id: Tab; label: string }[] = [{ id: 'outcomes', label: 'Outcomes' }, { id: 'steps', label: 'Step by step' }];
 interface Loaded { id: ExampleId; n: number; text: string }
 
 const nameOf = (id: string | null | undefined) => EXAMPLES.find(e => e.id === id)?.name;
@@ -96,6 +99,10 @@ export function SimulationKernel() {
   const [elapsed, setElapsed]     = useState(0);
   const [runError, setRunError]   = useState<QasmProblem | null>(null);
   const [notice, setNotice]       = useState<string | null>(null);
+  const [ranSource, setRanSource] = useState('');            // the circuit text the result belongs to
+  const [runId, setRunId]         = useState(0);
+  const [tab, setTab]             = useState<Tab>('outcomes');
+  const [activeLine, setActiveLine] = useState<number | null>(null);
   const socketRef   = useRef<WebSocket | null>(null);
   const stoppingRef = useRef(false);
   const editorRef   = useRef<HTMLTextAreaElement>(null);
@@ -137,6 +144,9 @@ export function SimulationKernel() {
     }, 350);
     return () => window.clearTimeout(t);
   }, [source]);
+
+  // Step by step marks the current gate's line; keep it in view.
+  useEffect(() => { if (activeLine) scrollToLine(editorRef.current, activeLine); }, [activeLine]);
 
   useEffect(() => {
     if (!loading) return;
@@ -240,6 +250,9 @@ export function SimulationKernel() {
         data = await kernelApi.runQasm(text, SHOTS);
       }
       setResult(data);
+      setRanSource(text);
+      setRunId(id => id + 1);
+      setTab('outcomes');
     } catch (e) {
       if (e instanceof Stopped) {
         setNotice(`${e.message} Nothing was kept, and the server has freed the memory.`);
@@ -267,6 +280,14 @@ export function SimulationKernel() {
   };
 
   const r = result;
+  const canStep = !!r && r.n_qubits <= MAX_STEP_QUBITS && r.gate_count <= MAX_STEPS;
+
+  const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const next = TABS[(TABS.findIndex(t => t.id === tab) + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id;
+    setTab(next);
+    document.getElementById(`${ids.result}-tab-${next}`)?.focus();
+  };
 
   return (
     <div className="space-y-6 px-4 py-10">
@@ -340,6 +361,7 @@ export function SimulationKernel() {
               onChange={edit}
               onFile={openFile}
               errorLine={problem?.line ?? null}
+              activeLine={tab === 'steps' ? activeLine : null}
               labelledBy={ids.circuit}
               describedBy={ids.summary}
               disabled={loading}
@@ -430,8 +452,36 @@ export function SimulationKernel() {
               </dl>
               {r.check?.kind === 'norm' && <NormLine check={r.check} n={r.n_qubits} />}
               <div>
-                <h3 className="text-sm font-semibold text-white mb-2">Most likely outcomes</h3>
-                <OutcomeTable result={r} shots={SHOTS} />
+                <div role="tablist" aria-label="Ways to look at the result" onKeyDown={onTabKey}
+                  className="flex gap-1 border-b border-quantum-600 mb-3">
+                  {TABS.map(t => (
+                    <button key={t.id} type="button" role="tab" id={`${ids.result}-tab-${t.id}`}
+                      aria-selected={tab === t.id} aria-controls={`${ids.result}-panel`} tabIndex={tab === t.id ? 0 : -1}
+                      onClick={() => setTab(t.id)}
+                      className={`px-3 py-2 -mb-px text-sm border-b-2 transition-colors ${tab === t.id
+                        ? 'border-quantum-neon text-white font-semibold' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div role="tabpanel" id={`${ids.result}-panel`} aria-labelledby={`${ids.result}-tab-${tab}`}>
+                  {tab === 'outcomes' ? (
+                    <>
+                      <OutcomeTable result={r} shots={SHOTS} />
+                      {canStep && (
+                        <p className="text-sm text-gray-300 mt-3">
+                          Want to see how it got here?{' '}
+                          <button type="button" onClick={() => setTab('steps')} className="underline text-quantum-neon hover:text-teal-200">
+                            Watch it step by step
+                          </button>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <StepThrough key={runId} source={ranSource} nQubits={r.n_qubits} gateCount={r.gate_count}
+                      edited={source !== ranSource} onLine={setActiveLine} />
+                  )}
+                </div>
               </div>
               <p className="text-xs text-gray-400">
                 {transport === 'rest' ? 'Run on the QAIbridge server.' : 'Run on the QAIbridge server, with live progress.'}
