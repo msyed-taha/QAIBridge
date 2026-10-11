@@ -47,6 +47,8 @@ export interface SimulationResult {
   /** OpenQASM runs: each qubit's name (q[0], q[1], …), the example the circuit still is, and its check. */
   labels?: string[];
   example?: string | null;
+  /** OpenQASM runs: the chance each qubit reads 1, in qubit order. */
+  qubit_ones?: number[];
   check?: TheoryCheck | null;
 }
 

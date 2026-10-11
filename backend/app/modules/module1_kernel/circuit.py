@@ -90,6 +90,7 @@ class SimulationResult:
     depth:          int = 0
     bloch:          List[Dict] = field(default_factory=list)
     truncated:      bool = False     # True when more states exist than were reported
+    qubit_ones:     List[float] = field(default_factory=list)   # chance each qubit reads 1 (when asked for)
 
     def to_dict(self) -> Dict:
         return {
@@ -107,6 +108,7 @@ class SimulationResult:
             "memory_report": self.memory_report,
             "bloch":         self.bloch,
             "truncated":     self.truncated,
+            "qubit_ones":    self.qubit_ones,
         }
 
 
@@ -334,12 +336,15 @@ class QuantumCircuit:
 
     def run(self, shots: int = 1024,
             on_progress: Optional[Callable[[int, int], None]] = None,
-            should_stop: Optional[Callable[[], bool]] = None) -> SimulationResult:
+            should_stop: Optional[Callable[[], bool]] = None,
+            amplitude_states: int = 64, per_qubit: bool = False) -> SimulationResult:
         """
         Execute the circuit on a fresh QuantumStateVector.
 
         Args:
             shots: Number of measurement samples for histogram counts.
+            amplitude_states: how many of the most likely states to report amplitudes for.
+            per_qubit: also report the chance each qubit reads 1 (one extra pass over the state).
 
         Returns:
             SimulationResult with amplitudes, probabilities, counts, and metadata.
@@ -370,7 +375,7 @@ class QuantumCircuit:
         ]
 
         amplitudes = []
-        for i, p in sorted(top[:64]):
+        for i, p in sorted(top[:amplitude_states]):
             amp = sv._state[i]
             amplitudes.append({
                 "state": f"|{i:0{n}b}>", "index": int(i),
@@ -412,6 +417,7 @@ class QuantumCircuit:
             depth=self.depth(),
             bloch=sv.bloch_vectors() if n <= 16 else [],
             truncated=len(top) >= MAX_REPORTED_STATES,
+            qubit_ones=[_sig(x) for x in sv.qubit_one_probabilities()] if per_qubit else [],
         )
 
     # ── Circuit statistics ────────────────────────────────────────────────

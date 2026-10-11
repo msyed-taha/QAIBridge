@@ -8,6 +8,8 @@ import { HowToUse } from '../shared/HowToUse';
 import { OutcomeTable } from './OutcomeTable';
 import { QasmEditor, goToLine, scrollToLine } from './QasmEditor';
 import { MAX_STEPS, MAX_STEP_QUBITS, StepThrough } from './StepThrough';
+import { AmplitudesView } from './AmplitudesView';
+import { QubitsView } from './QubitsView';
 import { formatBytes, formatChance, formatDuration, ket } from './format';
 
 interface Example { id: ExampleId; name: string; expect: ReactNode }
@@ -32,8 +34,11 @@ class RunProblem extends Error {
 }
 
 interface Progress { percent: number; step: string; detail: string }
-type Tab = 'outcomes' | 'steps';
-const TABS: { id: Tab; label: string }[] = [{ id: 'outcomes', label: 'Outcomes' }, { id: 'steps', label: 'Step by step' }];
+type Tab = 'outcomes' | 'steps' | 'amplitudes' | 'qubits';
+const TABS: { id: Tab; label: string; short?: string }[] = [
+  { id: 'outcomes', label: 'Outcomes' }, { id: 'steps', label: 'Step by step', short: 'Steps' },
+  { id: 'amplitudes', label: 'Amplitudes' }, { id: 'qubits', label: 'Qubits' },
+];
 interface Loaded { id: ExampleId; n: number; text: string }
 
 const nameOf = (id: string | null | undefined) => EXAMPLES.find(e => e.id === id)?.name;
@@ -452,17 +457,19 @@ export function SimulationKernel() {
               </dl>
               {r.check?.kind === 'norm' && <NormLine check={r.check} n={r.n_qubits} />}
               <div>
+                <div className="relative overflow-x-auto mb-3">
                 <div role="tablist" aria-label="Ways to look at the result" onKeyDown={onTabKey}
-                  className="flex gap-1 border-b border-quantum-600 mb-3">
+                  className="flex sm:gap-1 border-b border-quantum-600 min-w-max">
                   {TABS.map(t => (
                     <button key={t.id} type="button" role="tab" id={`${ids.result}-tab-${t.id}`}
                       aria-selected={tab === t.id} aria-controls={`${ids.result}-panel`} tabIndex={tab === t.id ? 0 : -1}
-                      onClick={() => setTab(t.id)}
-                      className={`px-3 py-2 -mb-px text-sm border-b-2 transition-colors ${tab === t.id
+                      onClick={() => setTab(t.id)} aria-label={t.short ? t.label : undefined}
+                      className={`px-2.5 sm:px-3 py-2 -mb-px text-sm whitespace-nowrap border-b-2 transition-colors ${tab === t.id
                         ? 'border-quantum-neon text-white font-semibold' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>
-                      {t.label}
+                      {t.short ? <><span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span></> : t.label}
                     </button>
                   ))}
+                </div>
                 </div>
                 <div role="tabpanel" id={`${ids.result}-panel`} aria-labelledby={`${ids.result}-tab-${tab}`}>
                   {tab === 'outcomes' ? (
@@ -477,9 +484,13 @@ export function SimulationKernel() {
                         </p>
                       )}
                     </>
-                  ) : (
+                  ) : tab === 'steps' ? (
                     <StepThrough key={runId} source={ranSource} nQubits={r.n_qubits} gateCount={r.gate_count}
                       edited={source !== ranSource} onLine={setActiveLine} />
+                  ) : tab === 'amplitudes' ? (
+                    <AmplitudesView key={runId} result={r} />
+                  ) : (
+                    <QubitsView result={r} />
                   )}
                 </div>
               </div>

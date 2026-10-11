@@ -39,6 +39,7 @@ from ..modules.module1_kernel import (
     MULTI_QUBIT_GATES,
     MAX_QUBITS,
 )
+from ..modules.module1_kernel.circuit import MAX_REPORTED_STATES
 from ..modules.module1_kernel.examples import EXAMPLES, MIN_QUBITS, PATTERN_PERIOD, example_qasm, match_example
 from ..modules.module1_kernel.limits import simulation_slot
 from ..modules.module1_kernel.qasm import MAX_SOURCE_CHARS, QasmError, QasmProgram, parse_qasm
@@ -137,14 +138,18 @@ def _short_of_memory(n: int) -> str:
             "Try fewer qubits, or try again in a minute.")
 
 
-def _run_or_http_error(circuit_factory, shots: int) -> Dict:
+# OpenQASM runs report amplitudes for every listed outcome and every qubit's own chance (the Amplitudes and Qubits views).
+FULL_REPORT = {"amplitude_states": MAX_REPORTED_STATES, "per_qubit": True}
+
+
+def _run_or_http_error(circuit_factory, shots: int, **report) -> Dict:
     try:
         circuit = circuit_factory()
         mem = check_memory(circuit.n_qubits)
         if not mem.is_safe:
             raise HTTPException(status_code=400, detail=_short_of_memory(circuit.n_qubits))
         with simulation_slot():
-            return circuit.run(shots=shots).to_dict()
+            return circuit.run(shots=shots, **report).to_dict()
     except HTTPException:
         raise
     except MemoryError as e:
@@ -243,7 +248,7 @@ def run_qasm(req: QasmRequest, _user: User = Depends(get_current_user)) -> Dict:
         program = parse_qasm(req.source)
     except QasmError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    result = _qasm_finish(program)(_run_or_http_error(lambda: program.circuit, req.shots))
+    result = _qasm_finish(program)(_run_or_http_error(lambda: program.circuit, req.shots, **FULL_REPORT))
     return {"status": "ok", "result": result}
 
 
@@ -332,13 +337,13 @@ async def kernel_websocket(websocket: WebSocket, session_id: str, token: str = Q
             if action == "simulate":
                 def build():
                     req = SimulateRequest(**payload)
-                    return _build_custom(req), req.shots, None
+                    return _build_custom(req), req.shots, None, {}
                 still_here = await _ws_run(websocket, build)
             elif action == "qasm":
                 def build():
                     req = QasmRequest(**payload)
                     program = parse_qasm(req.source)
-                    return program.circuit, req.shots, _qasm_finish(program)
+                    return program.circuit, req.shots, _qasm_finish(program), FULL_REPORT
                 still_here = await _ws_run(websocket, build)
             elif action == "ping":
                 await _send(websocket, {"type": "pong"})
@@ -398,7 +403,7 @@ async def _ws_run(websocket: WebSocket, build) -> bool:
 
     watcher: Optional[asyncio.Task] = None
     try:
-        circuit, shots, finish = build()
+        circuit, shots, finish, report = build()
         mem = check_memory(circuit.n_qubits)
         if not mem.is_safe:
             await _send(websocket, {"type": "error", "detail": _short_of_memory(circuit.n_qubits)})
@@ -416,7 +421,7 @@ async def _ws_run(websocket: WebSocket, build) -> bool:
 
         def work():
             with simulation_slot():
-                return circuit.run(shots=shots, on_progress=on_progress, should_stop=stop.is_set)
+                return circuit.run(shots=shots, on_progress=on_progress, should_stop=stop.is_set, **report)
 
         watcher = asyncio.create_task(watch())
         task = loop.run_in_executor(None, work)

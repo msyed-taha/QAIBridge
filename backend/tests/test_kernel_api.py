@@ -275,3 +275,34 @@ def test_step_by_step_is_kept_to_small_circuits(client, token):
     r = _steps(client, token, _example(client, token, "ghz", 9))
     assert r.status_code == 422 and "up to 8 qubits" in r.json()["detail"]
     assert client.post("/api/kernel/qasm/steps", json={"source": BELL}).status_code in (401, 403)
+
+
+# ── Amplitudes and qubits ────────────────────────────────────────────────────
+
+def test_each_qubits_own_chance_matches_a_direct_count():
+    import numpy as np
+    from app.modules.module1_kernel import QuantumStateVector
+    rng = np.random.default_rng(5)
+    for n in (1, 4, 21):                         # 21 qubits spans several 2^20-amplitude chunks
+        v = rng.normal(size=2 ** n) + 1j * rng.normal(size=2 ** n)
+        v /= np.linalg.norm(v)
+        sv = QuantumStateVector(n)
+        sv.set_state(v)
+        p = (np.abs(v) ** 2).reshape([2] * n)
+        direct = [p.sum(axis=tuple(a for a in range(n) if a != q))[1] for q in range(n)]
+        assert np.allclose(sv.qubit_one_probabilities(), direct, atol=1e-12)
+
+
+def test_runs_report_every_qubit_and_the_amplitudes_behind_the_chances(client, token):
+    src = 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\nh q[0];\ncx q[0], q[1];\nx q[2];\ns q[0];\n'
+    result = _run(client, token, src)
+    assert result["qubit_ones"] == pytest.approx([0.5, 0.5, 1.0])
+    amps = {a["state"]: a for a in result["amplitudes"]}
+    assert set(amps) == {"|001>", "|111>"}
+    assert amps["|001>"]["phase_deg"] == pytest.approx(0) and amps["|111>"]["phase_deg"] == pytest.approx(90)   # s turned |1..⟩
+    assert amps["|111>"]["magnitude"] == pytest.approx(0.5 ** 0.5)
+
+
+def test_amplitudes_cover_every_listed_outcome(client, token):
+    result = _run(client, token, 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[11];\nh q;\n')
+    assert len(result["probabilities"]) == 1024 and len(result["amplitudes"]) == 1024 and result["truncated"]

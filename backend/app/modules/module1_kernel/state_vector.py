@@ -507,6 +507,30 @@ class QuantumStateVector:
             "length": round(float(np.sqrt(x * x + y * y + z * z)), 6),
         }
 
+    def qubit_one_probabilities(self) -> np.ndarray:
+        """
+        The chance that each qubit reads 1, for all qubits in one chunked pass
+        (no full-size temporary, so it also works at 28 qubits).
+
+        Chunks are aligned blocks of 2^low amplitudes: inside a block the last
+        `low` qubits vary (summed per axis), the first n − low are fixed by the
+        block number (the block's total goes to every qubit set in it).
+        """
+        n = self.n_qubits
+        ones = np.zeros(n)
+        size = min(self.dim, _CHUNK)
+        low = size.bit_length() - 1
+        high = n - low
+        for block, start in enumerate(range(0, self.dim, size)):
+            p = np.abs(self._state[start:start + size]) ** 2
+            total = float(p.sum())
+            for q in range(high):
+                if (block >> (high - 1 - q)) & 1:
+                    ones[q] += total
+            for k in range(low):
+                ones[high + k] += float(p.reshape(1 << k, 2, -1)[:, 1, :].sum())
+        return ones
+
     def bloch_vectors(self) -> List[Dict[str, float]]:
         return [self.bloch_vector(q) for q in range(self.n_qubits)]
 
