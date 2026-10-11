@@ -47,4 +47,5 @@ export const aiApi = {
 /** Feature names as people read them. */
 export const AI_FEATURE_NAMES: Record<string, string> = {
   code_to_quantum: 'Code to Quantum',
+  advisor: 'AI Advisor',
 };

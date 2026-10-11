@@ -70,7 +70,8 @@ def llm_status(user_id: Optional[int] = None) -> Dict[str, Any]:
 
 def analyze_with_llm(code: str, user_id: Optional[int] = None) -> Dict[str, Any]:
     """The problem spec Claude reads from the code. Raises ai.AIUnavailable or LLMError."""
-    answer = ai.ask(FEATURE, SYSTEM_PROMPT, code, user_id=user_id, max_tokens=2000)
+    # reading arbitrary code into exact parameters benefits from thinking first
+    answer = ai.ask(FEATURE, SYSTEM_PROMPT, code, user_id=user_id, max_tokens=4000, think=True)
     try:
         return _spec_from(answer)
     except LLMError:

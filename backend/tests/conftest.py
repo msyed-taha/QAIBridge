@@ -40,8 +40,8 @@ class FakeClaude:
         self.error = None
         self.calls: list = []
 
-    def send(self, model, system, user, max_tokens):
-        self.calls.append({"model": model, "system": system, "user": user, "max_tokens": max_tokens})
+    def send(self, model, system, user, max_tokens, think=False):
+        self.calls.append({"model": model, "system": system, "user": user, "max_tokens": max_tokens, "think": think})
         if self.error is not None:
             raise self.error
         return (self.replies.pop(0) if self.replies else self.reply), dict(self.usage)

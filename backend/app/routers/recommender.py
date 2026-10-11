@@ -1,10 +1,16 @@
 """
-Module 4 – Quantum Algorithm AI Advisor
+AI Advisor
 Accepts a free-text problem description (or an uploaded file) and recommends
 whether a Quantum or Classical approach is best, along with the specific
 algorithm using a Random Forest Classifier.
 
-Routes:
+Reading the problem: the AI (Claude, through the shared AI service) fills in
+the model's ten features and, after the model has chosen, explains the choice
+in plain words. When the AI can't answer, or the user picks the built-in
+reader, keyword rules fill in the features instead. Either way the Random
+Forest makes the recommendation.
+
+Routes (signed-in users; the AI has a daily allowance per user):
   POST /api/module4/advise        – Analyse free-text problem description
   POST /api/module4/advise-file   – Analyse uploaded file (PDF, DOCX, CSV, TXT…)
   GET  /api/module4/algorithms    – List all supported algorithms
@@ -19,14 +25,19 @@ import math
 import json
 import random
 import numpy as np
-from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from pydantic import BaseModel
+from typing import Any, Dict, List, Literal, Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel, Field
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-router = APIRouter(prefix="/api/module4", tags=["Module 4 – AI Algorithm Advisor"])
+from ..ai import service as ai
+from ..models.user import User
+from ..modules.module4_recommender import ai_reader
+from .auth import get_current_user
+
+router = APIRouter(prefix="/api/module4", tags=["AI Advisor"])
 
 # ── Algorithm catalogue ───────────────────────────────────────────────────────
 
@@ -352,10 +363,11 @@ _GENERIC_PROBLEM_CUES = [
 ]
 
 
-def _validate_problem_text(text: str) -> Optional[str]:
+def _validate_problem_text(text: str, check_topic: bool = True) -> Optional[str]:
     """Return an error message if `text` doesn't read as a genuine problem description
     to analyse, or None if it passes. Runs three gates: enough substance, plausible
-    words (not random characters), and at least some computing/problem relevance."""
+    words (not random characters), and at least some computing/problem relevance.
+    The AI judges relevance better than keywords, so it skips the third gate."""
     cleaned = text.strip()
     words = re.findall(r"[A-Za-z]+", cleaned)
 
@@ -375,6 +387,8 @@ def _validate_problem_text(text: str) -> Optional[str]:
                 "characters. Please describe an actual computational problem in plain English."
             )
 
+    if not check_topic:
+        return None
     t = cleaned.lower()
     has_category_hit = any(kw in t for kws in CATEGORY_KEYWORDS.values() for kw in kws)
     has_generic_cue = any(c in t for c in _GENERIC_PROBLEM_CUES)
@@ -445,7 +459,7 @@ def _extract_features_from_text(text: str) -> dict:
 
     # ── Data size detection ───────────────────────────────────────────────────
     # Look for explicit numbers, words like "billion", "million", "thousand", or counted things
-    data_size = {2: 100, 4: 50, 6: 1_000}.get(best_cat, 1_000_000)  # category-aware default
+    data_size = _default_size(best_cat)
     size_patterns = [
         (r'(\d[\d,]*)\s*billion', 1_000_000_000),
         (r'(\d[\d,]*)\s*million', 1_000_000),
@@ -479,6 +493,11 @@ def _extract_features_from_text(text: str) -> dict:
         "multi_solution":      multi_sol,
         "speedup_priority":    1,
     }
+
+def _default_size(category: int) -> int:
+    """The problem size assumed when the description doesn't give one."""
+    return {2: 100, 4: 50, 6: 1_000}.get(category, 1_000_000)
+
 
 def _features_to_vector(f: dict) -> np.ndarray:
     return np.array([[
@@ -558,7 +577,7 @@ REASON_TEMPLATES = {
     # Quantum algorithms
     "grovers":       "Your problem involves searching an unstructured space — Grover's √N oracle calls give a direct quadratic speedup over any classical linear scan.",
     "shors":         "The periodic or cryptographic nature of your problem maps directly to Shor's QFT-based period-finding, delivering exponential advantage.",
-    "qaoa":          "Your combinatorial optimisation problem with graph structure is the ideal target for QAOA's variational quantum circuits.",
+    "qaoa":          "Combinatorial optimisation, choosing the best of very many possible combinations, is the target QAOA's variational quantum circuits are built for.",
     "amplitude_amp": "Multiple valid solutions in an unstructured space make Amplitude Amplification the strongest match — it generalises Grover's to any 'good state' subspace.",
     "vqe":           "Continuous variables and simulation requirements point to VQE's hybrid variational energy minimisation — designed for quantum chemistry.",
     "qpe":           "Your need for precise eigenvalue or phase estimation makes Quantum Phase Estimation the optimal choice.",
@@ -770,25 +789,68 @@ async def _extract_text(file: UploadFile) -> str:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+Mode = Literal["auto", "local"]
+
+
 class AdviseTextRequest(BaseModel):
-    problem_text: str
+    problem_text: str = Field(..., max_length=20_000)
+    mode:         Mode = "auto"          # auto: the AI reads it (built-in reader if it can't); local: built-in only
+
+
+def _advise(text: str, mode: str, user: User) -> Dict[str, Any]:
+    """Read the problem (AI or keywords), let the Random Forest choose, and have the AI explain the choice."""
+    # Too short, or random characters: turned away before anything is sent to the AI.
+    problem = _validate_problem_text(text, check_topic=False)
+    if problem:
+        raise HTTPException(422, problem)
+
+    read, note = None, None
+    if mode == "auto":
+        try:
+            read = ai_reader.read_problem(text, user.id)
+        except ai.AIUnavailable as e:
+            note = f"{e.message} The built-in reader was used instead."
+        except ValueError:
+            note = "The AI's answer couldn't be used, so the built-in reader was used instead."
+
+    if read and read["off_topic"]:
+        return {"off_topic": True, "message": read["redirect"], "ai_status": ai.status(user.id)}
+
+    if read:
+        features = dict(read["features"])
+        if features["data_size"] is None:
+            features["data_size"] = _default_size(features["problem_category"])
+    else:
+        problem = _validate_problem_text(text)
+        if problem:
+            raise HTTPException(422, problem)
+        features = _extract_features_from_text(text)
+
+    result = _run_classifier(features, text)
+    result["engine"] = "ai" if read else "built-in"
+    if read:
+        result["summary"] = read["summary"]
+        result["ai"] = {"model": read["model"], "saved": read["saved"]}
+        result["explanation"] = ai_reader.explain(read["summary"] or text[:2000], result, user.id)
+    if note:
+        result["ai_note"] = note
+    result["ai_status"] = ai.status(user.id)
+    return result
+
 
 @router.post("/advise")
-def advise_text(req: AdviseTextRequest):
+def advise_text(req: AdviseTextRequest, user: User = Depends(get_current_user)):
     """Analyse a free-text problem description and recommend the best approach."""
     if not req.problem_text.strip():
         raise HTTPException(400, "problem_text cannot be empty.")
-    validation_error = _validate_problem_text(req.problem_text)
-    if validation_error:
-        raise HTTPException(422, validation_error)
-    features = _extract_features_from_text(req.problem_text)
-    result   = _run_classifier(features, req.problem_text)
+    result = _advise(req.problem_text, req.mode, user)
     result["source"] = "text"
     result["input_preview"] = req.problem_text[:300]
     return result
 
+
 @router.post("/advise-file")
-async def advise_file(file: UploadFile = File(...)):
+async def advise_file(file: UploadFile = File(...), mode: Mode = Form("auto"), user: User = Depends(get_current_user)):
     """Extract text from an uploaded file and analyse the problem."""
     allowed = {"pdf", "docx", "doc", "csv", "txt", "md", "json", "tex", "rtf"}
     ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
@@ -797,15 +859,12 @@ async def advise_file(file: UploadFile = File(...)):
     extracted = await _extract_text(file)
     if not extracted.strip():
         raise HTTPException(400, "Could not extract any text from the uploaded file.")
-    validation_error = _validate_problem_text(extracted)
-    if validation_error:
-        raise HTTPException(422, validation_error)
-    features = _extract_features_from_text(extracted)
-    result   = _run_classifier(features, extracted)
+    result = _advise(extracted, mode, user)
     result["source"]        = "file"
     result["filename"]      = file.filename
     result["input_preview"] = extracted[:300]
     return result
+
 
 @router.get("/algorithms")
 def get_algorithms():

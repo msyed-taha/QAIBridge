@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowRight, Bot, Brain, CheckCircle2, ChevronRight, Code2, Cpu, Loader2, RefreshCw,
-  Sparkles, Terminal, WifiOff, XCircle, Zap,
+  AlertTriangle, ArrowRight, Brain, CheckCircle2, ChevronRight, Code2, Cpu, Loader2, RefreshCw,
+  Sparkles, Terminal, XCircle, Zap,
 } from 'lucide-react';
 import { HowToUse } from '../components/shared/HowToUse';
+import { AIStatusLine, WrittenByAI } from '../components/ai/AIStatus';
 import { CodeBlock } from '../components/shared/CodeBlock';
 import { GroverViews, ShorViews, SideBySide, TspViews } from '../components/module2/SfodResultViews';
 import { LogicView, QaoaProblemView } from '../components/module5/TransformerViews';
@@ -39,21 +40,6 @@ const MODES = [
   { id: 'llm', label: 'AI only', hint: 'Only the AI reads your code. You\'ll see a message if it can\'t.' },
   { id: 'local', label: 'Built-in', hint: 'The built-in reader understands Python without the AI. It works offline.' },
 ] as const;
-
-/** "AI on · 38 of 40 left today", or why the AI is off. */
-function EngineBadge({ engine }: { engine: EngineStatus | null }) {
-  if (!engine) return null;
-  return engine.available ? (
-    <p className="inline-flex items-center gap-1.5 text-xs text-purple-200 bg-purple-500/10 border border-purple-500/30 rounded-full px-3 py-1">
-      <Bot className="w-3.5 h-3.5" aria-hidden="true" />
-      AI reads your code · {engine.remaining_today} of {engine.daily_limit} left today
-    </p>
-  ) : (
-    <p className="inline-flex items-center gap-1.5 text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1">
-      <WifiOff className="w-3.5 h-3.5" aria-hidden="true" /> {engine.message} The built-in code reader is used.
-    </p>
-  );
-}
 
 function PipelineBar({ reached }: { reached: number }) {
   return (
@@ -171,7 +157,7 @@ export function Module5Page() {
           The AI reads your code, the Mathematical Bridge turns it into a Hamiltonian or oracle, the circuit runs on
           QAIbridge's simulator, and the quantum answer is checked against the classical one.
         </p>
-        <EngineBadge engine={engine} />
+        <AIStatusLine status={engine} reads="your code" fallback="The built-in code reader is used." />
       </div>
 
       <HowToUse
@@ -280,9 +266,7 @@ export function Module5Page() {
             <span className="ml-auto text-xs text-gray-400">confidence {(spec.confidence * 100).toFixed(0)}%</span>
           </div>
           {spec.engine === 'llm' && (
-            <p className="inline-flex items-center gap-1.5 text-xs text-purple-200 bg-purple-500/10 border border-purple-500/30 rounded-full px-2.5 py-0.5 mb-3">
-              <Bot className="w-3.5 h-3.5" aria-hidden="true" /> Written by AI, checked by the simulator
-            </p>
+            <div className="mb-3"><WrittenByAI /></div>
           )}
           <p className="text-sm text-gray-300 leading-relaxed mb-3">{spec.explanation}</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

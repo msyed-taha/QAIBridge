@@ -307,7 +307,7 @@ def _error_kind(r: httpx.Response) -> str:
         return ""
 
 
-def _send(model: str, system: str, user: str, max_tokens: int) -> Tuple[str, Dict[str, int]]:
+def _send(model: str, system: str, user: str, max_tokens: int, think: bool = False) -> Tuple[str, Dict[str, int]]:
     """The only place that talks to Claude. Tests replace it with a fake."""
     base = (os.getenv("LLM_BASE_URL") or API_URL).rstrip("/")
     r = httpx.post(
@@ -318,6 +318,8 @@ def _send(model: str, system: str, user: str, max_tokens: int) -> Tuple[str, Dic
             # the fixed instructions are cached by Claude, so repeats cost less
             "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             "messages": [{"role": "user", "content": user}],
+            # Thinking first makes answers slower and longer (its tokens are paid for); only some tasks need it.
+            **({} if think else {"thinking": {"type": "disabled"}}),
         },
         timeout=TIMEOUT_SECONDS,
     )
@@ -325,7 +327,7 @@ def _send(model: str, system: str, user: str, max_tokens: int) -> Tuple[str, Dic
         raise AIServiceError(f"HTTP {r.status_code} {_error_kind(r)}".strip())
     data = r.json()
     if data.get("stop_reason") == "max_tokens":
-        raise AIServiceError("the answer was cut off")
+        raise AIServiceError(f"the answer was cut off at {max_tokens} tokens")
     text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     u = data.get("usage") or {}
     return text, {
@@ -337,10 +339,12 @@ def _send(model: str, system: str, user: str, max_tokens: int) -> Tuple[str, Dic
 
 
 def ask(feature: str, system: str, data: str, *, user_id: Optional[int], note: str = "",
-        max_tokens: int = 1000) -> Answer:
+        max_tokens: int = 1000, think: bool = False) -> Answer:
     """
     Ask Claude to do `feature`'s task (`system`) on the user's material (`data`).
     `note` is extra instructions from the app itself (never the user's text).
+    `think` lets Claude reason before answering (better for hard reading, slower;
+    its tokens count towards `max_tokens`).
     Raises AIUnavailable when the AI can't answer; the caller then falls back.
     """
     if not api_key():
@@ -348,7 +352,7 @@ def ask(feature: str, system: str, data: str, *, user_id: Optional[int], note: s
     model = model_name()
     full_system = system.strip() + SHARED_RULES
     user_msg = (note.strip() + "\n\n" if note.strip() else "") + as_data(data)
-    key = hashlib.sha256("\x1f".join([model, feature, full_system, user_msg, str(max_tokens)]).encode()).hexdigest()
+    key = hashlib.sha256("\x1f".join([model, feature, full_system, user_msg, str(max_tokens), str(think)]).encode()).hexdigest()
 
     with SessionLocal() as db:
         s = settings(db)
@@ -368,7 +372,7 @@ def ask(feature: str, system: str, data: str, *, user_id: Optional[int], note: s
 
     t0 = time.perf_counter()
     try:
-        text, usage = _send(model, full_system, user_msg, max_tokens)
+        text, usage = _send(model, full_system, user_msg, max_tokens, think)
     except (httpx.HTTPError, AIServiceError, ValueError, KeyError) as e:
         with SessionLocal() as db:
             _add(db, user_id, feature, model, OUTCOME_ERROR, latency_ms=(time.perf_counter() - t0) * 1000)

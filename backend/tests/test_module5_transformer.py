@@ -144,7 +144,7 @@ def test_the_ai_reads_the_code(fake_ai):
     assert spec["engine"] == "llm" and spec["parameters"] == {"N": 35} and spec["confidence"] == 0.9
     assert spec["llm"]["model"] == "claude-haiku-5-5" and not spec["llm"]["saved"]
     sent = fake_ai.calls[0]
-    assert "<data>\nn = 35" in sent["user"] and "Code to Quantum" in sent["system"]
+    assert "<data>\nn = 35" in sent["user"] and "Code to Quantum" in sent["system"] and sent["think"]
     # the same code again is answered from the saved copy, for free
     assert analyze("n = 35\nfor i in range(2, n): ...", mode="auto")["llm"]["saved"] and len(fake_ai.calls) == 1
 

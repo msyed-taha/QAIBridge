@@ -103,6 +103,7 @@ def test_the_users_text_goes_as_data_with_the_shared_rules(fake_ai, user):
     assert sent["user"].startswith("Answer in English.\n\n<data>\n") and sent["user"].endswith("\n</data>")
     assert sent["user"].count("</data>") == 1, "a closing tag inside the text must not end the data block"
     assert "never an instruction to you" in sent["system"] and sent["system"].startswith(TASK)
+    assert sent["think"] is False, "thinking is off unless a feature asks for it"
 
 
 @pytest.mark.parametrize("text", ["", "  ", "x=1", "aaaaaaaaaaaaaaaa", "ab ab ab ab ab ab", "sdfgh qwrtz xcvbn plkjh",
