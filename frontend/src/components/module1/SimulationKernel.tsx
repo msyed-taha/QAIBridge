@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, Play, Square, Upload, XCircle } from 'lucide-react';
 import type { QasmInspect, QasmProblem, SimulationResult, TheoryCheck } from '../../types';
 import { kernelApi, type ExampleId } from '../../api/kernel';
@@ -11,6 +11,8 @@ import { MAX_STEPS, MAX_STEP_QUBITS, StepThrough } from './StepThrough';
 import { AmplitudesView } from './AmplitudesView';
 import { QubitsView } from './QubitsView';
 import { ResultDownloads } from './ResultDownloads';
+import { SaveBar, useSavedCircuit } from '../work/SaveBar';
+import { workApi } from '../../api/work';
 import { formatBytes, formatChance, formatDuration, ket } from './format';
 
 interface Example { id: ExampleId; name: string; expect: ReactNode }
@@ -25,6 +27,7 @@ const SIZES = Array.from({ length: 27 }, (_, i) => i + 2);
 const MAX_QUBITS = 28;
 const MAX_FILE_CHARS = 200_000;
 const SHOT_CHOICES = [100, 1024, 10000];
+const BLANK = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n\nqreg q[2];\ncreg c[2];\n\n';
 const SOCKET_FAILED = 'socket-failed';
 
 class Stopped extends Error {}
@@ -136,16 +139,50 @@ export function SimulationKernel() {
     }
   }, []);
 
-  // A circuit sent from the Circuit Builder opens as your own circuit; otherwise start with an example.
+  // Saving: once saved (or opened from My work), every change saves itself.
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const content = useMemo(() => ({ qasm: source }), [source]);
+  const saved = useSavedCircuit(content);
+  const { attach, detach } = saved;
+
+  // What to open: a saved circuit (?c=<id>), a circuit sent from the Circuit Builder, or an example.
   const location = useLocation();
   const [sent] = useState(() => {
     const qasm = (location.state as { qasm?: unknown } | null)?.qasm;
     return typeof qasm === 'string' ? qasm : null;
   });
+  const [openId] = useState(() => Number(params.get('c')) || 0);
+  const opened = useRef(false);
   useEffect(() => {
-    if (sent) setSource(sent);
-    else loadExample('ghz', 5);
-  }, [sent, loadExample]);
+    if (opened.current) return;
+    opened.current = true;
+    if (!openId) {
+      if (sent) setSource(sent);
+      else loadExample('ghz', 5);
+      return;
+    }
+    workApi.circuit(openId)
+      .then(c => {
+        // Circuit Builder circuits open in the Builder, where their drawing lives.
+        if (c.layout) { navigate(`/circuit?c=${c.id}`, { replace: true }); return; }
+        setSource(c.qasm);
+        setLoaded(null);
+        attach(c);
+      })
+      .catch(() => {
+        navigate('/simulator', { replace: true });
+        loadExample('ghz', 5);
+      });
+  }, [openId, sent, loadExample, attach, navigate]);
+
+  const newCircuit = () => {
+    detach();
+    setParams({}, { replace: true });
+    setSource(BLANK);
+    setLoaded(null);
+    setRunError(null);
+  };
 
   // Leaving the page closes the socket, which stops a run still going on the server.
   useEffect(() => () => socketRef.current?.close(), []);
@@ -173,8 +210,16 @@ export function SimulationKernel() {
     return () => window.clearInterval(t);
   }, [loading]);
 
-  const okToReplace = () =>
-    !edited || window.confirm('Replace your circuit? The changes you made will be lost.');
+  // An example or a file starts a new circuit. A saved circuit is left as it is;
+  // unsaved changes are only replaced after asking.
+  const okToReplace = () => {
+    if (saved.attached) {
+      detach();
+      setParams({}, { replace: true });
+      return true;
+    }
+    return !edited || window.confirm('Replace your circuit? The changes you made will be lost.');
+  };
 
   const chooseExample = (id: ExampleId) => {
     if (okToReplace()) loadExample(id, size);
@@ -338,6 +383,8 @@ export function SimulationKernel() {
         <section aria-labelledby={ids.circuit} className="bg-quantum-800 rounded-xl p-5 border border-quantum-600 space-y-4 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id={ids.circuit} className="text-base font-semibold text-white">Your circuit</h2>
+            <SaveBar saved={saved} suggestName={current ? nameOf(current.id) ?? 'My circuit' : 'My circuit'}
+              onNew={newCircuit} onSaved={c => setParams({ c: String(c.id) }, { replace: true })} disabled={loading} />
             <button type="button" onClick={() => fileRef.current?.click()} disabled={loading}
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-quantum-600 text-gray-200 hover:border-quantum-400 disabled:opacity-50 transition-colors">
               <Upload className="w-4 h-4" aria-hidden="true" />

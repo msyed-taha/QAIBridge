@@ -27,6 +27,7 @@ const page = <K extends string>(load: () => Promise<Record<K, React.ComponentTyp
 
 const AppHome        = page(() => import('./pages/AppHome'), 'AppHome');
 const AccountPage    = page(() => import('./pages/AccountPage'), 'AccountPage');
+const WorkPage       = page(() => import('./pages/WorkPage'), 'WorkPage');
 const SolvePage      = page(() => import('./pages/SolvePage'), 'SolvePage');
 const DashboardPage  = page(() => import('./pages/DashboardPage'), 'DashboardPage');
 const Module1Page    = page(() => import('./pages/Module1Page'), 'Module1Page');
@@ -127,6 +128,7 @@ export default function App() {
                 {/* ── Protected ── */}
                 <Route path="/app"       element={<ProtectedRoute><AppHome /></ProtectedRoute>} />
                 <Route path="/account"   element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+                <Route path="/work"      element={<ProtectedRoute><WorkPage /></ProtectedRoute>} />
                 <Route path="/simulator" element={<ProtectedRoute><Module1Page /></ProtectedRoute>} />
                 <Route path="/circuit"   element={<ProtectedRoute><Module3Page /></ProtectedRoute>} />
                 <Route path="/solve"     element={<ProtectedRoute><SolvePage /></ProtectedRoute>} />

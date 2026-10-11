@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Cpu, LogOut, ArrowRight, LogIn, ShieldCheck, Settings, ChevronDown } from 'lucide-react';
+import { Menu, X, Cpu, LogOut, ArrowRight, LogIn, ShieldCheck, Settings, ChevronDown, FolderOpen } from 'lucide-react';
 import { QAIBridgeLogo } from './QAIBridgeLogo';
 import { useAuth } from '../../context/AuthContext';
 import { adminApi, onMessagesChanged } from '../../api/admin';
@@ -251,6 +251,15 @@ export function Navbar() {
                     <p className="text-white text-sm font-semibold truncate">{user?.username}</p>
                     <p className="text-gray-400 text-xs truncate">{user?.email}</p>
                   </div>
+                  {!inAdminView && (
+                    <Link
+                      to="/work"
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-quantum-700 hover:text-white transition-colors"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                      My work
+                    </Link>
+                  )}
                   <Link
                     to="/account"
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-quantum-700 hover:text-white transition-colors"
@@ -358,6 +367,14 @@ export function Navbar() {
                     className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-amber-300 hover:bg-amber-500/10 transition-colors"
                   >
                     <viewSwitch.Icon className="w-4 h-4" /> {viewSwitch.label}
+                  </Link>
+                )}
+                {!inAdminView && (
+                  <Link
+                    to="/work"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-quantum-800 hover:text-white transition-colors"
+                  >
+                    <FolderOpen className="w-4 h-4" /> My work
                   </Link>
                 )}
                 <Link

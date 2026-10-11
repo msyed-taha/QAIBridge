@@ -10,6 +10,7 @@ import { TOOLS, TOOL_GROUPS, toolsIn } from '../tools';
 import type { Tool, ToolGroup } from '../tools';
 import { dashboardApi } from '../api/dashboard';
 import type { HistoryRun } from '../api/dashboard';
+import { workApi, circuitLink, timeAgo, type CircuitSummary } from '../api/work';
 import { ContinueLearning } from '../learn/components/ContinueLearning';
 
 // ── Ask the AI Advisor ────────────────────────────────────────────────────────
@@ -180,39 +181,55 @@ const RUN_SOURCES: Record<HistoryRun['kind'], { tool: string; to: (run: HistoryR
   benchmark: { tool: toolName('/dashboard'), to: () => '/dashboard' },
 };
 
-const timeAgo = (iso: string | null) => {
-  if (!iso) return '';
-  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
-  const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-  for (const [unit, size] of [['day', 86_400], ['hour', 3_600], ['minute', 60]] as const) {
-    if (seconds >= size) return format.format(-Math.floor(seconds / size), unit);
-  }
-  return 'just now';
-};
-
-/** The last 3 saved runs, each one click from its tool. Hidden until there is a run. */
+/** The circuit you last saved and your latest runs, each one click away. Hidden until there is one. */
 function RecentRuns() {
   const [runs, setRuns] = useState<HistoryRun[]>([]);
+  const [circuit, setCircuit] = useState<CircuitSummary | null>(null);
   useEffect(() => {
     let live = true;
     dashboardApi.history(3)
       .then(r => { if (live) setRuns(r); })
       .catch(() => { /* the rest of the page works without it */ });
+    workApi.circuits({ limit: 1 })
+      .then(c => { if (live) setCircuit(c[0] ?? null); })
+      .catch(() => { /* the rest of the page works without it */ });
     return () => { live = false; };
   }, []);
-  if (runs.length === 0) return null;
+  if (runs.length === 0 && !circuit) return null;
+  const shownRuns = runs.slice(0, circuit ? 2 : 3);
 
   return (
     <section className="px-6 pb-10">
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Pick up where you left off</h2>
-          <Link to="/dashboard" className="inline-flex items-center gap-1 text-xs font-medium text-quantum-neon hover:text-teal-300 transition-colors">
-            All your runs <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
+          <span className="flex gap-4">
+            <Link to="/work" className="inline-flex items-center gap-1 text-xs font-medium text-quantum-neon hover:text-teal-300 transition-colors">
+              My work <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+            <Link to="/dashboard" className="inline-flex items-center gap-1 text-xs font-medium text-quantum-neon hover:text-teal-300 transition-colors">
+              All your runs <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </span>
         </div>
         <ul className="grid gap-3 md:grid-cols-3">
-          {runs.map(run => {
+          {circuit && (
+            <li>
+              <Link to={circuitLink(circuit)} className="group flex h-full flex-col glass-card rounded-2xl p-4">
+                <span className="text-xs text-gray-400">
+                  {circuit.opens_in === 'builder' ? 'Circuit Builder' : 'Quantum Simulator'} · saved {timeAgo(circuit.updated_at)}
+                </span>
+                <span className="mt-1 text-sm font-semibold text-white break-words">{circuit.name}</span>
+                {circuit.n_qubits !== null && circuit.gate_count !== null && (
+                  <span className="mt-2 text-xs text-gray-300">{circuit.n_qubits} qubits, {circuit.gate_count} gates</span>
+                )}
+                <span className="mt-auto pt-3 inline-flex items-center gap-1 text-xs font-medium text-quantum-neon/80 group-hover:text-quantum-neon transition-colors">
+                  Continue <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+                </span>
+              </Link>
+            </li>
+          )}
+          {shownRuns.map(run => {
             const source = RUN_SOURCES[run.kind] ?? RUN_SOURCES.benchmark;
             const correct = run.summary?.quantum_correct;
             const showCheck = source.checked && typeof correct === 'boolean' && (run.kind !== 'transform' || run.summary?.supported !== false);

@@ -331,7 +331,7 @@ export function AccountPage() {
                 Closes your account and signs you out. We'll email a verification code
                 to <span className="text-gray-300">{email}</span> first.
                 You can restore it within {LEGAL.deletedAccountDays} days by signing up again with the same
-                email; after that, your account, its run history and your learning progress are permanently erased.
+                email; after that, your account, its run history, your learning progress and your saved circuits and projects are permanently erased.
               </>
             )}
           </p>
@@ -368,7 +368,7 @@ export function AccountPage() {
                   This closes <span className="text-white">{email}</span> and signs you
                   out. To continue, we'll send a 5-digit code to that email address. Signing up again
                   with it within {LEGAL.deletedAccountDays} days restores the account; after that it is
-                  permanently erased, with its run history and learning progress.
+                  permanently erased, with its run history, learning progress and saved circuits and projects.
                 </p>
                 <div className="flex gap-2">
                   <button

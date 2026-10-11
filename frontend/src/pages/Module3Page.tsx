@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, Award, Check, ChevronRight, Gamepad2, Hammer, Lightbulb, Link2, Loader2, Minus, Plus, Redo2,
   RotateCcw, Sparkles, Star, Trash2, Undo2, Zap,
@@ -11,6 +11,8 @@ import { BADGES, LEVELS, starsFor, type SimResult } from '../components/module3/
 import { CodeBlock } from '../components/shared/CodeBlock';
 import { HowToUse } from '../components/shared/HowToUse';
 import { builderQasm } from '../components/module3/qasm';
+import { SaveBar, useSavedCircuit } from '../components/work/SaveBar';
+import { workApi, type SavedCircuit } from '../api/work';
 
 // ── Gates ─────────────────────────────────────────────────────────────────────
 
@@ -106,22 +108,37 @@ function toKernelOps(gates: PlacedGate[]) {
 //    to the Simulator doesn't lose it. ──────────────────────────────────────────
 
 const DRAFT_KEY = 'qai_builder_draft';
+const CHALLENGES_KEY = 'qai_m3_progress';      // stars from before they were saved to the account
 
-function loadDraft(): { n: number; gates: PlacedGate[] } | null {
+interface Layout { n: number; gates: PlacedGate[] }
+interface Draft extends Layout { savedId?: number }
+
+/** A drawing we can trust: known gates, on wires that exist. */
+function asLayout(d: unknown): Layout | null {
+  const l = d as Layout | null;
+  if (!l || !Number.isInteger(l.n) || l.n < 1 || l.n > 6 || !Array.isArray(l.gates)) return null;
+  const ok = l.gates.every((g: PlacedGate) => g && META[g.gate] && Number.isInteger(g.col) && g.col >= 0
+    && [g.target, ...(g.controls ?? [])].every(q => Number.isInteger(q) && q >= 0 && q < l.n)
+    && (g.controls ?? []).length === META[g.gate].arity - 1);
+  return ok ? { n: l.n, gates: l.gates } : null;
+}
+
+function loadDraft(): Draft | null {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
-    if (!d || !Number.isInteger(d.n) || d.n < 1 || d.n > 6 || !Array.isArray(d.gates)) return null;
-    const ok = d.gates.every((g: PlacedGate) => g && META[g.gate] && Number.isInteger(g.col) && g.col >= 0
-      && [g.target, ...(g.controls ?? [])].every(q => Number.isInteger(q) && q >= 0 && q < d.n)
-      && (g.controls ?? []).length === META[g.gate].arity - 1);
-    return ok ? { n: d.n, gates: d.gates } : null;
+    const layout = asLayout(d);
+    return layout ? { ...layout, savedId: Number.isInteger(d.savedId) ? d.savedId : undefined } : null;
   } catch {
     return null;
   }
 }
 
-function saveDraft(n: number, gates: PlacedGate[]) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n, gates })); } catch { /* private mode */ }
+function saveDraft(draft: Draft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* private mode */ }
+}
+
+function localStars(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(CHALLENGES_KEY) ?? '{}'); } catch { return {}; }
 }
 
 // ── Toasts ────────────────────────────────────────────────────────────────────
@@ -132,7 +149,12 @@ interface Toast { id: number; text: string; tone: 'info' | 'good' | 'warn' }
 
 export function Module3Page() {
   const navigate = useNavigate();
-  const [draft] = useState(loadDraft);
+  const [params, setParams] = useSearchParams();
+  // "?new" (My work's "New circuit") starts a blank canvas instead of the draft.
+  const [startNew] = useState(() => params.has('new'));
+  const [draft] = useState(() => (startNew ? null : loadDraft()));
+  // The saved circuit the draft belongs to; cleared once handled so it is never reopened by mistake.
+  const [draftCircuit, setDraftCircuit] = useState(draft?.savedId ?? 0);
   const [mode, setMode] = useState<'free' | 'challenge'>('free');
   const [numQubits, setNumQubits] = useState(draft?.n ?? 2);
   const [gates, setGates] = useState<PlacedGate[]>(draft?.gates ?? []);
@@ -152,9 +174,7 @@ export function Module3Page() {
 
   const [levelIdx, setLevelIdx] = useState(0);
   const [showHint, setShowHint] = useState(false);
-  const [progress, setProgress] = useState<Record<string, number>>(() => {
-    try { return JSON.parse(localStorage.getItem('qai_m3_progress') ?? '{}'); } catch { return {}; }
-  });
+  const [progress, setProgress] = useState<Record<string, number>>(localStars);
   const [solved, setSolved] = useState<{ id: string; stars: number } | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -343,10 +363,10 @@ export function Module3Page() {
       const stars = starsFor(level, gates.length);
       if (solved?.id !== level.id || stars > solved.stars) {
         setSolved({ id: level.id, stars });
-        setProgress(p => {
-          const next = { ...p, [level.id]: Math.max(p[level.id] ?? 0, stars) };
-          try { localStorage.setItem('qai_m3_progress', JSON.stringify(next)); } catch { /* private mode */ }
-          return next;
+        setProgress(p => ({ ...p, [level.id]: Math.max(p[level.id] ?? 0, stars) }));
+        workApi.saveChallenges({ [level.id]: stars }).catch(() => {
+          // keep it in this browser; it moves to the account next time
+          try { localStorage.setItem(CHALLENGES_KEY, JSON.stringify({ ...localStars(), [level.id]: stars })); } catch { /* private mode */ }
         });
         toast(`Level complete — ${'★'.repeat(stars)}`, 'good');
       }
@@ -380,10 +400,74 @@ export function Module3Page() {
     }
   };
 
-  useEffect(() => { if (mode === 'free') saveDraft(numQubits, gates); }, [mode, numQubits, gates]);
-
   // The circuit as OpenQASM: shown live under the canvas, and what "Open in Simulator" takes along.
   const qasm = useMemo(() => builderQasm(toKernelOps(gates), numQubits), [gates, numQubits]);
+
+  // Saving: once saved (or opened from My work), every change saves itself. Challenges are never saved as circuits.
+  const content = useMemo(() => ({ qasm, layout: { n: numQubits, gates } }), [qasm, numQubits, gates]);
+  const saved = useSavedCircuit(content, mode !== 'free');
+  const savedId = saved.attached?.id;
+
+  useEffect(() => { if (mode === 'free') saveDraft({ n: numQubits, gates, savedId }); }, [mode, numQubits, gates, savedId]);
+
+  const showCircuit = useCallback((layout: Layout) => {
+    setNumQubits(layout.n);
+    setGates(layout.gates);
+    setPast([]);
+    setFuture([]);
+    setSelectedId(null);
+  }, []);
+
+  // Open the circuit in the address (?c=<id>), or the saved circuit you were last working on.
+  const wanted = Number(params.get('c')) || draftCircuit;
+  const { attach, detach } = saved;
+  useEffect(() => {
+    if (startNew && params.has('new')) setParams({}, { replace: true });
+  }, [startNew, params, setParams]);
+  useEffect(() => {
+    if (!wanted || wanted === savedId) return;
+    let live = true;
+    workApi.circuit(wanted)
+      .then((c: SavedCircuit) => {
+        if (!live) return;
+        setDraftCircuit(0);
+        if (!c.layout) { navigate(`/simulator?c=${c.id}`, { replace: true }); return; }
+        const layout = asLayout(c.layout);
+        if (!layout) return;
+        showCircuit(layout);
+        attach(c);
+        setParams({ c: String(c.id) }, { replace: true });
+      })
+      .catch(() => {
+        if (!live) return;
+        // deleted, or not yours: carry on with what is on the canvas, unsaved
+        setDraftCircuit(0);
+        setParams({}, { replace: true });
+      });
+    return () => { live = false; };
+  }, [wanted, savedId, attach, showCircuit, navigate, setParams]);
+
+  const newCircuit = () => {
+    detach();
+    setDraftCircuit(0);
+    showCircuit({ n: 2, gates: [] });
+    setParams({}, { replace: true });
+  };
+
+  // Challenge stars live in the account; stars from before that move across once.
+  useEffect(() => {
+    let live = true;
+    const local = localStars();
+    workApi.challenges()
+      .then(async server => {
+        const better = Object.fromEntries(Object.entries(local).filter(([id, s]) => s > (server[id] ?? 0)));
+        const all = Object.keys(better).length ? await workApi.saveChallenges(better) : server;
+        try { localStorage.removeItem(CHALLENGES_KEY); } catch { /* private mode */ }
+        if (live) setProgress(all);
+      })
+      .catch(() => { /* keep showing this browser's stars */ });
+    return () => { live = false; };
+  }, []);
 
   const changeQubits = (n: number) => {
     const kept = gates.filter(g => Math.max(...qubitsOf(g)) < n);
@@ -505,6 +589,12 @@ export function Module3Page() {
         <span className="text-xs text-gray-500 flex items-center gap-1 ml-2">
           <Star className="w-3.5 h-3.5 text-amber-300" /> {totalStars} / {LEVELS.length * 3} stars
         </span>
+        {mode === 'free' && (
+          <div className="w-full sm:w-auto sm:ml-auto">
+            <SaveBar saved={saved} suggestName="My circuit" onNew={newCircuit}
+              onSaved={c => setParams({ c: String(c.id) }, { replace: true })} />
+          </div>
+        )}
         {earnedBadges.map(b => (
           <span key={b.id} className="text-[11px] flex items-center gap-1 text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
             <Award className="w-3 h-3" /> {b.title}

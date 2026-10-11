@@ -17,6 +17,7 @@ const TITLES: Record<string, string> = {
   '/forgot-password': 'Reset your password',
   '/app':             'Home',
   '/account':         'Account settings',
+  '/work':            'My work',
   '/solve':           'Problem Solver',
   '/learn':           'Learn quantum computing',
   '/admin':           'Admin dashboard',
