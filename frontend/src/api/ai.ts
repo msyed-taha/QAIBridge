@@ -70,4 +70,5 @@ export const AI_FEATURE_NAMES: Record<string, string> = {
   code_to_quantum: 'Code to Quantum',
   advisor: 'AI Advisor',
   assistant: 'Ask QAIbridge',
+  describe_circuit: 'Describe a circuit',
 };

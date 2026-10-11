@@ -2,6 +2,7 @@
 Circuit Builder
 Routes:
   POST /api/module3/simulate  - Simulate a circuit built in the Circuit Builder (signed-in users)
+  POST /api/module3/describe  - Describe a circuit in words: the AI writes it, the simulator checks it (signed-in users)
   GET  /api/module3/gates     - Gate palette with plain-language descriptions
 
 The circuit builder sends gates in time order. Each gate names its target
@@ -14,11 +15,12 @@ statistics.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..ai import describe_circuit, service
 from ..models.user import User
 from ..modules.module1_kernel import QuantumCircuit, QuantumStateVector
 from ..routers.auth import get_current_user
@@ -145,6 +147,41 @@ def simulate(req: CircuitRequest, _user: User = Depends(get_current_user)):
         counts=counts,
         entangled_qubits=[b.qubit for b in bloch if b.entangled],
     )
+
+
+class DescribeRequest(BaseModel):
+    text:         str = Field(..., min_length=1, max_length=500)
+    current_qasm: str = Field("", max_length=6000)        # the circuit on the canvas now, so they can ask for a change
+
+
+@router.post("/describe")
+def describe(req: DescribeRequest, user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    """
+    The AI's circuit for a description, in the Builder's layout, and whether the
+    simulator's real chances match the ones the AI expected. When the AI can't
+    give one, `unavailable` says why.
+    """
+    try:
+        out = describe_circuit.describe(req.text, req.current_qasm, user_id=user.id)
+    except service.AIUnavailable as e:
+        return {"unavailable": e.message, "ai_status": service.status(user.id)}
+    if not out["off_topic"]:
+        n, gates = out["n"], out["gates"]
+        ops = [GateOp(gate=g["gate"], qubit=g["qubits"][-1],
+                      control_qubit=g["qubits"][0] if len(g["qubits"]) > 1 else None,
+                      control2=g["qubits"][1] if len(g["qubits"]) > 2 else None, angle=g.get("angle"))
+               for g in gates]
+        sv = QuantumStateVector(n)
+        _build(CircuitRequest(num_qubits=n, gates=ops, shots=0)).execute(sv)
+        probs = sv.probabilities()
+        out = {
+            "off_topic": False,
+            "layout": describe_circuit.layout(n, gates),
+            "explanation": out["explanation"],
+            "check": describe_circuit.compare(out["expected"], {format(i, f"0{n}b"): float(p) for i, p in enumerate(probs)}),
+        }
+    out["ai_status"] = service.status(user.id)
+    return out
 
 
 @router.get("/gates")

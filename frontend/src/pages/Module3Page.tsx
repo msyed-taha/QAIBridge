@@ -7,6 +7,7 @@ import {
 import axios from 'axios';
 import apiClient, { getApiErrorMessage } from '../api/client';
 import { AngleField } from '../components/module3/AngleField';
+import { DescribeCircuit } from '../components/module3/DescribeCircuit';
 import { BlochSphere } from '../components/module3/BlochSphere';
 import { BADGES, LEVELS, starsFor, type SimResult } from '../components/module3/challenges';
 import { CodeBlock } from '../components/shared/CodeBlock';
@@ -15,6 +16,7 @@ import { angleLabel, builderQasm } from '../components/module3/qasm';
 import { SaveBar, useSavedCircuit } from '../components/work/SaveBar';
 import { workApi, type SavedCircuit } from '../api/work';
 import { usePageDetails } from '../components/ai/pageDetails';
+import type { BuiltCircuit } from '../api/builder';
 
 // ── Gates ─────────────────────────────────────────────────────────────────────
 
@@ -603,6 +605,19 @@ export function Module3Page() {
     return () => { live = false; };
   }, []);
 
+  // The circuit from "Describe a circuit" replaces the canvas; Undo brings the old one back.
+  const placeBuilt = (built: BuiltCircuit['layout']): string | null => {
+    const layout = asLayout(built);
+    if (!layout) return null;
+    const placed = layout.gates.map(g => ({ ...g, id: uid() }));
+    if (gates.length) toast('Your circuit was replaced. Undo brings it back.');
+    commit(placed, layout.n);
+    setSelectedId(null);
+    setArmed(null);
+    setSaid(`The AI built a circuit with ${layout.n} qubit${layout.n > 1 ? 's' : ''} and ${placed.length} gate${placed.length !== 1 ? 's' : ''}.`);
+    return builderQasm(toKernelOps(placed), layout.n);
+  };
+
   const changeQubits = (n: number) => {
     if (n < 1 || n > MAX_QUBITS) return;
     const kept = gates.filter(g => Math.max(...qubitsOf(g)) < n);
@@ -713,8 +728,8 @@ export function Module3Page() {
         </p>
         <h1 className="text-3xl font-extrabold text-white mb-2">Quantum Circuit Builder</h1>
         <p className="text-gray-300 text-sm max-w-2xl mx-auto leading-relaxed">
-          Put gates on the wires and see the chances change straight away, with one Bloch sphere per qubit showing
-          superposition and entanglement. Save your circuit, or open it in the Simulator.
+          Put gates on the wires, or describe a circuit in words, and see the chances change straight away, with one
+          Bloch sphere per qubit showing superposition and entanglement. Save your circuit, or open it in the Simulator.
         </p>
       </div>
 
@@ -722,6 +737,7 @@ export function Module3Page() {
         defaultOpen={false}
         steps={[
           <><strong>Choose a gate</strong>, then a spot on a wire. With a mouse you can also drag it there.</>,
+          <>Or <strong>describe a circuit in words</strong>, such as “a Bell pair”. The AI builds it, and the simulator checks its chances.</>,
           <>Select a placed gate to change it: type an angle like <code>pi/8</code>, pick its qubits, or move it with the arrows. <kbd>Delete</kbd> removes it and <kbd>Ctrl/⌘ Z</kbd> undoes.</>,
           <>With a keyboard: press <kbd>Enter</kbd> on a gate, pick a spot with the arrow keys, then press <kbd>Enter</kbd> again. <kbd>Shift</kbd> + arrows move the selected gate.</>,
           <>Press <strong>Save</strong> to keep your circuit, or switch to <strong>Challenges</strong> for {LEVELS.length} levels with stars.</>,
@@ -756,6 +772,8 @@ export function Module3Page() {
           </span>
         ))}
       </div>
+
+      {mode === 'free' && <DescribeCircuit qasm={qasm} hasGates={gates.length > 0} onBuild={placeBuilt} />}
 
       {/* Challenge panel */}
       {mode === 'challenge' && (

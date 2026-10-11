@@ -25,7 +25,7 @@ PAGES: Dict[str, str] = {
     "/app": "App home: ask the AI Advisor a question, and pick up recent work",
     "/learn": "Learn: 9 short lessons, each with a reading, a picture, a game and a quiz",
     "/simulator": "Quantum Simulator: run any OpenQASM circuit (up to 28 qubits), replay it gate by gate, see its amplitudes and each qubit, download the results",
-    "/circuit": "Circuit Builder: put gates on wires and see the chances and one Bloch sphere per qubit straight away; 10 challenge levels",
+    "/circuit": "Circuit Builder: put gates on wires, or describe a circuit in words and the AI builds it; see the chances and one Bloch sphere per qubit straight away; 10 challenge levels",
     "/module4": "AI Advisor: describe a problem; it recommends a quantum or classical approach and an algorithm, and explains why",
     "/module5": "Code to Quantum: paste Python code; it becomes a quantum circuit that is run and checked against the code",
     "/module2": "Quantum vs Classical: Grover, Shor, QAOA and amplitude amplification next to the best classical method on the same input",
