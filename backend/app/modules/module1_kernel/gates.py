@@ -69,6 +69,8 @@ SX_GATE = np.array(
      [1 - 1j, 1 + 1j]], dtype=complex
 ) / 2   # √X — the native gate of IBM hardware
 
+SXDG_GATE = SX_GATE.conj().T   # √X† — undoes an SX gate
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Single-Qubit Parametric Gates
 # ──────────────────────────────────────────────────────────────────────────────
@@ -245,6 +247,16 @@ def RYY(theta: float) -> np.ndarray:
     )
 
 
+def CU(theta: float, phi: float, lam: float, gamma: float) -> np.ndarray:
+    """
+    Controlled-U with a phase on the control (Qiskit's CUGate, OpenQASM `cu`):
+    |0⟩⟨0| ⊗ I + e^{iγ}|1⟩⟨1| ⊗ U(θ, φ, λ).  With γ = 0 this is `cu3`.
+    """
+    m = np.eye(4, dtype=complex)
+    m[2:, 2:] = np.exp(1j * gamma) * U_GATE(theta, phi, lam)
+    return m
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Three-Qubit Constant Gates
 # ──────────────────────────────────────────────────────────────────────────────
@@ -275,6 +287,7 @@ SINGLE_QUBIT_GATES: Dict[str, Any] = {
     "TDAG":  T_DAG_GATE,
     "TDG":   T_DAG_GATE,  # alias (Qiskit spelling)
     "SX":    SX_GATE,
+    "SXDG":  SXDG_GATE,
     # Parametric (callables)
     "RX":    RX,
     "RY":    RY,
@@ -300,6 +313,7 @@ TWO_QUBIT_GATES: Dict[str, Any] = {
     "RXX":   RXX,
     "RYY":   RYY,
     "RZZ":   RZZ,
+    "CU":    CU,
 }
 
 THREE_QUBIT_GATES: Dict[str, Any] = {

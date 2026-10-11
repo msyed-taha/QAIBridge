@@ -19,7 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 _SIMPLE_1Q = {
     "H": "h", "X": "x", "Y": "y", "Z": "z", "S": "s", "SDAG": "sdg", "SDG": "sdg",
-    "T": "t", "TDAG": "tdg", "TDG": "tdg", "SX": "sx", "I": "id",
+    "T": "t", "TDAG": "tdg", "TDG": "tdg", "SX": "sx", "SXDG": "sxdg", "I": "id",
 }
 _PARAM_1Q = {"RX": "rx", "RY": "ry", "RZ": "rz", "P": "p", "U": "u"}
 _SIMPLE_2Q = {"CNOT": "cx", "CY": "cy", "CZ": "cz", "CH": "ch", "SWAP": "swap", "ISWAP": "iswap"}
@@ -98,6 +98,8 @@ def circuit_to_qiskit(circ: "QuantumCircuit", measure: bool = True) -> str:
             body.append(f"qc.{_SIMPLE_2Q[g]}({q[0]}, {q[1]})")
         elif g in _PARAM_2Q:
             body.append(f"qc.{_PARAM_2Q[g]}({_num(p[0])}, {q[0]}, {q[1]})")
+        elif g == "CU":
+            body.append(f"qc.cu({', '.join(_num(x) for x in p)}, {q[0]}, {q[1]})")
         elif g in _SIMPLE_3Q:
             body.append(f"qc.{_SIMPLE_3Q[g]}({q[0]}, {q[1]}, {q[2]})")
         elif g == "MCX":

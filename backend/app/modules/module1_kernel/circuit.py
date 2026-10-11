@@ -607,23 +607,6 @@ class CircuitLibrary:
         return circ
 
     @staticmethod
-    def qft_pattern(n_qubits: int = 4, period: int = 4) -> QuantumCircuit:
-        """
-        QFT of a pattern that repeats every `period` steps: H on all but the
-        last log2(period) qubits gives an even mix of 0, period, 2·period, …,
-        and the QFT turns that into `period` equally likely, evenly spaced
-        peaks (multiples of 2^n / period) — the step at the heart of Shor.
-        """
-        k = int(period).bit_length() - 1
-        if period < 2 or 2 ** k != period or k > n_qubits:
-            raise ValueError(f"The period must be a power of two between 2 and 2^{n_qubits}.")
-        circ = QuantumCircuit(n_qubits, f"QFT-pattern-{n_qubits}q", max_gates=100_000)
-        for q in range(n_qubits - k):
-            circ.h(q)
-        circ.qft()
-        return circ
-
-    @staticmethod
     def parametric_ansatz(n_qubits: int, layers: int = 2) -> QuantumCircuit:
         """
         Hardware-efficient ansatz for VQE / QAOA.

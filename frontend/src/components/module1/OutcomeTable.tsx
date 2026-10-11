@@ -10,6 +10,8 @@ const SHOWN_FROM = 1e-4;          // rows below 0.01 % are noise next to the pea
  */
 export function OutcomeTable({ result, shots }: { result: SimulationResult; shots: number }) {
   const n = result.n_qubits;
+  const labels = result.labels ?? Array.from({ length: n }, (_, i) => `q${i}`);
+  const order = labels.length <= 4 ? labels.join(', ') : `${labels.slice(0, 3).join(', ')} and so on`;
   const all = Object.entries(result.probabilities).sort(([, a], [, b]) => b - a);
   const rows = all.filter(([, p]) => p >= SHOWN_FROM).slice(0, MAX_ROWS);
   const top = rows[0]?.[1] ?? 1;
@@ -54,7 +56,7 @@ export function OutcomeTable({ result, shots }: { result: SimulationResult; shot
           ? <>The {rows.length} most likely of {possible} possible outcomes. </>
           : <>Every outcome with a chance, out of {possible} possible. </>}
         "Seen" counts how often each came up in {shots.toLocaleString()} measurements.
-        Read each outcome left to right as q0, q1, q2…
+        Read each outcome left to right as {order}. (Qiskit writes the same outcome right to left.)
       </p>
     </div>
   );

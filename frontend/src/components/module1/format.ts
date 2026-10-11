@@ -14,9 +14,6 @@ export function formatBytes(bytes: number): string {
   return `${shown} ${UNITS[u]}`;
 }
 
-/** Largest qubit count whose state vector fits in `bytes`. */
-export const qubitsThatFit = (bytes: number) => Math.floor(Math.log2(bytes / 16));
-
 /** 50%, 94.53%, 99.9988% (never rounds a near-certain chance up to 100%), 0.0244%, < 0.01%. */
 export function formatChance(p: number): string {
   if (p >= 1 - 1e-12) return '100%';

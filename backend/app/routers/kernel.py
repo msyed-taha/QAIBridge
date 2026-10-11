@@ -1,8 +1,10 @@
 """
 Module 1 – Custom Simulation Kernel  (FastAPI Router)
 Routes (all but /ram-table and /gates need a signed-in user):
-  POST  /api/kernel/simulate          – Run a circuit and return results
-  POST  /api/kernel/preset            – Run a pre-built circuit, checked against the textbook answer
+  POST  /api/kernel/simulate          – Run a circuit given as a list of gates
+  GET   /api/kernel/examples/{id}     – An example circuit as OpenQASM text (2–28 qubits)
+  POST  /api/kernel/qasm/inspect      – Read OpenQASM text: its size, or the line of the first problem
+  POST  /api/kernel/qasm              – Run OpenQASM text (examples are checked against the maths)
   POST  /api/kernel/export/qiskit     – Export a circuit as runnable Qiskit code
   GET   /api/kernel/memory            – RAM check for a given qubit count
   GET   /api/kernel/ram-table         – Full qubit → RAM table
@@ -15,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import math
 import threading
 from typing import Callable, List, Optional, Dict
 
@@ -26,7 +27,6 @@ from ..database import SessionLocal
 from ..models.user import User
 from ..modules.module1_kernel import (
     QuantumCircuit,
-    CircuitLibrary,
     SimulationCancelled,
     check_memory,
     ram_table,
@@ -36,7 +36,9 @@ from ..modules.module1_kernel import (
     MULTI_QUBIT_GATES,
     MAX_QUBITS,
 )
+from ..modules.module1_kernel.examples import EXAMPLES, MIN_QUBITS, PATTERN_PERIOD, example_qasm, match_example
 from ..modules.module1_kernel.limits import simulation_slot
+from ..modules.module1_kernel.qasm import MAX_SOURCE_CHARS, QasmError, QasmProgram, parse_qasm
 from ..modules.module1_kernel.memory_manager import MAX_RAM_CAP_GB, SAFETY_MARGIN
 from ..routers.auth import get_current_user, user_from_token
 
@@ -61,16 +63,15 @@ class SimulateRequest(BaseModel):
     name:       str = Field(default="Custom Circuit")
 
 
-class PresetCircuitRequest(BaseModel):
-    preset:   str = Field(..., description="One of: bell, ghz, grover, qft, qft_pattern, ansatz")
-    n_qubits: int = Field(default=2, ge=2, le=MAX_QUBITS)
-    shots:    int = Field(default=1024, ge=1, le=10000)
-    layers:   int = Field(default=2, ge=1, le=5)
+class QasmRequest(BaseModel):
+    source: str = Field(..., max_length=MAX_SOURCE_CHARS + 1, description="The circuit, in OpenQASM 2 or 3")
+    shots:  int = Field(default=1024, ge=1, le=10000)
 
 
-PRESETS = ("bell", "ghz", "grover", "qft", "qft_pattern", "ansatz")
-MAX_GROVER_PRESET_QUBITS = 16
-PATTERN_PERIOD = 4          # the qft_pattern input repeats every 4 steps
+class InspectRequest(BaseModel):
+    source: str = Field(..., max_length=MAX_SOURCE_CHARS + 1)
+
+
 CHECK_TOLERANCE = 1e-6      # how far a chance may sit from the textbook value
 
 
@@ -81,75 +82,54 @@ def _build_custom(req: SimulateRequest) -> QuantumCircuit:
     return circuit
 
 
-def _build_preset(req: PresetCircuitRequest) -> QuantumCircuit:
-    preset = req.preset.lower()
-    if preset == "bell":
-        return CircuitLibrary.bell_state(max(req.n_qubits, 2))
-    if preset == "ghz":
-        return CircuitLibrary.ghz_state(req.n_qubits)
-    if preset == "grover":
-        if req.n_qubits == 2:
-            return CircuitLibrary.grover_oracle_2qubit()
-        if req.n_qubits > MAX_GROVER_PRESET_QUBITS:
-            raise ValueError(f"The Grover preset supports up to {MAX_GROVER_PRESET_QUBITS} qubits.")
-        return CircuitLibrary.grover(req.n_qubits, target=2 ** req.n_qubits - 1)
-    if preset == "qft":
-        return CircuitLibrary.qft_circuit(req.n_qubits)
-    if preset == "qft_pattern":
-        return CircuitLibrary.qft_pattern(req.n_qubits, period=PATTERN_PERIOD)
-    if preset == "ansatz":
-        return CircuitLibrary.parametric_ansatz(req.n_qubits, layers=req.layers)
-    raise HTTPException(status_code=400, detail=f"Unknown preset '{preset}'. Choose from: {', '.join(PRESETS)}")
-
-
-def _grover_success(n: int) -> float:
-    """Textbook chance of the marked item after the preset's floor(π/4·√N) rounds."""
-    if n == 2:
-        return 1.0
-    theta = math.asin(1 / math.sqrt(2 ** n))
-    rounds = max(1, int(math.floor(math.pi / 4 * math.sqrt(2 ** n))))
-    return math.sin((2 * rounds + 1) * theta) ** 2
-
-
-def _theory_check(preset: str, n: int, result: Dict) -> Optional[Dict]:
+def _theory_check(example: Optional[str], n: int, result: Dict) -> Dict:
     """
-    Compare the simulator's exact chances with what the maths says they must be,
-    so every preset run proves itself. `kind` tells the page how to word it.
+    Compare the simulator's exact chances with what the maths says they must be.
+    The GHZ and pattern examples have a known answer; for anything else the check
+    is that every chance still adds up to 100%. `kind` tells the page how to word it.
     """
     probs = result["probabilities"]
     ket = lambda i: f"|{i:0{n}b}>"
 
-    def against(kind: str, expected: Dict[str, float]) -> Dict:
+    def against(expected: Dict[str, float]) -> Dict:
         measured = {s: probs.get(s, 0.0) for s in expected}
         error = max(abs(measured[s] - p) for s, p in expected.items())
-        return {"kind": kind, "expected": expected, "measured": measured,
+        return {"kind": "outcomes", "expected": expected, "measured": measured,
                 "max_error": float(f"{error:.3g}"), "passed": error < CHECK_TOLERANCE}
 
-    if preset == "bell":
-        return against("outcomes", {ket(0): 0.5, ket(3 << (n - 2)): 0.5})
-    if preset == "ghz":
-        return against("outcomes", {ket(0): 0.5, ket(2 ** n - 1): 0.5})
-    if preset == "grover":
-        return against("marked", {ket(2 ** n - 1): _grover_success(n)})
-    if preset == "qft_pattern":
+    if example == "ghz":
+        return against({ket(0): 0.5, ket(2 ** n - 1): 0.5})
+    if example == "qft_pattern":
         step = 2 ** n // PATTERN_PERIOD
-        return against("outcomes", {ket(i * step): 1 / PATTERN_PERIOD for i in range(PATTERN_PERIOD)})
-    if preset == "qft":
-        error = max((abs(p - 2.0 ** -n) for p in probs.values()), default=1.0)
-        return {"kind": "uniform", "expected": 2.0 ** -n, "max_error": float(f"{error:.3g}"),
-                "passed": error < CHECK_TOLERANCE}
-    if preset == "ansatz":
-        total = result["summary"]["norm"]
-        error = abs(total - 1)
-        return {"kind": "norm", "total": total, "max_error": float(f"{error:.3g}"), "passed": error < CHECK_TOLERANCE}
-    return None
+        return against({ket(i * step): 1 / PATTERN_PERIOD for i in range(PATTERN_PERIOD)})
+    total = result["summary"]["norm"]
+    error = abs(total - 1)
+    return {"kind": "norm", "total": total, "max_error": float(f"{error:.3g}"), "passed": error < CHECK_TOLERANCE}
 
 
-def _with_check(req: PresetCircuitRequest) -> Callable[[Dict], Dict]:
+def _qasm_finish(program: QasmProgram) -> Callable[[Dict], Dict]:
+    """Add what the page needs to a run's result: qubit names, the example it is, and the check."""
+    example = match_example(program)
+
     def finish(result: Dict) -> Dict:
-        result["check"] = _theory_check(req.preset.lower(), result["n_qubits"], result)
+        result["labels"] = program.labels
+        result["example"] = example
+        result["check"] = _theory_check(example, result["n_qubits"], result)
         return result
     return finish
+
+
+def _size_text(n_bytes: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n_bytes < 1024 or unit == "GB":
+            return f"{n_bytes:.0f} {unit}" if n_bytes >= 10 or unit == "B" else f"{n_bytes:.1f} {unit}"
+        n_bytes /= 1024
+    return ""
+
+
+def _short_of_memory(n: int) -> str:
+    return (f"{n} qubits need {_size_text(2 ** n * 16)} of memory, more than the simulator can spare right now. "
+            "Try fewer qubits, or try again in a minute.")
 
 
 def _run_or_http_error(circuit_factory, shots: int) -> Dict:
@@ -157,7 +137,7 @@ def _run_or_http_error(circuit_factory, shots: int) -> Dict:
         circuit = circuit_factory()
         mem = check_memory(circuit.n_qubits)
         if not mem.is_safe:
-            raise HTTPException(status_code=400, detail=mem.warning)
+            raise HTTPException(status_code=400, detail=_short_of_memory(circuit.n_qubits))
         with simulation_slot():
             return circuit.run(shots=shots).to_dict()
     except HTTPException:
@@ -187,15 +167,46 @@ def simulate_circuit(req: SimulateRequest, _user: User = Depends(get_current_use
     return {"status": "ok", "result": _run_or_http_error(lambda: _build_custom(req), req.shots)}
 
 
-@router.post("/preset")
-def run_preset_circuit(req: PresetCircuitRequest, _user: User = Depends(get_current_user)) -> Dict:
+@router.get("/examples/{example_id}")
+def get_example(example_id: str, n_qubits: int = Query(default=5, ge=MIN_QUBITS, le=MAX_QUBITS),
+                _user: User = Depends(get_current_user)) -> Dict:
+    """An example circuit as OpenQASM text, sized to `n_qubits`."""
+    if example_id not in EXAMPLES:
+        raise HTTPException(status_code=404, detail=f"Unknown example. Choose from: {', '.join(EXAMPLES)}.")
+    return {"id": example_id, "n_qubits": n_qubits, "qasm": example_qasm(example_id, n_qubits)}
+
+
+@router.post("/qasm/inspect")
+def inspect_qasm(req: InspectRequest, _user: User = Depends(get_current_user)) -> Dict:
     """
-    Run one of the pre-built circuits from the CircuitLibrary.
-    Presets: bell, ghz, grover, qft, qft_pattern, ansatz. The result carries a
-    `check` against the textbook answer.
+    Read OpenQASM text without running it (the page calls this as you type):
+    the circuit's size and the example it still is, or the first problem and its line.
     """
-    result = _with_check(req)(_run_or_http_error(lambda: _build_preset(req), req.shots))
-    return {"status": "ok", "preset": req.preset.lower(), "result": result}
+    try:
+        program = parse_qasm(req.source)
+    except QasmError as e:
+        return {"ok": False, "error": {"message": e.message, "line": e.line}}
+    circuit = program.circuit
+    return {
+        "ok": True,
+        "n_qubits": circuit.n_qubits,
+        "gate_count": circuit.gate_count(),
+        "depth": circuit.depth(),
+        "required_bytes": 2 ** circuit.n_qubits * 16,
+        "labels": program.labels,
+        "example": match_example(program),
+    }
+
+
+@router.post("/qasm")
+def run_qasm(req: QasmRequest, _user: User = Depends(get_current_user)) -> Dict:
+    """Run OpenQASM text. (The page uses the WebSocket for live progress; this is the fallback.)"""
+    try:
+        program = parse_qasm(req.source)
+    except QasmError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    result = _qasm_finish(program)(_run_or_http_error(lambda: program.circuit, req.shots))
+    return {"status": "ok", "result": result}
 
 
 @router.post("/export/qiskit")
@@ -258,13 +269,13 @@ async def kernel_websocket(websocket: WebSocket, session_id: str, token: str = Q
     WebSocket endpoint for streaming simulation progress to the frontend.
 
     Client → server:  {"action": "simulate", "payload": SimulateRequest}
-                      {"action": "preset",   "payload": PresetCircuitRequest}
+                      {"action": "qasm",     "payload": QasmRequest}
                       {"action": "cancel"}   (or just close the socket) – stops a run
                       {"action": "ping"}
     Server → client:  {"type": "progress", "percent": 0-100, "step": "...", "detail": "..."}
                       {"type": "result", "result": SimulationResult}
                       {"type": "cancelled", "detail": "..."}
-                      {"type": "error", "detail": "..."}
+                      {"type": "error", "detail": "...", "line": n | null}
     """
     with SessionLocal() as db:
         user = user_from_token(token, db)
@@ -285,10 +296,11 @@ async def kernel_websocket(websocket: WebSocket, session_id: str, token: str = Q
                     req = SimulateRequest(**payload)
                     return _build_custom(req), req.shots, None
                 still_here = await _ws_run(websocket, build)
-            elif action == "preset":
+            elif action == "qasm":
                 def build():
-                    req = PresetCircuitRequest(**payload)
-                    return _build_preset(req), req.shots, _with_check(req)
+                    req = QasmRequest(**payload)
+                    program = parse_qasm(req.source)
+                    return program.circuit, req.shots, _qasm_finish(program)
                 still_here = await _ws_run(websocket, build)
             elif action == "ping":
                 await _send(websocket, {"type": "pong"})
@@ -351,12 +363,12 @@ async def _ws_run(websocket: WebSocket, build) -> bool:
         circuit, shots, finish = build()
         mem = check_memory(circuit.n_qubits)
         if not mem.is_safe:
-            await _send(websocket, {"type": "error", "detail": mem.warning})
+            await _send(websocket, {"type": "error", "detail": _short_of_memory(circuit.n_qubits)})
             return True
 
         n_ops = circuit.gate_count()
-        await _progress(websocket, "Allocating state vector", 3,
-                        f"{circuit.n_qubits} qubits · 2^{circuit.n_qubits} amplitudes · {mem.required_gb * 1000:.1f} MB")
+        await _progress(websocket, "Preparing memory", 3,
+                        f"{circuit.n_qubits} qubits, {_size_text(2 ** circuit.n_qubits * 16)}")
 
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
@@ -384,13 +396,15 @@ async def _ws_run(websocket: WebSocket, build) -> bool:
         result = (await task).to_dict()
         if finish is not None:
             result = finish(result)
-        await _progress(websocket, "Measuring state", 95, f"{n_ops} gates applied")
+        await _progress(websocket, "Measuring", 95, f"{n_ops:,} gates applied")
         await _send(websocket, {"type": "result", "result": result})
         await _progress(websocket, "Complete", 100)
 
     except SimulationCancelled as e:
         if not gone:
             await _send(websocket, {"type": "cancelled", "detail": str(e)})
+    except QasmError as e:
+        await _send(websocket, {"type": "error", "detail": str(e), "line": e.line})
     except Exception as e:
         await _send(websocket, {"type": "error", "detail": _error_text(e)})
     finally:

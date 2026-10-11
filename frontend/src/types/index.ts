@@ -44,28 +44,24 @@ export interface SimulationResult {
     is_safe: boolean;
     warning: string | null;
   };
-  /** Preset runs only: the simulator's exact chances against the textbook answer. */
+  /** OpenQASM runs: each qubit's name (q[0], q[1], …), the example the circuit still is, and its check. */
+  labels?: string[];
+  example?: string | null;
   check?: TheoryCheck | null;
 }
 
+/** 'outcomes': an example with a known answer. 'norm': every chance still adds up to 100%. */
 export type TheoryCheck =
-  | { kind: 'outcomes' | 'marked'; expected: Record<string, number>; measured: Record<string, number>;
+  | { kind: 'outcomes'; expected: Record<string, number>; measured: Record<string, number>;
       max_error: number; passed: boolean }
-  | { kind: 'uniform'; expected: number; max_error: number; passed: boolean }
   | { kind: 'norm'; total: number; max_error: number; passed: boolean };
 
-export interface MemoryCheckResponse {
-  n_qubits: number;
-  state_vector_size: number;
-  required_gb: number;
-  available_gb: number;
-  total_ram_gb: number;
-  is_safe: boolean;
-  warning: string | null;
-  required_bytes: number;
-  /** The most one run may use right now: 85 % of free RAM, never above the 5 GB cap. */
-  limit_bytes: number;
-}
+export interface QasmProblem { message: string; line: number | null }
+
+export type QasmInspect =
+  | { ok: true; n_qubits: number; gate_count: number; depth: number; required_bytes: number;
+      labels: string[]; example: string | null }
+  | { ok: false; error: QasmProblem };
 
 // ── Module 6 – Neural Angle Optimizer Types ──────────────────────────────────
 

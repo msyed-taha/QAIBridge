@@ -1,15 +1,12 @@
 import apiClient from './client';
-import type {
-  GateOperation, SimulationResult,
-  MemoryCheckResponse, ApiResponse,
-} from '../types';
+import type { GateOperation, SimulationResult, ApiResponse, QasmInspect } from '../types';
 
-export type KernelPreset = 'bell' | 'ghz' | 'grover' | 'qft' | 'qft_pattern' | 'ansatz';
+export type ExampleId = 'ghz' | 'qft_pattern' | 'layered' | 'random';
 
 const BASE = '/api/kernel';
 
 export const kernelApi = {
-  /** Run a custom circuit */
+  /** Run a custom circuit given as a list of gates */
   simulate: async (
     n_qubits: number,
     operations: GateOperation[],
@@ -23,26 +20,22 @@ export const kernelApi = {
     return data.result;
   },
 
-  /** Run a preset circuit (the result carries a `check` against the textbook answer) */
-  preset: async (
-    preset: KernelPreset,
-    n_qubits = 2,
-    shots = 1024,
-    layers = 2,
-  ): Promise<SimulationResult> => {
-    const { data } = await apiClient.post<{ status: string; result: SimulationResult }>(
-      `${BASE}/preset`,
-      { preset, n_qubits, shots, layers },
-    );
-    return data.result;
+  /** An example circuit as OpenQASM text */
+  example: async (id: ExampleId, n_qubits: number): Promise<string> => {
+    const { data } = await apiClient.get<{ qasm: string }>(`${BASE}/examples/${id}`, { params: { n_qubits } });
+    return data.qasm;
   },
 
-  /** Check RAM for n_qubits */
-  memoryCheck: async (n_qubits: number): Promise<MemoryCheckResponse> => {
-    const { data } = await apiClient.get<MemoryCheckResponse>(`${BASE}/memory`, {
-      params: { n_qubits },
-    });
+  /** Read OpenQASM text without running it: its size, or the first problem and its line */
+  inspect: async (source: string): Promise<QasmInspect> => {
+    const { data } = await apiClient.post<QasmInspect>(`${BASE}/qasm/inspect`, { source });
     return data;
+  },
+
+  /** Run OpenQASM text without live progress (used when the WebSocket can't connect) */
+  runQasm: async (source: string, shots = 1024): Promise<SimulationResult> => {
+    const { data } = await apiClient.post<{ result: SimulationResult }>(`${BASE}/qasm`, { source, shots });
+    return data.result;
   },
 
   /** Opens the live simulation socket (token passed as a query parameter). */
