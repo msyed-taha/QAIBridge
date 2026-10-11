@@ -44,3 +44,55 @@ export function builderQasm(ops: KernelOp[], nQubits: number): string {
   lines.push('measure q -> c;', '');
   return lines.join('\n');
 }
+
+/** An angle for a small label: 3π/4, π/8, -π/3, or the number to 2 decimals. */
+export function angleLabel(t: number): string {
+  const s = angleText(t);
+  return s.includes('pi') ? s.replace('*pi', 'π').replace('pi', 'π') : String(Number(t.toFixed(2)));
+}
+
+/**
+ * Reads an angle the way people type it: 0.5, pi/8, 3*pi/4, 2pi/3, -π/2, (pi+1)/2.
+ * Returns radians, or null when it can't be read.
+ */
+export function parseAngle(text: string): number | null {
+  const tokens = text.toLowerCase().replace(/π/g, 'pi').replace(/−/g, '-').match(/\d*\.?\d+|pi|\S/g) ?? [];
+  let i = 0;
+  const fail = (): never => { throw new Error('not an angle'); };
+
+  const factor = (): number => {
+    const t = tokens[i++];
+    if (t === '-') return -factor();
+    if (t === '+') return factor();
+    if (t === 'pi') return Math.PI;
+    if (t === '(') {
+      const v = sum();
+      if (tokens[i++] !== ')') fail();
+      return v;
+    }
+    if (t !== undefined && /^\d*\.?\d+$/.test(t)) return Number(t);
+    return fail();
+  };
+  const product = (): number => {
+    let v = factor();
+    for (;;) {
+      const t = tokens[i];
+      if (t === '*') { i++; v *= factor(); }
+      else if (t === '/') { i++; v /= factor(); }
+      else if (t === 'pi' || t === '(') v *= factor();     // 2pi, 3(pi/4)
+      else return v;
+    }
+  };
+  const sum = (): number => {
+    let v = product();
+    while (tokens[i] === '+' || tokens[i] === '-') v += tokens[i++] === '+' ? product() : -product();
+    return v;
+  };
+
+  try {
+    const v = sum();
+    return i === tokens.length && Number.isFinite(v) ? v : null;
+  } catch {
+    return null;
+  }
+}

@@ -1,7 +1,7 @@
 """
-Module 3 - Educational Quantum Circuit Simulator
+Circuit Builder
 Routes:
-  POST /api/module3/simulate  - Simulate a user-built circuit on the Module 1 kernel
+  POST /api/module3/simulate  - Simulate a circuit built in the Circuit Builder (signed-in users)
   GET  /api/module3/gates     - Gate palette with plain-language descriptions
 
 The circuit builder sends gates in time order. Each gate names its target
@@ -16,12 +16,14 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..models.user import User
 from ..modules.module1_kernel import QuantumCircuit, QuantumStateVector
+from ..routers.auth import get_current_user
 
-router = APIRouter(prefix="/api/module3", tags=["Module 3 - Circuit Builder"])
+router = APIRouter(prefix="/api/module3", tags=["Circuit Builder"])
 
 MAX_QUBITS = 6
 MAX_GATES = 120
@@ -111,7 +113,7 @@ def _build(req: CircuitRequest) -> QuantumCircuit:
 
 
 @router.post("/simulate", response_model=CircuitResult)
-def simulate(req: CircuitRequest):
+def simulate(req: CircuitRequest, _user: User = Depends(get_current_user)):
     circ = _build(req)
     n = req.num_qubits
     sv = QuantumStateVector(n)

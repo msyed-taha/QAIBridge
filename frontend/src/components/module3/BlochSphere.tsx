@@ -35,10 +35,10 @@ export function BlochSphere({ qubit, x, y, z, entangled, size = 132 }: Props) {
         <line x1={c} y1={c - R} x2={c} y2={c + R} stroke="#2e2e66" strokeWidth={1} />
         <line x1={c - R} y1={c} x2={c + R} y2={c} stroke="#2e2e66" strokeWidth={1} />
         <line x1={axisX[0].sx} y1={axisX[0].sy} x2={axisX[1].sx} y2={axisX[1].sy} stroke="#2e2e66" strokeWidth={1} />
-        <text x={c} y={c - R - 5} textAnchor="middle" fontSize={11} fill="#9ca3af" fontFamily="monospace">|0⟩</text>
-        <text x={c} y={c + R + 12} textAnchor="middle" fontSize={11} fill="#9ca3af" fontFamily="monospace">|1⟩</text>
-        <text x={axisX[1].sx - 6} y={axisX[1].sy + 12} fontSize={11} fill="#9ca3af" fontFamily="monospace">|+⟩</text>
-        <text x={c + R + 2} y={c + 3} fontSize={11} fill="#9ca3af" fontFamily="monospace">|i⟩</text>
+        <text x={c} y={c - R - 5} textAnchor="middle" fontSize={12} fill="#9ca3af" fontFamily="monospace">|0⟩</text>
+        <text x={c} y={c + R + 12} textAnchor="middle" fontSize={12} fill="#9ca3af" fontFamily="monospace">|1⟩</text>
+        <text x={axisX[1].sx - 6} y={axisX[1].sy + 12} fontSize={12} fill="#9ca3af" fontFamily="monospace">|+⟩</text>
+        <text x={c + R + 2} y={c + 3} fontSize={12} fill="#9ca3af" fontFamily="monospace">|i⟩</text>
         <line x1={c} y1={c} x2={tip.sx} y2={tip.sy} stroke={color} strokeWidth={2.5}
           strokeDasharray={entangled ? '4 3' : undefined} strokeLinecap="round" />
         <circle cx={tip.sx} cy={tip.sy} r={4} fill={color} />

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowRight, Award, Check, ChevronRight, Gamepad2, Hammer, Lightbulb, Link2, Loader2, Minus, Plus, Redo2,
-  RotateCcw, Sparkles, Star, Trash2, Undo2, Zap,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Award, Check, ChevronRight, Gamepad2, Hammer, Lightbulb, Link2, Loader2,
+  Minus, Plus, Redo2, RotateCcw, Sparkles, Star, Trash2, Undo2, Zap, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import axios from 'axios';
 import apiClient, { getApiErrorMessage } from '../api/client';
+import { AngleField } from '../components/module3/AngleField';
 import { BlochSphere } from '../components/module3/BlochSphere';
 import { BADGES, LEVELS, starsFor, type SimResult } from '../components/module3/challenges';
 import { CodeBlock } from '../components/shared/CodeBlock';
 import { HowToUse } from '../components/shared/HowToUse';
-import { builderQasm } from '../components/module3/qasm';
+import { angleLabel, builderQasm } from '../components/module3/qasm';
 import { SaveBar, useSavedCircuit } from '../components/work/SaveBar';
 import { workApi, type SavedCircuit } from '../api/work';
 
@@ -42,6 +43,7 @@ const GATES: GateMeta[] = [
 ];
 const META = Object.fromEntries(GATES.map(g => [g.name, g])) as Record<GateName, GateMeta>;
 const GROUPS = ['Basics', 'Phase', 'Rotations', 'Multi-qubit'];
+const MAX_QUBITS = 6;
 
 interface PlacedGate { id: string; gate: GateName; col: number; target: number; controls: number[]; angle?: number }
 
@@ -69,19 +71,32 @@ function defaultQubits(meta: GateMeta, row: number, n: number): { target: number
   if (meta.arity === 2) {
     if (n < 2) return null;
     const other = row + 1 < n ? row + 1 : row - 1;
-    return { target: other, controls: [row] };            // dropped row = control (CNOT/CZ) or first qubit (SWAP)
+    return { target: other, controls: [row] };            // the chosen wire = control (CNOT/CZ) or first qubit (SWAP)
   }
   if (n < 3) return null;
   const r0 = Math.min(Math.max(row, 0), n - 3);
   return { target: r0 + 2, controls: [r0, r0 + 1] };
 }
 
-function fmtAngle(t = 0): string {
-  const f = t / Math.PI;
-  const known: [number, string][] = [[0, '0'], [0.25, 'π/4'], [0.5, 'π/2'], [1 / 3, 'π/3'], [2 / 3, '2π/3'], [0.75, '3π/4'],
-    [1, 'π'], [1.5, '3π/2'], [2, '2π'], [1 / 6, 'π/6'], [5 / 6, '5π/6'], [1.25, '5π/4'], [7 / 4, '7π/4']];
-  const hit = known.find(([v]) => Math.abs(v - f) < 1e-6);
-  return hit ? hit[1] : `${(t).toFixed(2)}`;
+/** The gate moved by `dc` steps and `dr` wires (sideways it hops over other gates), or null if it can't go there. */
+function moved(gates: PlacedGate[], g: PlacedGate, dc: number, dr: number, n: number): PlacedGate | null {
+  const qs = qubitsOf(g).map(q => q + dr);
+  const a = Math.min(...qs), b = Math.max(...qs);
+  if (a < 0 || b >= n) return null;
+  let col = g.col + dc;
+  if (dc) while (col >= 0 && !spanFree(gates, col, a, b, g.id)) col += dc;
+  if (col < 0 || !spanFree(gates, col, a, b, g.id)) return null;
+  return { ...g, col, target: g.target + dr, controls: g.controls.map(q => q + dr) };
+}
+
+/** "H on q0", "RY(π/8) on q1", "CNOT with control q0 and target q1" — for screen readers. */
+function describeGate(g: PlacedGate): string {
+  const m = META[g.gate];
+  if (g.gate === 'SWAP') return `SWAP on q${g.controls[0]} and q${g.target}`;
+  if (m.arity > 1) {
+    return `${m.label} with control${g.controls.length > 1 ? 's' : ''} ${g.controls.map(q => `q${q}`).join(' and ')} and target q${g.target}`;
+  }
+  return `${m.label}${m.param ? `(${angleLabel(g.angle ?? Math.PI / 2)})` : ''} on q${g.target}`;
 }
 
 function sortForSim(gates: PlacedGate[]) {
@@ -104,6 +119,10 @@ function toKernelOps(gates: PlacedGate[]) {
   });
 }
 
+function focusVisible(el: Element) {
+  try { return el.matches(':focus-visible'); } catch { return true; }
+}
+
 // ── Draft: the free-build circuit is kept in this browser, so a reload or a trip
 //    to the Simulator doesn't lose it. ──────────────────────────────────────────
 
@@ -116,7 +135,7 @@ interface Draft extends Layout { savedId?: number }
 /** A drawing we can trust: known gates, on wires that exist. */
 function asLayout(d: unknown): Layout | null {
   const l = d as Layout | null;
-  if (!l || !Number.isInteger(l.n) || l.n < 1 || l.n > 6 || !Array.isArray(l.gates)) return null;
+  if (!l || !Number.isInteger(l.n) || l.n < 1 || l.n > MAX_QUBITS || !Array.isArray(l.gates)) return null;
   const ok = l.gates.every((g: PlacedGate) => g && META[g.gate] && Number.isInteger(g.col) && g.col >= 0
     && [g.target, ...(g.controls ?? [])].every(q => Number.isInteger(q) && q >= 0 && q < l.n)
     && (g.controls ?? []).length === META[g.gate].arity - 1);
@@ -141,9 +160,27 @@ function localStars(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem(CHALLENGES_KEY) ?? '{}'); } catch { return {}; }
 }
 
+/** ★★☆ with the count for screen readers. */
+function Stars({ n, dim = 'text-gray-600' }: { n: number; dim?: string }) {
+  return (
+    <span className="font-mono">
+      <span className="sr-only">{n} of 3 stars</span>
+      <span aria-hidden="true">{'★'.repeat(n)}<span className={dim}>{'★'.repeat(3 - n)}</span></span>
+    </span>
+  );
+}
+
 // ── Toasts ────────────────────────────────────────────────────────────────────
 
 interface Toast { id: number; text: string; tone: 'info' | 'good' | 'warn' }
+
+const MOVES = [
+  { dc: -1, dr: 0, Icon: ArrowLeft, label: 'Move earlier' },
+  { dc: 1, dr: 0, Icon: ArrowRight, label: 'Move later' },
+  { dc: 0, dr: -1, Icon: ArrowUp, label: 'Move up a wire' },
+  { dc: 0, dr: 1, Icon: ArrowDown, label: 'Move down a wire' },
+];
+const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -158,11 +195,13 @@ export function Module3Page() {
   const [mode, setMode] = useState<'free' | 'challenge'>('free');
   const [numQubits, setNumQubits] = useState(draft?.n ?? 2);
   const [gates, setGates] = useState<PlacedGate[]>(draft?.gates ?? []);
-  const [past, setPast] = useState<PlacedGate[][]>([]);
-  const [future, setFuture] = useState<PlacedGate[][]>([]);
-  const [armed, setArmed] = useState<GateName | null>(null);           // click-to-place
+  const [past, setPast] = useState<Layout[]>([]);
+  const [future, setFuture] = useState<Layout[]>([]);
+  const [armed, setArmed] = useState<GateName | null>(null);           // chosen in the palette, placed with a click, tap or Enter
   const [paletteDrag, setPaletteDrag] = useState<GateName | null>(null);
   const [hover, setHover] = useState<{ col: number; row: number } | null>(null);
+  const [cursor, setCursor] = useState({ col: 0, row: 0 });              // the keyboard's spot on the canvas
+  const [canvasFocus, setCanvasFocus] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [moving, setMoving] = useState<{ id: string; grabRow: number; grabCol: number; sx: number; sy: number; x: number; y: number; moved: boolean; outside: boolean } | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -171,6 +210,7 @@ export function Module3Page() {
   const [simError, setSimError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [tooltip, setTooltip] = useState<string | null>(null);
+  const [said, setSaid] = useState('');                                  // read out by screen readers
 
   const [levelIdx, setLevelIdx] = useState(0);
   const [showHint, setShowHint] = useState(false);
@@ -178,10 +218,14 @@ export function Module3Page() {
   const [solved, setSolved] = useState<{ id: string; stars: number } | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dragged = useRef(false);                                         // a drag just ended: ignore its click
+  const ids = { hint: useId(), canvas: useId() };
   const level = LEVELS[levelIdx];
   const cols = Math.max(10, ...gates.map(g => g.col + 3));
   const width = LEFT + cols * COL_W + 16;
   const height = TOP + numQubits * ROW_H + 8;
+  const cur = { col: Math.min(cursor.col, cols - 1), row: Math.min(cursor.row, numQubits - 1) };
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = Date.now() + Math.random();
@@ -189,33 +233,38 @@ export function Module3Page() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
   }, []);
 
-  // ── history ──
-  const commit = useCallback((next: PlacedGate[]) => {
-    setPast(p => [...p.slice(-80), gates]);
+  // ── history (each step keeps the qubit count too, so undo brings back removed wires) ──
+  const commit = useCallback((next: PlacedGate[], n?: number) => {
+    setPast(p => [...p.slice(-80), { n: numQubits, gates }]);
     setFuture([]);
     setGates(next);
-  }, [gates]);
+    if (n !== undefined) setNumQubits(n);
+  }, [gates, numQubits]);
 
   const undo = useCallback(() => {
     if (!past.length) return;
-    setFuture([gates, ...future]);
-    setGates(past[past.length - 1]);
+    const prev = past[past.length - 1];
+    setFuture([{ n: numQubits, gates }, ...future]);
     setPast(past.slice(0, -1));
-  }, [past, future, gates]);
+    setGates(prev.gates);
+    setNumQubits(prev.n);
+  }, [past, future, gates, numQubits]);
 
   const redo = useCallback(() => {
     if (!future.length) return;
-    setPast([...past, gates]);
-    setGates(future[0]);
+    const next = future[0];
+    setPast([...past, { n: numQubits, gates }]);
     setFuture(future.slice(1));
-  }, [past, future, gates]);
+    setGates(next.gates);
+    setNumQubits(next.n);
+  }, [past, future, gates, numQubits]);
 
   // ── placing / moving ──
   const placeGate = useCallback((name: GateName, col: number, row: number) => {
     const meta = META[name];
     const qs = defaultQubits(meta, row, numQubits);
     if (!qs) {
-      toast(`${meta.label} needs at least ${meta.arity} qubits — add more qubits first.`, 'warn');
+      toast(`${meta.label} needs at least ${meta.arity} qubits. Add more qubits first.`, 'warn');
       return;
     }
     const all = [qs.target, ...qs.controls];
@@ -224,8 +273,16 @@ export function Module3Page() {
     while (!spanFree(gates, c, a, b)) c++;
     const g: PlacedGate = { id: uid(), gate: name, col: c, ...qs, ...(meta.param ? { angle: Math.PI / 2 } : {}) };
     commit([...gates, g]);
+    setCursor({ col: c, row });
     if (meta.arity > 1 || meta.param) setSelectedId(g.id);
+    setSaid(`Placed ${describeGate(g)}, step ${c + 1}.`);
   }, [gates, numQubits, commit, toast]);
+
+  const removeGate = (g: PlacedGate) => {
+    commit(gates.filter(x => x.id !== g.id));
+    if (selectedId === g.id) setSelectedId(null);
+    setSaid(`Removed ${describeGate(g)}.`);
+  };
 
   const svgPoint = (clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -243,8 +300,10 @@ export function Module3Page() {
     if (col < 0 || row < 0 || row >= numQubits) return null;
     return { col, row, x: p.x, y: p.y };
   };
+  const gateAt = (col: number, row: number) =>
+    gates.find(g => g.col === col && spanOf(g)[0] <= row && row <= spanOf(g)[1]) ?? null;
 
-  // palette → canvas (HTML5 drag and drop)
+  // palette → canvas (HTML5 drag and drop, for a mouse)
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
@@ -260,8 +319,9 @@ export function Module3Page() {
     if (name && META[name] && c) placeGate(name, c.col, c.row);
   };
 
-  // move placed gates with the pointer
+  // move placed gates with a mouse or pen; on a touch screen a tap selects, so the page still scrolls
   const startMove = (e: React.PointerEvent, g: PlacedGate) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return;
     e.stopPropagation();
     const c = cellAt(e.clientX, e.clientY);
     if (!c) return;
@@ -283,8 +343,10 @@ export function Module3Page() {
       const g = gates.find(x => x.id === m.id);
       if (!g) return;
       const p = svgPoint(e.clientX, e.clientY);
-      const moved = m.moved || (p && Math.abs(p.x - m.sx) + Math.abs(p.y - m.sy) > 4);
-      if (!moved) { setSelectedId(g.id); return; }
+      const didMove = m.moved || (p && Math.abs(p.x - m.sx) + Math.abs(p.y - m.sy) > 4);
+      if (!didMove) return;                                      // a plain click: the gate's onClick selects it
+      dragged.current = true;
+      window.setTimeout(() => { dragged.current = false; }, 0);
       if (!p || p.x < 0 || p.y < 0 || p.x > width || p.y > height) {
         commit(gates.filter(x => x.id !== g.id));
         if (selectedId === g.id) setSelectedId(null);
@@ -301,16 +363,27 @@ export function Module3Page() {
       if (!spanFree(gates, col, Math.min(...all), Math.max(...all), g.id)) { toast('That spot is taken', 'warn'); return; }
       commit(gates.map(x => (x.id === g.id ? { ...x, col, target, controls } : x)));
     };
+    const onCancel = () => setMoving(null);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
     };
   }, [moving, gates, numQubits, width, height, commit, selectedId, toast]);
 
+  const selectGate = (g: PlacedGate) => {
+    if (dragged.current) return;
+    setSelectedId(g.id);
+    setCursor({ col: g.col, row: g.target });
+  };
+
   const onCanvasClick = (e: React.MouseEvent) => {
+    if (dragged.current) return;
     const c = cellAt(e.clientX, e.clientY);
+    if (c) setCursor({ col: c.col, row: c.row });
     if (armed && c) {
       placeGate(armed, c.col, c.row);
       return;
@@ -318,9 +391,69 @@ export function Module3Page() {
     setSelectedId(null);
   };
 
-  // keyboard shortcuts
+  // a mouse shows where the chosen gate would go
+  const onCanvasPointerMove = (e: React.PointerEvent) => {
+    if (!armed || e.pointerType !== 'mouse') return;
+    const c = cellAt(e.clientX, e.clientY);
+    setHover(h => (!c ? null : h && h.col === c.col && h.row === c.row ? h : { col: c.col, row: c.row }));
+  };
+
+  // Keep the keyboard's spot in view when the circuit is wider than the screen.
+  const revealCol = (col: number) => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const left = (colX(col) - COL_W / 2) * zoom, right = left + COL_W * zoom;
+    if (col === 0) el.scrollLeft = 0;
+    else if (left < el.scrollLeft) el.scrollLeft = left - 8;
+    else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth + 8;
+  };
+
+  const selected = gates.find(g => g.id === selectedId) ?? null;
+
+  const moveSelected = (dc: number, dr: number) => {
+    if (!selected) return;
+    const next = moved(gates, selected, dc, dr, numQubits);
+    if (!next) { toast("It can't move that way", 'warn'); return; }
+    commit(gates.map(g => (g.id === next.id ? next : g)));
+    setCursor({ col: next.col, row: Math.min(numQubits - 1, Math.max(0, cur.row + dr)) });
+    revealCol(next.col);
+    setSaid(`Moved to step ${next.col + 1}: ${describeGate(next)}.`);
+  };
+
+  // Keyboard on the canvas: arrows pick a spot, Enter places or selects, Shift + arrows move, Delete removes.
+  const onCanvasKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!canvasFocus) setCanvasFocus(true);
+    const d = ARROWS[e.key];
+    if (d) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        if (selected) moveSelected(d[0], d[1]);
+        else setSaid('Select a gate first: press Enter on it.');
+        return;
+      }
+      const next = { col: Math.min(cols - 1, Math.max(0, cur.col + d[0])), row: Math.min(numQubits - 1, Math.max(0, cur.row + d[1])) };
+      setCursor(next);
+      revealCol(next.col);
+      const g = gateAt(next.col, next.row);
+      setSaid(`q${next.row}, step ${next.col + 1}: ${g ? describeGate(g) : 'empty'}`);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (armed) { placeGate(armed, cur.col, cur.row); return; }
+      const g = gateAt(cur.col, cur.row);
+      if (!g) setSaid('Nothing here. Choose a gate first, then press Enter to place it.');
+      else if (g.id === selectedId) { setSelectedId(null); setSaid('Unselected.'); }
+      else { setSelectedId(g.id); setSaid(`Selected ${describeGate(g)}. Shift and the arrow keys move it.`); }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      const g = selected ?? gateAt(cur.col, cur.row);
+      if (g) { e.preventDefault(); removeGate(g); }
+    }
+  };
+
+  // keyboard shortcuts for the whole page
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       const mod = e.metaKey || e.ctrlKey;
@@ -347,7 +480,7 @@ export function Module3Page() {
         setResult(data);
         setSimError(null);
       } catch (e) {
-        if (!axios.isCancel(e)) setSimError(getApiErrorMessage(e, 'Simulation failed'));
+        if (!axios.isCancel(e)) setSimError(getApiErrorMessage(e, "Couldn't work out the result. Please try again."));
       } finally {
         setSimLoading(false);
       }
@@ -470,13 +603,13 @@ export function Module3Page() {
   }, []);
 
   const changeQubits = (n: number) => {
+    if (n < 1 || n > MAX_QUBITS) return;
     const kept = gates.filter(g => Math.max(...qubitsOf(g)) < n);
-    if (kept.length !== gates.length) toast(`${gates.length - kept.length} gate(s) on removed wires were deleted`, 'warn');
-    setNumQubits(n);
-    commit(kept);
+    const lost = gates.length - kept.length;
+    if (lost) toast(`Removed ${lost} gate${lost > 1 ? 's' : ''} on the last wire. Undo brings ${lost > 1 ? 'them' : 'it'} back.`, 'warn');
+    commit(kept, n);
   };
 
-  const selected = gates.find(g => g.id === selectedId) ?? null;
   const updateSelected = (patch: Partial<PlacedGate>) => {
     if (!selected) return;
     const next = { ...selected, ...patch };
@@ -495,18 +628,20 @@ export function Module3Page() {
     const m = META[g.gate];
     const x = colX(g.col) + ox;
     const isSel = g.id === selectedId && !ghost;
-    const common = { opacity: ghost ? 0.45 : 1 };
     const [lo, hi] = spanOf(g);
-    const box = (q: number, label: string, sub?: string) => (
-      <g key={`b${q}`}>
-        <rect x={x - BOX / 2} y={rowY(q) + oy - BOX / 2} width={BOX} height={BOX} rx={7}
-          fill="#16163a" stroke={m.color} strokeWidth={isSel ? 3 : 1.8}
-          style={isSel ? { filter: `drop-shadow(0 0 6px ${m.color})` } : undefined} />
-        <text x={x} y={rowY(q) + oy + (sub ? 1 : 5)} textAnchor="middle" fill={m.color} fontSize={label.length > 2 ? 11 : 14}
-          fontWeight="bold" fontFamily="monospace">{label}</text>
-        {sub && <text x={x} y={rowY(q) + oy + 13} textAnchor="middle" fill="#cbd5e1" fontSize={8.5} fontFamily="monospace">{sub}</text>}
-      </g>
-    );
+    const box = (q: number, label: string, sub?: string) => {
+      const w = sub ? 50 : BOX, h = sub ? 44 : BOX;
+      return (
+        <g key={`b${q}`}>
+          <rect x={x - w / 2} y={rowY(q) + oy - h / 2} width={w} height={h} rx={7}
+            fill="#16163a" stroke={m.color} strokeWidth={isSel ? 3 : 1.8}
+            style={isSel ? { filter: `drop-shadow(0 0 6px ${m.color})` } : undefined} />
+          <text x={x} y={rowY(q) + oy + (sub ? -3 : 5)} textAnchor="middle" fill={m.color} fontSize={sub ? 13 : 14}
+            fontWeight="bold" fontFamily="monospace">{label}</text>
+          {sub && <text x={x} y={rowY(q) + oy + 14} textAnchor="middle" fill="#e5e7eb" fontSize={12} fontFamily="monospace">{sub}</text>}
+        </g>
+      );
+    };
     const dot = (q: number) => <circle key={`c${q}`} cx={x} cy={rowY(q) + oy} r={6.5} fill={m.color} />;
     const oplus = (q: number) => (
       <g key={`t${q}`}>
@@ -522,72 +657,74 @@ export function Module3Page() {
       </g>
     );
     return (
-      <g key={g.id + (ghost ? '-ghost' : '')} {...common}
-        onPointerDown={ghost ? undefined : (e) => startMove(e, g)}
-        onClick={e => e.stopPropagation()}
+      <g key={g.id + (ghost ? '-ghost' : '')} opacity={ghost ? 0.45 : 1} data-gate={g.gate}
+        onPointerDown={ghost ? undefined : e => startMove(e, g)}
+        onClick={e => { e.stopPropagation(); if (!ghost) selectGate(g); }}
         onMouseEnter={() => !ghost && setTooltip(m.desc)} onMouseLeave={() => setTooltip(null)}
-        style={{ cursor: ghost ? 'grabbing' : 'grab' }}>
-        {m.arity > 1 && <line x1={x} y1={rowY(lo) + oy} x2={x} y2={rowY(hi) + oy} stroke={m.color} strokeWidth={2} />}
+        style={{ cursor: ghost ? 'grabbing' : 'pointer' }}>
+        {/* a wider, invisible target so a finger can hit thin controls and crosses */}
+        {!ghost && <rect x={x - COL_W / 2 + 4} y={rowY(lo) - ROW_H / 2 + 4} width={COL_W - 8} height={(hi - lo + 1) * ROW_H - 8} fill="transparent" />}
+        {m.arity > 1 && <line x1={x} y1={rowY(lo) + oy} x2={x} y2={rowY(hi) + oy} stroke={m.color} strokeWidth={isSel ? 3 : 2} />}
         {g.gate === 'CNOT' && <>{dot(g.controls[0])}{oplus(g.target)}</>}
         {g.gate === 'CCX' && <>{dot(g.controls[0])}{dot(g.controls[1])}{oplus(g.target)}</>}
         {g.gate === 'CZ' && <>{dot(g.controls[0])}{dot(g.target)}</>}
         {g.gate === 'SWAP' && <>{cross(g.controls[0])}{cross(g.target)}</>}
-        {m.arity === 1 && box(g.target, m.label, m.param ? fmtAngle(g.angle) : undefined)}
+        {m.arity === 1 && box(g.target, m.label, m.param ? angleLabel(g.angle ?? Math.PI / 2) : undefined)}
       </g>
     );
   };
 
-  const hoverSpan = useMemo(() => {
-    const name = paletteDrag ?? armed;
-    if (!hover || !name) return null;
-    const qs = defaultQubits(META[name], hover.row, numQubits);
-    if (!qs) return null;
-    const all = [qs.target, ...qs.controls];
-    return { col: hover.col, a: Math.min(...all), b: Math.max(...all) };
-  }, [hover, paletteDrag, armed, numQubits]);
+  // Where the chosen gate would land: under the mouse, or at the keyboard's spot.
+  const previewName = paletteDrag ?? armed;
+  const previewAt = hover ?? (canvasFocus && armed ? cur : null);
+  const previewQubits = previewName && previewAt ? defaultQubits(META[previewName], previewAt.row, numQubits) : null;
+  const preview = previewAt && previewQubits
+    ? { col: previewAt.col, a: Math.min(previewQubits.target, ...previewQubits.controls), b: Math.max(previewQubits.target, ...previewQubits.controls) }
+    : null;
 
   const movingGate = moving ? gates.find(g => g.id === moving.id) : null;
+  const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-quantum-700 disabled:opacity-30 disabled:hover:bg-transparent';
 
   return (
     <div className="min-h-screen px-4 py-10 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 text-center">
-        <div className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-400 mb-4">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Module 3 — Educational Quantum Simulator
-        </div>
+        <p className="inline-flex items-center gap-2 bg-quantum-800 border border-quantum-600 rounded-full px-4 py-1.5 text-xs text-gray-300 mb-4">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+          Results update with every gate
+        </p>
         <h1 className="text-3xl font-extrabold text-white mb-2">Quantum Circuit Builder</h1>
-        <p className="text-gray-400 text-sm max-w-2xl mx-auto">
-          Drag gates onto the wires — the circuit re-simulates instantly on QAIBridge's kernel, with a Bloch sphere per
-          qubit showing superposition and entanglement as they happen.
+        <p className="text-gray-300 text-sm max-w-2xl mx-auto leading-relaxed">
+          Put gates on the wires and see the chances change straight away, with one Bloch sphere per qubit showing
+          superposition and entanglement. Save your circuit, or open it in the Simulator.
         </p>
       </div>
 
       <HowToUse
         defaultOpen={false}
         steps={[
-          <><strong>Drag</strong> a gate from the palette onto a wire (or click a gate, then click a cell).</>,
-          <>Drag placed gates to move them; drag one <strong>off the canvas</strong> or press <kbd>Delete</kbd> to remove it. <kbd>Ctrl/⌘ Z</kbd> undoes.</>,
-          <>Click a gate to edit it — rotation angle, or which qubits a CNOT / Toffoli uses.</>,
-          <>Results update live. Switch to <strong>Challenges</strong> for guided levels with stars and badges.</>,
+          <><strong>Choose a gate</strong>, then a spot on a wire. With a mouse you can also drag it there.</>,
+          <>Select a placed gate to change it: type an angle like <code>pi/8</code>, pick its qubits, or move it with the arrows. <kbd>Delete</kbd> removes it and <kbd>Ctrl/⌘ Z</kbd> undoes.</>,
+          <>With a keyboard: press <kbd>Enter</kbd> on a gate, pick a spot with the arrow keys, then press <kbd>Enter</kbd> again. <kbd>Shift</kbd> + arrows move the selected gate.</>,
+          <>Press <strong>Save</strong> to keep your circuit, or switch to <strong>Challenges</strong> for {LEVELS.length} levels with stars.</>,
         ]}
-        outcome={<>Probability bars, one Bloch sphere per qubit (dashed purple = entangled), measurement counts, and your circuit as OpenQASM. Open it in the Simulator to replay it gate by gate, see its amplitudes or download it.</>}
+        outcome={<>The chance of each outcome, one Bloch sphere per qubit (dashed purple = entangled), measurement counts, and your circuit as OpenQASM. Open it in the Simulator to replay it gate by gate, see its amplitudes or download it.</>}
       />
 
       {/* Mode switch */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <div className="inline-flex bg-quantum-800 border border-quantum-700 rounded-xl p-1">
-          <button onClick={() => switchMode('free')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm ${mode === 'free' ? 'bg-quantum-neon text-black font-semibold' : 'text-gray-400'}`}>
-            <Hammer className="w-4 h-4" /> Free build
+          <button type="button" onClick={() => switchMode('free')} aria-pressed={mode === 'free'}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm ${mode === 'free' ? 'bg-quantum-neon text-black font-semibold' : 'text-gray-300 hover:text-white'}`}>
+            <Hammer className="w-4 h-4" aria-hidden="true" /> Free build
           </button>
-          <button onClick={() => switchMode('challenge')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm ${mode === 'challenge' ? 'bg-purple-400 text-black font-semibold' : 'text-gray-400'}`}>
-            <Gamepad2 className="w-4 h-4" /> Challenges
+          <button type="button" onClick={() => switchMode('challenge')} aria-pressed={mode === 'challenge'}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm ${mode === 'challenge' ? 'bg-purple-400 text-black font-semibold' : 'text-gray-300 hover:text-white'}`}>
+            <Gamepad2 className="w-4 h-4" aria-hidden="true" /> Challenges
           </button>
         </div>
-        <span className="text-xs text-gray-500 flex items-center gap-1 ml-2">
-          <Star className="w-3.5 h-3.5 text-amber-300" /> {totalStars} / {LEVELS.length * 3} stars
+        <span className="text-xs text-gray-400 flex items-center gap-1 ml-2">
+          <Star className="w-3.5 h-3.5 text-amber-300" aria-hidden="true" /> {totalStars} / {LEVELS.length * 3} stars
         </span>
         {mode === 'free' && (
           <div className="w-full sm:w-auto sm:ml-auto">
@@ -596,8 +733,8 @@ export function Module3Page() {
           </div>
         )}
         {earnedBadges.map(b => (
-          <span key={b.id} className="text-[11px] flex items-center gap-1 text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
-            <Award className="w-3 h-3" /> {b.title}
+          <span key={b.id} className="text-xs flex items-center gap-1 text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
+            <Award className="w-3.5 h-3.5" aria-hidden="true" /> {b.title}
           </span>
         ))}
       </div>
@@ -607,39 +744,40 @@ export function Module3Page() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
           <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-3 max-h-72 overflow-y-auto">
             {LEVELS.map((l, i) => (
-              <button key={l.id} onClick={() => startLevel(i)}
-                className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs ${i === levelIdx ? 'bg-purple-500/15 text-white' : 'text-gray-400 hover:bg-quantum-700'}`}>
-                <span className="w-5 text-gray-500 font-mono">{i + 1}</span>
+              <button key={l.id} type="button" onClick={() => startLevel(i)} aria-current={i === levelIdx ? 'step' : undefined}
+                className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm ${i === levelIdx ? 'bg-purple-500/15 text-white' : 'text-gray-300 hover:bg-quantum-700'}`}>
+                <span className="w-5 text-gray-400 font-mono text-xs">{i + 1}</span>
                 <span className="flex-1">{l.title}</span>
-                <span className="text-amber-300 font-mono">{'★'.repeat(progress[l.id] ?? 0)}<span className="text-gray-700">{'★'.repeat(3 - (progress[l.id] ?? 0))}</span></span>
+                <span className="text-amber-300 text-xs"><Stars n={progress[l.id] ?? 0} /></span>
               </button>
             ))}
           </div>
           <div className="lg:col-span-3 bg-gradient-to-br from-purple-500/10 to-teal-500/5 border border-purple-500/30 rounded-2xl p-5">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="text-xs text-purple-300 font-semibold uppercase tracking-widest">Level {levelIdx + 1} · {level.concept}</span>
-              <span className="text-xs text-gray-500">{level.qubits} qubit{level.qubits > 1 ? 's' : ''} · 3 stars in ≤ {level.par} gate{level.par > 1 ? 's' : ''}</span>
+              <span className="text-xs text-gray-400">{level.qubits} qubit{level.qubits > 1 ? 's' : ''} · 3 stars in {level.par} gate{level.par > 1 ? 's' : ''} or fewer</span>
             </div>
             <h2 className="text-white text-xl font-bold mb-1">{level.title}</h2>
             <p className="text-gray-300 text-sm mb-2">{level.story}</p>
             <p className="text-sm text-white"><span className="text-quantum-neon font-semibold">Goal:</span> {level.goal}</p>
             <div className="flex flex-wrap gap-2 mt-3">
-              <button onClick={() => setShowHint(h => !h)} className="flex items-center gap-1 text-xs text-amber-200 border border-amber-500/40 rounded-lg px-3 py-1.5">
-                <Lightbulb className="w-3.5 h-3.5" /> {showHint ? level.hint : 'Show hint'}
+              <button type="button" onClick={() => setShowHint(h => !h)} aria-expanded={showHint}
+                className="flex items-center gap-1 text-sm text-amber-200 border border-amber-500/40 rounded-lg px-3 py-1.5">
+                <Lightbulb className="w-4 h-4" aria-hidden="true" /> {showHint ? level.hint : 'Show hint'}
               </button>
-              <button onClick={() => startLevel(levelIdx)} className="flex items-center gap-1 text-xs text-gray-300 border border-quantum-600 rounded-lg px-3 py-1.5">
-                <RotateCcw className="w-3.5 h-3.5" /> Restart level
+              <button type="button" onClick={() => startLevel(levelIdx)} className="flex items-center gap-1 text-sm text-gray-300 border border-quantum-600 rounded-lg px-3 py-1.5">
+                <RotateCcw className="w-4 h-4" aria-hidden="true" /> Restart level
               </button>
             </div>
             {solved?.id === level.id && (
-              <div className="mt-4 flex flex-wrap items-center gap-3 bg-emerald-500/10 border border-emerald-500/40 rounded-xl px-4 py-3 animate-pulse">
-                <Sparkles className="w-5 h-5 text-emerald-300" />
+              <div className="mt-4 flex flex-wrap items-center gap-3 bg-emerald-500/10 border border-emerald-500/40 rounded-xl px-4 py-3">
+                <Sparkles className="w-5 h-5 text-emerald-300" aria-hidden="true" />
                 <span className="text-emerald-200 font-semibold">Level complete!</span>
-                <span className="text-amber-300 text-lg">{'★'.repeat(solved.stars)}<span className="text-gray-600">{'★'.repeat(3 - solved.stars)}</span></span>
-                {solved.stars < 3 && <span className="text-xs text-gray-400">Try again with ≤ {level.par} gates for 3 stars.</span>}
+                <span className="text-amber-300 text-lg"><Stars n={solved.stars} /></span>
+                {solved.stars < 3 && <span className="text-sm text-gray-300">Try again with {level.par} gate{level.par > 1 ? 's' : ''} or fewer for 3 stars.</span>}
                 {levelIdx < LEVELS.length - 1 && (
-                  <button onClick={() => startLevel(levelIdx + 1)} className="ml-auto flex items-center gap-1 text-sm font-semibold text-black bg-emerald-300 rounded-lg px-3 py-1.5">
-                    Next level <ChevronRight className="w-4 h-4" />
+                  <button type="button" onClick={() => startLevel(levelIdx + 1)} className="ml-auto flex items-center gap-1 text-sm font-semibold text-black bg-emerald-300 rounded-lg px-3 py-1.5">
+                    Next level <ChevronRight className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -649,183 +787,221 @@ export function Module3Page() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-        {/* Palette */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
-            <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-3">Qubits</h3>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4, 5, 6].map(n => (
-                <button key={n} onClick={() => changeQubits(n)} disabled={mode === 'challenge'}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold ${numQubits === n ? 'text-black' : 'bg-quantum-700 text-gray-400 hover:text-white'} disabled:opacity-40`}
-                  style={numQubits === n ? { background: 'linear-gradient(90deg,#00ffcc,#00ccaa)' } : {}}>
-                  {n}
-                </button>
+        {/* Palette: beside the canvas on a wide screen, right above it on a phone */}
+        <div className="lg:col-span-1 min-w-0">
+          <section aria-labelledby={`${ids.canvas}-gates`} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
+            <h2 id={`${ids.canvas}-gates`} className="text-white font-bold text-sm mb-1">Gates</h2>
+            <p className="text-gray-400 text-xs mb-3">
+              Choose a gate, then a spot on a wire.<span className="hidden lg:inline"> You can also drag it there.</span>
+            </p>
+            <div className="grid grid-cols-6 sm:grid-cols-9 gap-1.5 lg:block">
+              {GROUPS.map(group => (
+                <div key={group} className="contents lg:block lg:mb-3">
+                  <p className="hidden lg:block text-gray-400 text-xs uppercase tracking-widest mb-1.5">{group}</p>
+                  <div className={`contents lg:grid ${group === 'Multi-qubit' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'} lg:gap-1.5`}>
+                    {GATES.filter(g => g.group === group).map(g => (
+                      <button key={g.name} type="button"
+                        draggable
+                        onDragStart={e => { e.dataTransfer.setData('text/plain', `gate:${g.name}`); e.dataTransfer.effectAllowed = 'copy'; setPaletteDrag(g.name); }}
+                        onDragEnd={() => { setPaletteDrag(null); setHover(null); }}
+                        onClick={e => {
+                          const on = armed !== g.name;
+                          setArmed(on ? g.name : null);
+                          // chosen with the keyboard: go straight to the canvas to place it
+                          if (on && e.detail === 0) {
+                            canvasRef.current?.focus();
+                            setSaid(`${g.label} chosen. Pick a spot with the arrow keys, then press Enter.`);
+                          }
+                        }}
+                        onMouseEnter={() => setTooltip(g.desc)} onMouseLeave={() => setTooltip(null)}
+                        onFocus={() => setTooltip(g.desc)} onBlur={() => setTooltip(null)}
+                        aria-label={`${g.label} gate`} aria-pressed={armed === g.name}
+                        className={`py-2.5 lg:py-2 rounded-lg text-xs font-bold border cursor-grab active:cursor-grabbing transition-all ${armed === g.name ? 'scale-105' : 'border-quantum-600 bg-quantum-900 hover:border-quantum-400'}`}
+                        style={armed === g.name ? { borderColor: g.color, background: `${g.color}22`, color: g.color } : { color: g.color }}>
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-
-          <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
-            <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-1">Gate palette</h3>
-            <p className="text-gray-500 text-[10px] mb-3">Drag onto a wire — or click, then click a cell.</p>
-            {GROUPS.map(group => (
-              <div key={group} className="mb-3">
-                <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-1.5">{group}</p>
-                <div className={`grid ${group === 'Multi-qubit' ? 'grid-cols-2' : 'grid-cols-4'} gap-1.5`}>
-                  {GATES.filter(g => g.group === group).map(g => (
-                    <button key={g.name}
-                      draggable
-                      onDragStart={e => { e.dataTransfer.setData('text/plain', `gate:${g.name}`); e.dataTransfer.effectAllowed = 'copy'; setPaletteDrag(g.name); }}
-                      onDragEnd={() => { setPaletteDrag(null); setHover(null); }}
-                      onClick={() => setArmed(a => (a === g.name ? null : g.name))}
-                      onMouseEnter={() => setTooltip(g.desc)} onMouseLeave={() => setTooltip(null)}
-                      aria-label={`${g.label} gate`}
-                      className={`py-2 rounded-lg text-xs font-bold border cursor-grab active:cursor-grabbing transition-all ${armed === g.name ? 'scale-105' : 'border-quantum-600 bg-quantum-900 hover:border-quantum-400'}`}
-                      style={armed === g.name ? { borderColor: g.color, background: `${g.color}22`, color: g.color } : { color: g.color }}>
-                      {g.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div className="min-h-[48px] p-2 bg-quantum-900/60 rounded-lg border border-quantum-700">
-              <p className="text-gray-400 text-[10px] leading-relaxed">{tooltip ?? 'Hover a gate to learn what it does.'}</p>
+            <div className="hidden lg:block min-h-[56px] p-2 bg-quantum-900/60 rounded-lg border border-quantum-700">
+              <p className="text-gray-300 text-xs leading-relaxed">{tooltip ?? (armed ? META[armed].desc : 'Point at a gate to see what it does.')}</p>
             </div>
-          </div>
+          </section>
         </div>
 
         {/* Canvas + inspector + results */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <h3 className="text-white font-bold text-sm">Circuit canvas</h3>
-              <span className="text-xs text-gray-500">{numQubits} qubit{numQubits > 1 ? 's' : ''} · {gates.length} gate{gates.length !== 1 ? 's' : ''}</span>
-              {simLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-quantum-neon" />}
-              {!simLoading && result && <span className="text-[10px] text-emerald-300 flex items-center gap-1"><Zap className="w-3 h-3" />live</span>}
-              <div className="ml-auto flex items-center gap-1">
-                <button onClick={undo} disabled={!past.length} title="Undo (Ctrl/⌘ Z)" className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-quantum-700 disabled:opacity-30"><Undo2 className="w-4 h-4" /></button>
-                <button onClick={redo} disabled={!future.length} title="Redo (Ctrl/⌘ Shift Z)" className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-quantum-700 disabled:opacity-30"><Redo2 className="w-4 h-4" /></button>
-                <button onClick={() => setZoom(z => Math.max(0.7, +(z - 0.1).toFixed(2)))} title="Zoom out" className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-quantum-700"><Minus className="w-4 h-4" /></button>
-                <span className="text-[10px] text-gray-500 w-9 text-center">{Math.round(zoom * 100)}%</span>
-                <button onClick={() => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)))} title="Zoom in" className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-quantum-700"><Plus className="w-4 h-4" /></button>
-                <button onClick={() => { commit([]); setSelectedId(null); }} disabled={!gates.length} title="Clear canvas" className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-quantum-700 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
+        <div className="lg:col-span-3 space-y-4 min-w-0">
+          <section aria-labelledby={ids.canvas} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
+              <h2 id={ids.canvas} className="text-white font-bold text-sm">Your circuit</h2>
+              <span className="text-xs text-gray-400">{gates.length} gate{gates.length !== 1 ? 's' : ''}</span>
+              {simLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-quantum-neon" aria-label="Working out the result" />}
+              {!simLoading && result && <span className="text-xs text-emerald-300 flex items-center gap-1"><Zap className="w-3.5 h-3.5" aria-hidden="true" />live</span>}
+              <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div role="group" aria-label="Qubits" className="flex items-center gap-1">
+                  <span className="text-xs text-gray-400 mr-1">Qubits</span>
+                  <button type="button" onClick={() => changeQubits(numQubits - 1)} disabled={mode === 'challenge' || numQubits <= 1}
+                    aria-label="Remove a qubit" className={`${iconBtn} border border-quantum-600`}><Minus className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                  <span className="w-5 text-center text-sm font-mono text-white" aria-live="polite">{numQubits}</span>
+                  <button type="button" onClick={() => changeQubits(numQubits + 1)} disabled={mode === 'challenge' || numQubits >= MAX_QUBITS}
+                    aria-label="Add a qubit" className={`${iconBtn} border border-quantum-600`}><Plus className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                </div>
+                <div className="flex items-center">
+                  <button type="button" onClick={undo} disabled={!past.length} title="Undo (Ctrl/⌘ Z)" aria-label="Undo" className={iconBtn}><Undo2 className="w-4 h-4" aria-hidden="true" /></button>
+                  <button type="button" onClick={redo} disabled={!future.length} title="Redo (Ctrl/⌘ Shift Z)" aria-label="Redo" className={iconBtn}><Redo2 className="w-4 h-4" aria-hidden="true" /></button>
+                  <button type="button" onClick={() => setZoom(z => Math.max(0.7, +(z - 0.1).toFixed(2)))} disabled={zoom <= 0.7} title="Zoom out" aria-label="Zoom out" className={iconBtn}><ZoomOut className="w-4 h-4" aria-hidden="true" /></button>
+                  <span className="text-xs text-gray-400 w-10 text-center">{Math.round(zoom * 100)}%</span>
+                  <button type="button" onClick={() => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)))} disabled={zoom >= 1.5} title="Zoom in" aria-label="Zoom in" className={iconBtn}><ZoomIn className="w-4 h-4" aria-hidden="true" /></button>
+                  <button type="button" onClick={() => { commit([]); setSelectedId(null); }} disabled={!gates.length} title="Clear the circuit" aria-label="Clear the circuit"
+                    className={`${iconBtn} hover:text-red-400`}><Trash2 className="w-4 h-4" aria-hidden="true" /></button>
+                </div>
               </div>
             </div>
             {armed && (
-              <p className="text-xs text-quantum-neon mb-2">
-                {META[armed].label} selected — click a cell to place it {META[armed].arity > 1 && '(the clicked wire becomes the control / first qubit)'} · <button className="underline" onClick={() => setArmed(null)}>cancel</button>
-              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-sm">
+                <p className="text-gray-200">
+                  <strong style={{ color: META[armed].color }}>{META[armed].label}</strong> chosen. Pick a spot on a wire to place it
+                  {META[armed].arity > 1 ? '; you can change its qubits after.' : '.'}
+                </p>
+                <button type="button" onClick={() => setArmed(null)} className="text-quantum-neon underline hover:text-white">Done</button>
+                <p className="basis-full text-xs text-gray-400 lg:hidden">{META[armed].desc}</p>
+              </div>
             )}
-            <div className="overflow-x-auto" onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => setHover(null)}>
-              <svg ref={svgRef} width={width * zoom} height={height * zoom} viewBox={`0 0 ${width} ${height}`}
-                onClick={onCanvasClick} className="select-none touch-none" role="img" aria-label="Quantum circuit canvas">
+            <div ref={canvasRef} id={`${ids.canvas}-area`} tabIndex={0} role="application"
+              aria-label={`Circuit with ${numQubits} qubit${numQubits > 1 ? 's' : ''} and ${gates.length} gate${gates.length !== 1 ? 's' : ''}`}
+              aria-describedby={ids.hint}
+              onKeyDown={onCanvasKey}
+              onFocus={e => { if (e.target === e.currentTarget) setCanvasFocus(focusVisible(e.currentTarget)); }}
+              onBlur={() => setCanvasFocus(false)}
+              className="overflow-x-auto rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-quantum-neon"
+              onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => setHover(null)}>
+              <svg ref={svgRef} width={width * zoom} height={height * zoom} viewBox={`0 0 ${width} ${height}`} aria-hidden="true"
+                onClick={onCanvasClick} onPointerMove={onCanvasPointerMove} onPointerLeave={() => setHover(null)} className="select-none">
                 {Array.from({ length: cols }, (_, c) => (
                   <line key={`g${c}`} x1={colX(c)} y1={TOP} x2={colX(c)} y2={TOP + numQubits * ROW_H} stroke="#1c1c44" strokeDasharray="2 6" />
                 ))}
                 {Array.from({ length: numQubits }, (_, q) => (
                   <g key={`w${q}`}>
-                    <text x={6} y={rowY(q) + 4} fill="#9ca3af" fontSize={12} fontFamily="monospace">q{q}</text>
-                    <text x={26} y={rowY(q) + 4} fill="#4b5563" fontSize={10} fontFamily="monospace">|0⟩</text>
+                    <text x={6} y={rowY(q) + 4} fill="#d1d5db" fontSize={12} fontFamily="monospace">q{q}</text>
+                    <text x={25} y={rowY(q) + 4} fill="#9ca3af" fontSize={12} fontFamily="monospace">|0⟩</text>
                     <line x1={LEFT - 2} y1={rowY(q)} x2={width - 8} y2={rowY(q)} stroke="#374151" strokeWidth={2} />
                   </g>
                 ))}
-                {hoverSpan && (
-                  <rect x={colX(hoverSpan.col) - COL_W / 2 + 4} y={rowY(hoverSpan.a) - ROW_H / 2 + 4} width={COL_W - 8}
-                    height={(hoverSpan.b - hoverSpan.a + 1) * ROW_H - 8} rx={8} fill="rgba(0,255,204,0.08)" stroke="#00ffcc" strokeDasharray="4 3" />
+                {preview && (
+                  <rect x={colX(preview.col) - COL_W / 2 + 4} y={rowY(preview.a) - ROW_H / 2 + 4} width={COL_W - 8}
+                    height={(preview.b - preview.a + 1) * ROW_H - 8} rx={8} fill="rgba(0,255,204,0.08)" stroke="#00ffcc" strokeDasharray="4 3" />
                 )}
                 {gates.map(g => (moving?.id === g.id && moving.moved ? null : renderGate(g)))}
                 {movingGate && moving && moving.moved &&
                   renderGate(movingGate, true, moving.x - colX(movingGate.col), (Math.round((moving.y - TOP - ROW_H / 2) / ROW_H) - moving.grabRow) * ROW_H)}
+                {canvasFocus && (
+                  <rect x={colX(cur.col) - COL_W / 2 + 1} y={rowY(cur.row) - ROW_H / 2 + 1} width={COL_W - 2} height={ROW_H - 2} rx={9}
+                    fill="none" stroke="#f9fafb" strokeWidth={1.5} strokeDasharray="5 4" pointerEvents="none" data-cursor="" />
+                )}
               </svg>
             </div>
+            <p id={ids.hint} className={canvasFocus ? 'text-xs text-gray-300 mt-2' : 'sr-only'}>
+              Arrow keys pick a spot. Enter places the chosen gate, or selects the gate there. Shift + arrows move the selected gate; Delete removes it.
+            </p>
+            <p className="sr-only" aria-live="polite">{said}</p>
             {moving?.moved && (
-              <p className={`text-xs mt-2 ${moving.outside ? 'text-red-400' : 'text-gray-500'}`}>
+              <p className={`text-xs mt-2 ${moving.outside ? 'text-red-400' : 'text-gray-400'}`}>
                 {moving.outside ? 'Release to delete this gate' : 'Drag off the canvas to delete'}
               </p>
             )}
             {gates.length === 0 && !armed && (
-              <p className="text-center py-3 text-gray-600 text-sm">Drag a gate from the palette onto a wire to start.</p>
+              <p className="text-center py-3 text-gray-400 text-sm">Choose a gate, then a spot on a wire, to start.</p>
             )}
-          </div>
+          </section>
 
           {/* Inspector */}
           {selected && (
-            <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4 flex flex-wrap items-center gap-4">
-              <span className="font-mono font-bold text-sm" style={{ color: META[selected.gate].color }}>{META[selected.gate].label}</span>
-              <span className="text-xs text-gray-400 flex-1 min-w-[200px]">{META[selected.gate].desc}</span>
+            <section aria-label={`Selected gate: ${describeGate(selected)}`} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4 space-y-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-mono font-bold" style={{ color: META[selected.gate].color }}>{META[selected.gate].label}</span>
+                <span className="text-sm text-gray-300 flex-1 min-w-[12rem]">{META[selected.gate].desc}</span>
+                <button type="button" onClick={() => setSelectedId(null)} className="text-sm text-quantum-neon underline hover:text-white">Done</button>
+              </div>
               {META[selected.gate].param && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">θ = <span className="text-white font-mono">{fmtAngle(selected.angle)}</span></span>
-                  <input type="range" min={0} max={24} value={Math.round(((selected.angle ?? 0) / (2 * Math.PI)) * 24)}
-                    onChange={e => updateSelected({ angle: (Number(e.target.value) / 24) * 2 * Math.PI })} className="accent-emerald-400" />
-                  {[Math.PI / 4, Math.PI / 3, Math.PI / 2, Math.PI].map(v => (
-                    <button key={v} onClick={() => updateSelected({ angle: v })} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-quantum-600 text-gray-300">{fmtAngle(v)}</button>
-                  ))}
-                </div>
+                <AngleField key={selected.id} value={selected.angle ?? Math.PI / 2} onChange={angle => updateSelected({ angle })} />
               )}
               {META[selected.gate].arity > 1 && (
-                <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300">
                   {selected.controls.map((c, i) => (
-                    <label key={i} className="flex items-center gap-1">
-                      {selected.gate === 'SWAP' ? 'qubit A' : `control${selected.controls.length > 1 ? ` ${i + 1}` : ''}`}
+                    <label key={i} className="flex items-center gap-1.5">
+                      {selected.gate === 'SWAP' ? 'Qubit A' : `Control${selected.controls.length > 1 ? ` ${i + 1}` : ''}`}
                       <select value={c} onChange={e => updateSelected({ controls: selected.controls.map((x, j) => (j === i ? Number(e.target.value) : x)) })}
-                        className="bg-quantum-900 border border-quantum-600 rounded px-1 py-0.5 text-white">
+                        className="bg-quantum-900 border border-quantum-600 rounded-lg px-2 py-1.5 text-white">
                         {Array.from({ length: numQubits }, (_, q) => <option key={q} value={q}>q{q}</option>)}
                       </select>
                     </label>
                   ))}
-                  <label className="flex items-center gap-1">
-                    {selected.gate === 'SWAP' ? 'qubit B' : 'target'}
+                  <label className="flex items-center gap-1.5">
+                    {selected.gate === 'SWAP' ? 'Qubit B' : 'Target'}
                     <select value={selected.target} onChange={e => updateSelected({ target: Number(e.target.value) })}
-                      className="bg-quantum-900 border border-quantum-600 rounded px-1 py-0.5 text-white">
+                      className="bg-quantum-900 border border-quantum-600 rounded-lg px-2 py-1.5 text-white">
                       {Array.from({ length: numQubits }, (_, q) => <option key={q} value={q}>q{q}</option>)}
                     </select>
                   </label>
                 </div>
               )}
-              <button onClick={() => { commit(gates.filter(g => g.id !== selected.id)); setSelectedId(null); }}
-                className="flex items-center gap-1 text-xs text-red-300 border border-red-800/60 rounded-lg px-2.5 py-1"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-            </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-300 mr-1">Move</span>
+                {MOVES.map(({ dc, dr, Icon, label }) => (
+                  <button key={label} type="button" onClick={() => moveSelected(dc, dr)} disabled={!moved(gates, selected, dc, dr, numQubits)}
+                    aria-label={label} title={label} className={`${iconBtn} border border-quantum-600`}>
+                    <Icon className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                ))}
+                <button type="button" onClick={() => removeGate(selected)}
+                  className="ml-auto flex items-center gap-1.5 text-sm text-red-300 border border-red-800/60 rounded-lg px-3 py-1.5 hover:border-red-600">
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />Delete
+                </button>
+              </div>
+            </section>
           )}
 
           <CodeBlock code={qasm} title="OpenQASM" subtitle="updates as you build" defaultOpen maxHeight={240} />
 
-          {simError && <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm">{simError}</div>}
+          {simError && <div role="alert" className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-300 text-sm">{simError}</div>}
 
           {/* Results */}
           {result && (
             <>
               <div className="flex flex-wrap gap-2">
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${result.is_superposition ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-quantum-800 border-quantum-700 text-gray-500'}`}>
-                  <Zap className="w-3.5 h-3.5" /> Superposition {result.is_superposition ? '✓' : '✗'}
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${result.is_superposition ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-quantum-800 border-quantum-700 text-gray-400'}`}>
+                  <Zap className="w-3.5 h-3.5" aria-hidden="true" /> Superposition {result.is_superposition ? '✓' : '✗'}
                 </span>
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${result.is_entangled ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-quantum-800 border-quantum-700 text-gray-500'}`}>
-                  <Link2 className="w-3.5 h-3.5" /> Entanglement {result.is_entangled ? `✓ (qubits ${result.entangled_qubits.map(q => `q${q}`).join(', ')})` : '✗'}
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${result.is_entangled ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-quantum-800 border-quantum-700 text-gray-400'}`}>
+                  <Link2 className="w-3.5 h-3.5" aria-hidden="true" /> Entanglement {result.is_entangled ? `✓ (qubits ${result.entangled_qubits.map(q => `q${q}`).join(', ')})` : '✗'}
                 </span>
-                <span className="px-3 py-1.5 rounded-xl border bg-quantum-800 border-quantum-700 text-gray-400 text-xs">
-                  {result.gate_count} gates · depth {result.circuit_depth} · {2 ** result.num_qubits} basis states
+                <span className="px-3 py-1.5 rounded-xl border bg-quantum-800 border-quantum-700 text-gray-300 text-xs">
+                  {result.gate_count} gates · depth {result.circuit_depth} · {2 ** result.num_qubits} possible outcomes
                 </span>
-                <button onClick={() => navigate('/simulator', { state: { qasm } })} disabled={!gates.length}
+                <button type="button" onClick={() => navigate('/simulator', { state: { qasm } })} disabled={!gates.length}
                   className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-quantum-neon/50 text-quantum-neon text-xs font-semibold hover:bg-quantum-neon/10 disabled:opacity-40">
                   Open in Simulator <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
 
               <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
-                <h3 className="text-white font-bold text-sm mb-2">Bloch spheres — one per qubit</h3>
+                <h2 className="text-white font-bold text-sm mb-2">Bloch spheres — one per qubit</h2>
                 <div className="flex flex-wrap gap-2 justify-around">
                   {result.bloch.map(b => <BlochSphere key={b.qubit} {...b} />)}
                 </div>
-                <p className="text-gray-500 text-[11px] mt-1">
+                <p className="text-gray-400 text-xs mt-1 leading-relaxed">
                   Up = |0⟩, down = |1⟩, the equator = superpositions. An entangled qubit has no state of its own, so its arrow shrinks toward the centre (dashed purple).
                 </p>
               </div>
 
               <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-4">
-                <h3 className="text-white font-bold text-sm mb-3">Probabilities (colour dot = phase)</h3>
+                <h2 className="text-white font-bold text-sm mb-3">Chances <span className="font-normal text-gray-400">(the dot's colour shows the phase)</span></h2>
                 <div className="space-y-1.5">
                   {result.states.map(s => (
                     <div key={s.label} className="flex items-center gap-3">
-                      <span className="font-mono text-xs text-gray-400 w-16 flex-shrink-0">{s.label}</span>
+                      <span className="font-mono text-xs text-gray-300 w-16 flex-shrink-0">{s.label}</span>
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                         style={{ background: s.probability > 1e-6 ? `hsl(${((Math.atan2(s.amplitude_im, s.amplitude_re) * 180) / Math.PI + 530) % 360}, 90%, 60%)` : '#1f2937' }}
                         title={`phase ${((Math.atan2(s.amplitude_im, s.amplitude_re) * 180) / Math.PI).toFixed(0)}°`} />
@@ -833,12 +1009,12 @@ export function Module3Page() {
                         <div className="h-full rounded-md transition-all duration-300"
                           style={{ width: `${(s.probability / maxProb) * 100}%`, background: 'linear-gradient(90deg,#00ffcc,#cc44ff)' }} />
                       </div>
-                      <span className="text-xs text-gray-300 w-14 text-right font-mono">{(s.probability * 100).toFixed(1)}%</span>
-                      <span className="text-[10px] text-gray-500 w-14 text-right font-mono">{result.counts[s.label] ?? 0} shots</span>
+                      <span className="text-xs text-gray-200 w-14 text-right font-mono">{(s.probability * 100).toFixed(1)}%</span>
+                      <span className="text-xs text-gray-400 w-[4.75rem] flex-shrink-0 whitespace-nowrap text-right font-mono">{result.counts[s.label] ?? 0} times</span>
                     </div>
                   ))}
                 </div>
-                <p className="text-gray-600 text-[11px] mt-3">Shots = a real sampling of 1024 simulated measurements — close to, but not exactly, the probabilities.</p>
+                <p className="text-gray-400 text-xs mt-3">Measured 1024 times, so the counts are close to the chances but rarely exactly the same.</p>
               </div>
 
             </>
@@ -847,13 +1023,13 @@ export function Module3Page() {
       </div>
 
       {/* Toasts */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2" aria-live="polite">
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-[calc(100vw-2rem)]" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-xl text-sm border ${
             t.tone === 'good' ? 'bg-emerald-950 border-emerald-600 text-emerald-200'
               : t.tone === 'warn' ? 'bg-amber-950 border-amber-600 text-amber-200'
                 : 'bg-quantum-800 border-quantum-600 text-gray-200'}`}>
-            {t.tone === 'good' ? <Check className="w-4 h-4" /> : <Zap className="w-4 h-4" />}{t.text}
+            {t.tone === 'good' ? <Check className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> : <Zap className="w-4 h-4 flex-shrink-0" aria-hidden="true" />}{t.text}
           </div>
         ))}
       </div>
