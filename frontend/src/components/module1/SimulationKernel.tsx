@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, Play, Square, Upload, XCircle } from 'lucide-react';
 import type { QasmInspect, QasmProblem, SimulationResult, TheoryCheck } from '../../types';
 import { kernelApi, type ExampleId } from '../../api/kernel';
@@ -136,7 +136,16 @@ export function SimulationKernel() {
     }
   }, []);
 
-  useEffect(() => { loadExample('ghz', 5); }, [loadExample]);
+  // A circuit sent from the Circuit Builder opens as your own circuit; otherwise start with an example.
+  const location = useLocation();
+  const [sent] = useState(() => {
+    const qasm = (location.state as { qasm?: unknown } | null)?.qasm;
+    return typeof qasm === 'string' ? qasm : null;
+  });
+  useEffect(() => {
+    if (sent) setSource(sent);
+    else loadExample('ghz', 5);
+  }, [sent, loadExample]);
 
   // Leaving the page closes the socket, which stops a run still going on the server.
   useEffect(() => () => socketRef.current?.close(), []);
@@ -357,6 +366,11 @@ export function SimulationKernel() {
               </select>
             </div>
           </div>
+          {sent && source === sent && (
+            <p className="text-sm text-gray-300">
+              Opened from the <Link to="/circuit" className="underline hover:text-white">Circuit Builder</Link>.
+            </p>
+          )}
           {current && (
             <p className="text-sm text-gray-300">
               <span className="text-gray-400">What you should see: </span>{EXAMPLES.find(e => e.id === current.id)?.expect}

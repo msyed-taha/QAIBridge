@@ -28,7 +28,7 @@ export function CodeBlock({ code, title = 'Code', subtitle, defaultOpen = false,
         <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 text-left">
           <FileCode2 className="w-4 h-4 text-quantum-neon" />
           <span className="text-white font-bold text-sm">{title}</span>
-          {subtitle && <span className="text-gray-500 text-xs hidden sm:inline">— {subtitle}</span>}
+          {subtitle && <span className="text-gray-400 text-xs hidden sm:inline">— {subtitle}</span>}
           <ChevronDown className={`w-4 h-4 text-gray-500 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         <button
@@ -41,7 +41,7 @@ export function CodeBlock({ code, title = 'Code', subtitle, defaultOpen = false,
       </div>
       {open && (
         <pre
-          className="text-[11px] leading-relaxed text-gray-300 font-mono bg-quantum-900/70 border-t border-quantum-700 px-5 py-4 overflow-auto"
+          className="text-xs leading-relaxed text-gray-300 font-mono [font-variant-ligatures:none] bg-quantum-900/70 border-t border-quantum-700 px-5 py-4 overflow-auto"
           style={{ maxHeight }}
         >
           {code}

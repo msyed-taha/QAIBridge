@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Award, Check, ChevronRight, Code2, Gamepad2, Hammer, Lightbulb, Link2, Loader2, Minus, Plus, Redo2,
+  ArrowRight, Award, Check, ChevronRight, Gamepad2, Hammer, Lightbulb, Link2, Loader2, Minus, Plus, Redo2,
   RotateCcw, Sparkles, Star, Trash2, Undo2, Zap,
 } from 'lucide-react';
+import axios from 'axios';
 import apiClient, { getApiErrorMessage } from '../api/client';
 import { BlochSphere } from '../components/module3/BlochSphere';
 import { BADGES, LEVELS, starsFor, type SimResult } from '../components/module3/challenges';
 import { CodeBlock } from '../components/shared/CodeBlock';
 import { HowToUse } from '../components/shared/HowToUse';
+import { builderQasm } from '../components/module3/qasm';
 
 // ── Gates ─────────────────────────────────────────────────────────────────────
 
@@ -99,6 +102,28 @@ function toKernelOps(gates: PlacedGate[]) {
   });
 }
 
+// ── Draft: the free-build circuit is kept in this browser, so a reload or a trip
+//    to the Simulator doesn't lose it. ──────────────────────────────────────────
+
+const DRAFT_KEY = 'qai_builder_draft';
+
+function loadDraft(): { n: number; gates: PlacedGate[] } | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+    if (!d || !Number.isInteger(d.n) || d.n < 1 || d.n > 6 || !Array.isArray(d.gates)) return null;
+    const ok = d.gates.every((g: PlacedGate) => g && META[g.gate] && Number.isInteger(g.col) && g.col >= 0
+      && [g.target, ...(g.controls ?? [])].every(q => Number.isInteger(q) && q >= 0 && q < d.n)
+      && (g.controls ?? []).length === META[g.gate].arity - 1);
+    return ok ? { n: d.n, gates: d.gates } : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(n: number, gates: PlacedGate[]) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n, gates })); } catch { /* private mode */ }
+}
+
 // ── Toasts ────────────────────────────────────────────────────────────────────
 
 interface Toast { id: number; text: string; tone: 'info' | 'good' | 'warn' }
@@ -106,9 +131,11 @@ interface Toast { id: number; text: string; tone: 'info' | 'good' | 'warn' }
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Module3Page() {
+  const navigate = useNavigate();
+  const [draft] = useState(loadDraft);
   const [mode, setMode] = useState<'free' | 'challenge'>('free');
-  const [numQubits, setNumQubits] = useState(2);
-  const [gates, setGates] = useState<PlacedGate[]>([]);
+  const [numQubits, setNumQubits] = useState(draft?.n ?? 2);
+  const [gates, setGates] = useState<PlacedGate[]>(draft?.gates ?? []);
   const [past, setPast] = useState<PlacedGate[][]>([]);
   const [future, setFuture] = useState<PlacedGate[][]>([]);
   const [armed, setArmed] = useState<GateName | null>(null);           // click-to-place
@@ -121,7 +148,6 @@ export function Module3Page() {
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [qiskit, setQiskit] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   const [levelIdx, setLevelIdx] = useState(0);
@@ -148,7 +174,6 @@ export function Module3Page() {
     setPast(p => [...p.slice(-80), gates]);
     setFuture([]);
     setGates(next);
-    setQiskit(null);
   }, [gates]);
 
   const undo = useCallback(() => {
@@ -156,7 +181,6 @@ export function Module3Page() {
     setFuture([gates, ...future]);
     setGates(past[past.length - 1]);
     setPast(past.slice(0, -1));
-    setQiskit(null);
   }, [past, future, gates]);
 
   const redo = useCallback(() => {
@@ -164,7 +188,6 @@ export function Module3Page() {
     setPast([...past, gates]);
     setGates(future[0]);
     setFuture(future.slice(1));
-    setQiskit(null);
   }, [past, future, gates]);
 
   // ── placing / moving ──
@@ -303,8 +326,8 @@ export function Module3Page() {
           { num_qubits: numQubits, gates: toPayload(gates), shots: 1024 }, { signal: ctrl.signal });
         setResult(data);
         setSimError(null);
-      } catch (e: any) {
-        if (e?.name !== 'CanceledError' && e?.code !== 'ERR_CANCELED') setSimError(getApiErrorMessage(e, 'Simulation failed'));
+      } catch (e) {
+        if (!axios.isCancel(e)) setSimError(getApiErrorMessage(e, 'Simulation failed'));
       } finally {
         setSimLoading(false);
       }
@@ -339,31 +362,34 @@ export function Module3Page() {
     setSelectedId(null);
     setSolved(null);
     setShowHint(false);
-    setQiskit(null);
   };
 
   const switchMode = (m: 'free' | 'challenge') => {
+    if (m === mode) return;
     setMode(m);
     if (m === 'challenge') startLevel(Math.max(0, LEVELS.findIndex(l => !progress[l.id])));
-    else { setSolved(null); }
+    else {
+      // back to your own circuit, as you left it
+      const d = loadDraft();
+      setSolved(null);
+      setNumQubits(d?.n ?? 2);
+      setGates(d?.gates ?? []);
+      setPast([]);
+      setFuture([]);
+      setSelectedId(null);
+    }
   };
+
+  useEffect(() => { if (mode === 'free') saveDraft(numQubits, gates); }, [mode, numQubits, gates]);
+
+  // The circuit as OpenQASM: shown live under the canvas, and what "Open in Simulator" takes along.
+  const qasm = useMemo(() => builderQasm(toKernelOps(gates), numQubits), [gates, numQubits]);
 
   const changeQubits = (n: number) => {
     const kept = gates.filter(g => Math.max(...qubitsOf(g)) < n);
     if (kept.length !== gates.length) toast(`${gates.length - kept.length} gate(s) on removed wires were deleted`, 'warn');
     setNumQubits(n);
     commit(kept);
-  };
-
-  const exportQiskit = async () => {
-    try {
-      const { data } = await apiClient.post('/api/kernel/export/qiskit', {
-        n_qubits: numQubits, operations: toKernelOps(gates), name: 'Circuit Builder export',
-      });
-      setQiskit(data.code);
-    } catch (e) {
-      toast(getApiErrorMessage(e, 'Export failed'), 'warn');
-    }
   };
 
   const selected = gates.find(g => g.id === selectedId) ?? null;
@@ -461,7 +487,7 @@ export function Module3Page() {
           <>Click a gate to edit it — rotation angle, or which qubits a CNOT / Toffoli uses.</>,
           <>Results update live. Switch to <strong>Challenges</strong> for guided levels with stars and badges.</>,
         ]}
-        outcome={<>Probability bars, one Bloch sphere per qubit (dashed purple = entangled), measurement counts, and runnable Qiskit code for your circuit.</>}
+        outcome={<>Probability bars, one Bloch sphere per qubit (dashed purple = entangled), measurement counts, and your circuit as OpenQASM. Open it in the Simulator to replay it gate by gate, see its amplitudes or download it.</>}
       />
 
       {/* Mode switch */}
@@ -671,6 +697,8 @@ export function Module3Page() {
             </div>
           )}
 
+          <CodeBlock code={qasm} title="OpenQASM" subtitle="updates as you build" defaultOpen maxHeight={240} />
+
           {simError && <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-red-400 text-sm">{simError}</div>}
 
           {/* Results */}
@@ -686,9 +714,9 @@ export function Module3Page() {
                 <span className="px-3 py-1.5 rounded-xl border bg-quantum-800 border-quantum-700 text-gray-400 text-xs">
                   {result.gate_count} gates · depth {result.circuit_depth} · {2 ** result.num_qubits} basis states
                 </span>
-                <button onClick={exportQiskit} disabled={!gates.length}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-quantum-600 text-gray-300 text-xs hover:text-white disabled:opacity-40">
-                  <Code2 className="w-3.5 h-3.5" /> Export to Qiskit
+                <button onClick={() => navigate('/simulator', { state: { qasm } })} disabled={!gates.length}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-quantum-neon/50 text-quantum-neon text-xs font-semibold hover:bg-quantum-neon/10 disabled:opacity-40">
+                  Open in Simulator <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -723,7 +751,6 @@ export function Module3Page() {
                 <p className="text-gray-600 text-[11px] mt-3">Shots = a real sampling of 1024 simulated measurements — close to, but not exactly, the probabilities.</p>
               </div>
 
-              {qiskit && <CodeBlock code={qiskit} title="Your circuit in Qiskit" subtitle="copy and run with Qiskit Aer or on IBM Quantum" defaultOpen />}
             </>
           )}
         </div>
