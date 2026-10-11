@@ -34,7 +34,7 @@ from sklearn.metrics import accuracy_score
 
 from ..ai import service as ai
 from ..models.user import User
-from ..modules.module4_recommender import ai_reader
+from ..modules.module4_recommender import ai_reader, reality
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/module4", tags=["AI Advisor"])
@@ -76,14 +76,15 @@ QUANTUM_ALGORITHMS = [
         "id":          "qaoa",
         "type":        "quantum",
         "name":        "QAOA",
-        "complexity":  "O(p·N)",
-        "speedup":     "Polynomial",
+        "complexity":  "Heuristic",
+        "speedup":     "None proven",
         "best_for":    "Combinatorial optimisation with graph structure",
         "qubits":      "N (problem variables)",
         "color":       "#f97316",
         "description": (
             "QAOA is a variational quantum algorithm that encodes combinatorial "
-            "optimisation problems into parameterised quantum circuits."
+            "optimisation problems into parameterised quantum circuits. It is a heuristic: "
+            "no speed-up over the best classical solvers has been shown."
         ),
         "use_cases":   ["Travelling Salesman", "Graph colouring", "Portfolio optimisation", "Scheduling"],
     },
@@ -106,8 +107,8 @@ QUANTUM_ALGORITHMS = [
         "id":          "vqe",
         "type":        "quantum",
         "name":        "VQE (Variational Quantum Eigensolver)",
-        "complexity":  "O(poly(N))",
-        "speedup":     "Exponential (quantum systems)",
+        "complexity":  "Heuristic",
+        "speedup":     "None proven",
         "best_for":    "Ground state energy and quantum chemistry",
         "qubits":      "N (molecular orbitals)",
         "color":       "#22c55e",
@@ -208,9 +209,94 @@ CLASSICAL_ALGORITHMS = [
         "use_cases":   ["Quantum chemistry (molecules with <10 orbitals)", "Testing algorithms"],
     },
     {
+        "id":          "routing_heuristics",
+        "type":        "classical",
+        "name":        "Routing heuristics (e.g. Google OR-Tools)",
+        "complexity":  "Seconds to minutes for hundreds of stops",
+        "speedup":     "None",
+        "best_for":    "Vehicle routing with many stops, time windows and several vehicles",
+        "color":       "#ef4444",
+        "description": (
+            "Build routes quickly with a savings or insertion method, then improve them with local search "
+            "(2-opt, moving and swapping stops) or a metaheuristic such as guided local search or tabu search. "
+            "Solvers like Google OR-Tools handle vehicles, time windows and driving limits."
+        ),
+        "use_cases":   ["Delivery routes", "Vehicle routing with time windows", "Field-service planning"],
+    },
+    {
+        "id":          "optimisation_solver",
+        "type":        "classical",
+        "name":        "Integer programming solver (e.g. OR-Tools CP-SAT)",
+        "complexity":  "Fast in practice for thousands of variables",
+        "speedup":     "None",
+        "best_for":    "Scheduling, budgets and allocation with constraints",
+        "color":       "#ef4444",
+        "description": (
+            "Describe the choices, limits and goal as an integer program and let a mature solver search it. "
+            "It returns proven-optimal answers for many real problems, or good ones within a time limit."
+        ),
+        "use_cases":   ["Knapsack and budgets", "Scheduling", "Portfolio selection", "Assignment"],
+    },
+    {
+        "id":          "index_lookup",
+        "type":        "classical",
+        "name":        "Build an index (hash table or B-tree)",
+        "complexity":  "O(N) once, then O(1) or O(log N) per lookup",
+        "speedup":     "None",
+        "best_for":    "Searching the same data many times",
+        "color":       "#ef4444",
+        "description": (
+            "Spend one pass building an index, then every lookup takes a few steps. This is what databases do, "
+            "and it beats any one-off scan when you search more than once."
+        ),
+        "use_cases":   ["Database queries", "Repeated lookups", "Matching records"],
+    },
+    {
+        "id":          "number_field_sieve",
+        "type":        "classical",
+        "name":        "General number field sieve",
+        "complexity":  "Sub-exponential",
+        "speedup":     "None",
+        "best_for":    "Factoring very large integers",
+        "color":       "#ef4444",
+        "description": (
+            "The fastest known classical method for factoring large numbers. It has factored 829-bit RSA numbers "
+            "with huge computing effort; 2048-bit RSA remains far out of reach, which is why it is still used."
+        ),
+        "use_cases":   ["Cryptanalysis research", "Testing key strength"],
+    },
+    {
+        "id":          "classical_chemistry",
+        "type":        "classical",
+        "name":        "Classical chemistry methods (DFT, coupled cluster)",
+        "complexity":  "Polynomial, with known accuracy limits",
+        "speedup":     "None",
+        "best_for":    "Energies and properties of molecules and materials",
+        "color":       "#ef4444",
+        "description": (
+            "Density functional theory and coupled-cluster methods are today's workhorses for molecular energies. "
+            "They are accurate for most molecules; strongly correlated ones remain hard."
+        ),
+        "use_cases":   ["Drug discovery", "Materials", "Reaction energies"],
+    },
+    {
+        "id":          "eigensolver",
+        "type":        "classical",
+        "name":        "Classical eigensolvers (Lanczos, Davidson)",
+        "complexity":  "Fast for sparse matrices",
+        "speedup":     "None",
+        "best_for":    "Finding a few eigenvalues of a large matrix",
+        "color":       "#ef4444",
+        "description": (
+            "Iterative methods that find the lowest or largest eigenvalues of very large, sparse matrices "
+            "without ever storing them in full."
+        ),
+        "use_cases":   ["Vibration and stability analysis", "Physics models", "Network analysis"],
+    },
+    {
         "id":          "hillclimbing",
         "type":        "classical",
-        "name":        "Hill Climbing / Heuristics",
+        "name":        "Local search & metaheuristics",
         "complexity":  "O(N) per iteration",
         "speedup":     "None",
         "best_for":    "Approximate solutions for large combinatorial problems",
@@ -513,73 +599,13 @@ def _features_to_vector(f: dict) -> np.ndarray:
         f["speedup_priority"],
     ]], dtype=float)
 
-def _decide_approach(top_algo: dict, confidence: float, data_size: int, features: dict = None) -> dict:
-    """Decide Quantum vs Classical based on algorithm speedup type, scale, and problem category."""
-    speedup = top_algo["speedup"]
-    score = 0
-    reasons = []
-
-    # ── Extract category from features (if provided)
-    category = features.get("problem_category", -1) if features else -1
-    has_graph = features.get("has_graph_structure", False) if features else False
-
-    if speedup == "Exponential" or speedup == "Exponential (quantum systems)" or speedup == "Exponential precision":
-        score += 50
-        reasons.append(f"{top_algo['name']} provides exponential speedup — classical algorithms cannot compete at scale")
-    elif speedup == "Quadratic":
-        if data_size >= 100_000:
-            score += 35
-            reasons.append(f"Quadratic speedup (√N) is highly effective at N={data_size:,}")
-        elif data_size >= 10_000:
-            score += 20
-            reasons.append(f"Quadratic speedup offers moderate advantage at N={data_size:,}")
-        else:
-            score += 5
-            reasons.append(f"At N={data_size:,} the classical overhead is low — quantum advantage is marginal")
-    elif speedup == "Polynomial":
-        # Special handling for optimization problems (category 2)
-        if category == 2:  # Optimisation category
-            if has_graph:
-                score += 30
-                reasons.append(f"Polynomial speedup on graph-based optimisation (e.g., TSP, routing) is highly valuable — combinatorial structure favours quantum")
-            else:
-                score += 20
-                reasons.append(f"Polynomial speedup on combinatorial optimisation problems is meaningful, even at moderate scale")
-        elif data_size >= 50_000:
-            score += 25
-            reasons.append(f"Polynomial speedup is meaningful at N={data_size:,}")
-        else:
-            score += 10
-            reasons.append(f"Polynomial speedup provides limited gain at small scale")
-
-    if confidence >= 70:
-        score += 20
-    elif confidence >= 50:
-        score += 10
-
-    if data_size >= 1_000_000:
-        score += 15
-    elif data_size >= 100_000:
-        score += 8
-
-    approach = "Quantum" if score >= 40 else "Classical"
-
-    if approach == "Classical":
-        reasons.append("At this scale a well-optimised classical algorithm is simpler and faster to deploy")
-
-    return {
-        "approach": approach,
-        "score": score,
-        "reason": ". ".join(reasons) + ".",
-    }
-
 REASON_TEMPLATES = {
     # Quantum algorithms
     "grovers":       "Your problem involves searching an unstructured space — Grover's √N oracle calls give a direct quadratic speedup over any classical linear scan.",
     "shors":         "The periodic or cryptographic nature of your problem maps directly to Shor's QFT-based period-finding, delivering exponential advantage.",
-    "qaoa":          "Combinatorial optimisation, choosing the best of very many possible combinations, is the target QAOA's variational quantum circuits are built for.",
+    "qaoa":          "Combinatorial optimisation, choosing the best of very many possible combinations, is what QAOA's variational circuits are built for, though no speed-up over classical solvers has been shown.",
     "amplitude_amp": "Multiple valid solutions in an unstructured space make Amplitude Amplification the strongest match — it generalises Grover's to any 'good state' subspace.",
-    "vqe":           "Continuous variables and simulation requirements point to VQE's hybrid variational energy minimisation — designed for quantum chemistry.",
+    "vqe":           "Continuous variables and simulation requirements point to VQE's hybrid variational energy minimisation, designed for quantum chemistry, though it has no proven speed-up yet.",
     "qpe":           "Your need for precise eigenvalue or phase estimation makes Quantum Phase Estimation the optimal choice.",
     # Classical algorithms
     "linear_search":       "For this problem size, a straightforward sequential search is the practical choice — no data structure overhead, simple to implement and debug.",
@@ -587,7 +613,13 @@ REASON_TEMPLATES = {
     "dynamic_programming": "Dynamic Programming caches subproblem results to avoid redundant work. Effective for small instances but becomes impractical at scale.",
     "binary_search":       "Binary search on sorted data provides O(log N) lookup — significantly faster than linear scan for structured, pre-indexed data.",
     "classical_simulation": "Classical state-vector simulation explicitly tracks all quantum amplitudes. Limited to ~20 qubits but works perfectly for small systems and algorithm testing.",
-    "hillclimbing":        "Hill Climbing quickly finds good (often near-optimal) solutions without the exponential blowup of exhaustive search. Trade optimality for speed.",
+    "hillclimbing":        "Local search and metaheuristics (simulated annealing, tabu search) quickly find good, often near-optimal answers without the exponential blow-up of trying everything.",
+    "routing_heuristics":  "Routing heuristics build good routes in seconds to minutes and keep improving them, handling vehicles, time windows and driving limits. They are what delivery companies use today.",
+    "optimisation_solver": "A mature integer programming solver handles the constraints directly and returns optimal or near-optimal answers quickly for problems of this size.",
+    "index_lookup":        "Build an index once and every later lookup takes a few steps; for a single search, one pass over the data is already fast.",
+    "number_field_sieve":  "The number field sieve is the fastest known classical way to factor large numbers; for RSA-sized numbers it is still far too slow, which is what keeps RSA safe today.",
+    "classical_chemistry": "Classical chemistry methods such as DFT and coupled cluster give reliable energies for most molecules today.",
+    "eigensolver":         "Iterative classical eigensolvers find the eigenvalues you need from very large, sparse matrices.",
 }
 
 # Quantum algorithms that genuinely apply to each detected problem category.
@@ -610,15 +642,14 @@ KEYWORD_PREFERENCE = {                        # strong phrases that single out o
 }
 
 
-def _run_classifier(features: dict, text: str = "") -> dict:
-    """Run RF classifier and return ranked recommendations, filtering by approach."""
-    # ── Step 1: Get quantum algorithm rankings from RF classifier
+def _rank_quantum(features: dict, text: str = "") -> List[tuple]:
+    """The Random Forest's ranking of the quantum algorithms, kept consistent with the problem type."""
     vec = _features_to_vector(features)
     proba = _clf.predict_proba(vec)[0]
     classes = list(_clf.classes_)
     rf_scores = {classes[i]: float(p) for i, p in enumerate(proba)}
 
-    # ── Step 1b: category gate + keyword preference, then renormalise the RF confidence
+    # category gate + keyword preference, then renormalise the RF confidence
     allowed = CATEGORY_ALLOWED.get(features["problem_category"], classes)
     t = text.lower()
     preferred = [a for a, kws in KEYWORD_PREFERENCE.items() if a in allowed and any(k in t for k in kws)]
@@ -628,7 +659,7 @@ def _run_classifier(features: dict, text: str = "") -> dict:
         return (algo in preferred, algo in allowed, rf_scores[algo])
 
     ordered = sorted(classes, key=rank_key, reverse=True)
-    quantum_scored = []
+    scored = []
     for algo in ordered:
         if algo in allowed:
             conf = max(rf_scores[algo] / allowed_mass, 0.0) * 100
@@ -636,51 +667,60 @@ def _run_classifier(features: dict, text: str = "") -> dict:
                 conf = max(conf, 60.0)                    # the gate itself is strong evidence
         else:
             conf = rf_scores[algo] * 100 * 0.5            # out-of-category algorithms are demoted
-        quantum_scored.append((algo, round(min(conf, 99.0), 1)))
+        scored.append((algo, round(min(conf, 99.0), 1)))
+    return scored
 
-    # ── Step 2: Decide approach based on TOP QUANTUM algorithm
-    top_quantum_id   = quantum_scored[0][0]
-    top_quantum_conf = quantum_scored[0][1]
-    decision = _decide_approach(ALGO_MAP[top_quantum_id], top_quantum_conf, features["data_size"], features)
-    approach = decision["approach"]
 
-    # ── Step 3: Filter algorithms by approach
-    if approach == "Quantum":
-        # Filter: only show quantum algorithms
-        filtered_ids = [algo_id for algo_id, conf in quantum_scored]
-        scored = quantum_scored
-        top_id = top_quantum_id
-        top_conf = top_quantum_conf
-    else:
-        # Classical approach: map quantum problem to classical alternatives
-        scored = _map_to_classical_alternatives(top_quantum_id, features)
-        top_id = scored[0][0]
-        top_conf = scored[0][1]
-        filtered_ids = [algo_id for algo_id, conf in scored]
-
-    # ── Step 4: Build recommendations from filtered list
-    recommendations = []
-    for rank, (algo_id, conf) in enumerate(scored, 1):
-        a = ALGO_MAP[algo_id]
-        recommendations.append({
-            "rank":           rank,
-            "algorithm_id":   algo_id,
-            "algorithm_name": a["name"],
-            "confidence":     conf,
-            "color":          a["color"],
-            "complexity":     a["complexity"],
-            "speedup":        a["speedup"],
-            "reason":         REASON_TEMPLATES.get(algo_id, "Suitable based on your problem profile."),
-            "use_cases":      a["use_cases"],
-        })
-
+def _card(algo_id: str, rank: int, confidence: Optional[float] = None) -> dict:
+    a = ALGO_MAP[algo_id]
     return {
-        "approach":           approach,
-        "approach_reason":    decision["reason"],
-        "top_algorithm_id":   top_id,
-        "top_algorithm_name": ALGO_MAP[top_id]["name"],
-        "top_confidence":     top_conf,
-        "recommendations":    recommendations,
+        "rank":           rank,
+        "algorithm_id":   algo_id,
+        "algorithm_name": a["name"],
+        "confidence":     confidence,
+        "color":          a["color"],
+        "complexity":     a["complexity"],
+        "speedup":        a["speedup"],
+        "reason":         REASON_TEMPLATES.get(algo_id, "Suitable based on your problem profile."),
+        "use_cases":      a["use_cases"],
+    }
+
+
+def _recommend(features: dict, text: str = "") -> dict:
+    """
+    The model picks the quantum algorithm that fits; the reality check then says what to use today
+    (and why), what a future error-corrected quantum computer could offer, and the limits right now.
+    """
+    ranked = _rank_quantum(features, text)
+    qid, qconf = ranked[0]
+    q = ALGO_MAP[qid]
+    check = reality.assess(qid, q["name"], features, text)
+    classical = [_card(c, i) for i, c in enumerate(check["classical"], 1)]
+    best = classical[0]
+    return {
+        "approach":           check["today"]["approach"],      # the best approach today
+        "approach_reason":    check["today"]["reason"],
+        "top_algorithm_id":   best["algorithm_id"],
+        "top_algorithm_name": best["algorithm_name"],
+        "today":              {**check["today"], "algorithm": best},
+        "classical_options":  classical,
+        "quantum": {
+            "algorithm_id":  qid,
+            "name":          q["name"],
+            "complexity":    q["complexity"],
+            "color":         q["color"],
+            "speedup":       check["speedup"],
+            "proven":        check["proven"],
+            "qubits_needed": check["qubits_needed"],
+            "verdict":       check["future"]["approach"],
+            "reason":        check["future"]["reason"],
+            "confidence":    qconf,
+        },
+        "limits":             check["limits"],
+        "try_here":           check["try_here"],
+        "solve_here":         check["solve_here"],
+        "model_confidence":   qconf,
+        "recommendations":    [_card(a, i, c) for i, (a, c) in enumerate(ranked, 1)],
         "detected_features":  {
             "category_label":      CATEGORY_LABELS.get(features["problem_category"], "Unknown"),
             "data_size":           features["data_size"],
@@ -691,32 +731,6 @@ def _run_classifier(features: dict, text: str = "") -> dict:
             "periodic_structure":  features["periodic_structure"],
         },
     }
-
-def _map_to_classical_alternatives(quantum_algo_id: str, features: dict) -> list:
-    """Map a top quantum algorithm to classical alternatives with confidence scores."""
-    data_size = features["data_size"]
-
-    # Define mappings: quantum algorithm → classical alternatives (in order of preference)
-    mappings = {
-        "grovers":       ["binary_search", "linear_search"],
-        "shors":         ["trial_division"],
-        "qaoa":          ["dynamic_programming", "hillclimbing"],
-        "amplitude_amp": ["binary_search", "linear_search"],
-        "vqe":           ["classical_simulation"],
-        "qpe":           ["classical_simulation"],
-    }
-
-    classical_pool = mappings.get(quantum_algo_id, ["hillclimbing", "dynamic_programming", "binary_search"])
-
-    # Score classical alternatives based on problem features
-    scored = []
-    for rank, classical_id in enumerate(classical_pool, 1):
-        # Confidence decreases with rank in the classical alternatives
-        base_conf = 90 - (rank - 1) * 15
-        conf = max(40.0, base_conf)
-        scored.append((classical_id, round(conf, 1)))
-
-    return scored
 
 CATEGORY_LABELS = {
     0: "Search", 1: "Factoring", 2: "Optimisation", 3: "Database",
@@ -826,12 +840,14 @@ def _advise(text: str, mode: str, user: User) -> Dict[str, Any]:
             raise HTTPException(422, problem)
         features = _extract_features_from_text(text)
 
-    result = _run_classifier(features, text)
+    result = _recommend(features, text)
     result["engine"] = "ai" if read else "built-in"
     if read:
         result["summary"] = read["summary"]
         result["ai"] = {"model": read["model"], "saved": read["saved"]}
-        result["explanation"] = ai_reader.explain(read["summary"] or text[:2000], result, user.id)
+        # the person's own words when short (so a direct question gets answered), else the AI's summary
+        result["explanation"] = ai_reader.explain(text if len(text) <= 2000 else read["summary"] or text[:2000],
+                                                  result, user.id)
     if note:
         result["ai_note"] = note
     result["ai_status"] = ai.status(user.id)

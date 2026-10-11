@@ -4,8 +4,10 @@ AI Advisor — tests.
 Run from backend/:  python -m pytest tests/test_module4_recommender.py -v
 
 The Random Forest ranks quantum algorithms from features read from the
-problem text; a category gate keeps the final choice consistent with the
-detected problem type. The features come from the AI (a fake Claude here,
+problem text; a category gate keeps the choice consistent with the detected
+problem type. A reality check then gives an honest answer in two parts: the
+best approach today (with real classical methods and the limits of today's
+hardware) and what a future, error-corrected quantum computer could offer. The features come from the AI (a fake Claude here,
 see conftest.py: nothing is sent or paid) or, when the AI can't answer or the
 user picks it, from the built-in keyword reader. The CASES are the kinds of
 prompts a user (or a panel) types in.
@@ -74,15 +76,54 @@ def _advise(client, auth, text, **extra):
 
 
 @pytest.mark.parametrize("text,expected", CASES)
-def test_the_built_in_reader_recommends_the_right_quantum_algorithm(client, auth, text, expected):
+def test_the_built_in_reader_finds_the_right_quantum_algorithm(client, auth, text, expected):
     r = _advise(client, auth, text)
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["engine"] == "built-in" and body["ai_note"].startswith("AI isn't set up on this server.")
-    quantum_top = body["top_algorithm_id"] if body["approach"] == "Quantum" else None
-    # when the advisor decides "Classical", the classical alternative must map from the right quantum algorithm
-    assert quantum_top in (expected, None)
-    assert body["recommendations"][0]["confidence"] > 0
+    assert body["quantum"]["algorithm_id"] == expected and body["recommendations"][0]["confidence"] > 0
+    # today, every one of these is a job for a classical method, and the page says what stops quantum
+    assert body["approach"] == "Classical" and body["today"]["algorithm"]["algorithm_id"] == body["top_algorithm_id"]
+    assert body["today"]["reason"].startswith("Quantum isn't ready for this yet") and len(body["limits"]) >= 3
+
+
+ROUTING = ("I need to plan delivery routes for 60 stops across a city, with time windows for each stop, a fleet of 5 "
+           "vans, and a limit on total driving time. I need a route that is good enough within a few minutes, not a "
+           "proven best route. The data is about 60 stops, so an exact answer would be very costly. Should I use a "
+           "quantum or classical approach, which algorithm would you pick, and what are the limits of your "
+           "recommendation on today's hardware?")
+
+
+def test_a_real_routing_problem_gets_an_honest_answer(client, auth):
+    body = _advise(client, auth, ROUTING).json()
+    assert body["approach"] == "Classical" and body["top_algorithm_id"] == "routing_heuristics"
+    q = body["quantum"]
+    assert q["algorithm_id"] == "qaoa" and not q["proven"] and q["verdict"] == "Classical" and q["qubits_needed"] == 3600
+    assert "no proven speed-up" in body["today"]["reason"] and "3,600 qubits" in body["today"]["reason"]
+    assert any("60 stops × 60 positions" in line and "5 vehicles and the time windows" in line for line in body["limits"])
+    assert body["try_here"]["path"] == "/module2?type=optimization" and body["solve_here"] == "/solve?type=optimization"
+
+
+def test_no_speed_up_is_claimed_for_heuristics(client, auth):
+    for text in (ROUTING, CASES[2][0], CASES[9][0]):
+        body = _advise(client, auth, text).json()
+        said = json.dumps(body).lower()
+        assert "polynomial speedup" not in said and "polynomial speed-up" not in said and "favours quantum" not in said
+        assert body["quantum"]["speedup"].startswith("None proven")
+
+
+@pytest.mark.parametrize("text, today, future, qubits", [
+    (CASES[4][0], "linear_search", "Quantum", 25),          # Grover: proven, but needs error correction
+    (CASES[7][0], "number_field_sieve", "Quantum", 4099),   # Shor on RSA-2048
+    (CASES[9][0], "classical_chemistry", "Classical", 50),  # VQE: no proven speed-up
+    (CASES[2][0], "optimisation_solver", "Classical", None),  # "5 million" is the budget, not 5 million items
+    ("Find the exact shortest route through 5 cities in Punjab (travelling salesman), it must be the proven optimum.",
+     "dynamic_programming", "Classical", 25),
+])
+def test_today_and_future(client, auth, text, today, future, qubits):
+    body = _advise(client, auth, text).json()
+    assert body["top_algorithm_id"] == today and body["quantum"]["verdict"] == future
+    assert body["quantum"]["qubits_needed"] == qubits
 
 
 def test_needs_sign_in(client):
@@ -97,14 +138,15 @@ def test_rejects_gibberish(client, auth):
 def test_the_ai_reads_the_problem_and_the_model_still_chooses(client, auth, fake_ai):
     fake_ai.replies = [BAKERY_READ, EXPLANATION]
     body = _advise(client, auth, BAKERY).json()
-    assert body["engine"] == "ai" and body["top_algorithm_id"] == "qaoa"
+    assert body["engine"] == "ai" and body["quantum"]["algorithm_id"] == "qaoa" and body["approach"] == "Classical"
     assert body["summary"].startswith("Assign 40 cake orders") and body["explanation"] == EXPLANATION
     assert body["detected_features"]["category_label"] == "Optimisation" and body["detected_features"]["data_size"] == 40
     assert body["ai_status"]["used_today"] == 2 and "ai_note" not in body
     read, explain = fake_ai.calls
     assert "<data>\n" + BAKERY in read["user"] and "Fill in the facts" in read["system"]
-    # the explanation is built on the model's real decision, not made up
-    assert "QAOA" in explain["user"] and "Model decision: Quantum approach" in explain["user"]
+    # the explanation is built on the Advisor's real verdict and limits, not made up, and sees the person's own words
+    assert "Best approach today: Classical" in explain["user"] and "Limits today:" in explain["user"]
+    assert "QAOA" in explain["user"] and BAKERY in explain["user"]
 
 
 def test_the_built_in_reader_can_not_read_what_the_ai_can(client, auth):
@@ -130,7 +172,7 @@ def test_when_the_ai_fails_the_built_in_reader_takes_over(client, auth, fake_ai)
     from app.ai.service import AIServiceError
     fake_ai.error = AIServiceError("HTTP 529 overloaded_error")
     body = _advise(client, auth, CASES[4][0]).json()
-    assert body["engine"] == "built-in" and body["top_algorithm_id"] in ("grovers", "binary_search")
+    assert body["engine"] == "built-in" and body["quantum"]["algorithm_id"] == "grovers"
     assert body["ai_note"] == "The AI couldn't answer just now. The built-in reader was used instead."
     assert "explanation" not in body
 
@@ -145,7 +187,7 @@ def test_an_unusable_reading_falls_back_and_is_asked_again(client, auth, fake_ai
 def test_a_missing_explanation_still_gives_the_recommendation(client, auth, fake_ai):
     fake_ai.replies = [BAKERY_READ, "   "]
     body = _advise(client, auth, BAKERY).json()
-    assert body["engine"] == "ai" and body["explanation"] is None and body["top_algorithm_id"] == "qaoa"
+    assert body["engine"] == "ai" and body["explanation"] is None and body["quantum"]["algorithm_id"] == "qaoa"
 
 
 def test_the_built_in_choice_never_calls_the_ai(client, auth, fake_ai):

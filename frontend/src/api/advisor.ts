@@ -1,11 +1,12 @@
 import apiClient from './client';
 import type { AIStatus } from './ai';
 
-export interface AlgoRec {
+/** A method, with how well it fits (the model's confidence, for the quantum ranking). */
+export interface AlgoCard {
   rank: number;
   algorithm_id: string;
   algorithm_name: string;
-  confidence: number;
+  confidence: number | null;
   color: string;
   complexity: string;
   speedup: string;
@@ -23,20 +24,44 @@ export interface DetectedFeatures {
   periodic_structure: boolean;
 }
 
+/** The quantum algorithm that fits the problem, and what it could offer on a future, error-corrected computer. */
+export interface QuantumOutlook {
+  algorithm_id: string;
+  name: string;
+  complexity: string;
+  color: string;
+  speedup: string;
+  proven: boolean;
+  qubits_needed: number | null;
+  verdict: 'Quantum' | 'Classical';
+  reason: string;
+  /** How well the model thinks this algorithm fits the problem type. */
+  confidence: number;
+}
+
 export interface Advice {
   off_topic?: false;
+  /** The best approach today, and why (what stops quantum). */
   approach: 'Quantum' | 'Classical';
   approach_reason: string;
   top_algorithm_id: string;
   top_algorithm_name: string;
-  top_confidence: number;
-  recommendations: AlgoRec[];
+  today: { approach: 'Quantum' | 'Classical'; reason: string; algorithm: AlgoCard };
+  classical_options: AlgoCard[];
+  quantum: QuantumOutlook;
+  /** The limits of today's hardware for this problem, in plain words. */
+  limits: string[];
+  try_here: { label: string; path: string } | null;
+  solve_here: string | null;
+  model_confidence: number;
+  /** The model's ranking of the quantum algorithms. */
+  recommendations: AlgoCard[];
   detected_features: DetectedFeatures;
   /** Who read the problem: the AI, or the built-in keyword reader. The model chooses either way. */
   engine: 'ai' | 'built-in';
   /** The AI's one-line reading of the problem. */
   summary?: string;
-  /** The AI's plain-words explanation of the model's choice (null if it couldn't write one). */
+  /** The AI's plain-words explanation (null if it couldn't write one). */
   explanation?: string | null;
   /** Why the built-in reader was used instead of the AI. */
   ai_note?: string;

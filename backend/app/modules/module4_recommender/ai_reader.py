@@ -58,13 +58,14 @@ How to fill it in:
   set "on_topic" to false and put one polite sentence in "redirect" saying what this tool does."""
 
 EXPLAIN_PROMPT = """You explain a recommendation from QAIbridge's AI Advisor to the person who asked for it.
-The app's note above the data gives the model's decision and its numbers; the data block holds the person's
-problem. Write 2 to 4 short sentences of plain English (at most 90 words), with no lists or headings:
+The app's note above the data gives the verdict and the facts behind it; the data block holds the person's own
+words. Write 3 to 5 short sentences of plain English (at most 120 words), with no lists or headings:
 - say what kind of problem it is, in the person's own terms;
-- say which approach and algorithm the model chose, and the main reason (use the speed-up and the size given);
-- if it helps, add in general terms what would change the advice (for example a much smaller problem).
-Use only the facts given, and never mention the note, the model's workings or anything you weren't told.
-Don't promise results on real quantum hardware."""
+- give the best approach today and the method to use, and why;
+- say what quantum computing could offer later and what stops it today, using the limits given;
+- if the person asked something directly (for example about limits or hardware), answer it from these facts.
+Use only the facts given; never claim a speed-up the facts don't state, and never mention the note or the model's
+workings."""
 
 
 def read_problem(text: str, user_id: Optional[int]) -> Dict[str, Any]:
@@ -109,13 +110,14 @@ def _read_answer(answer: ai.Answer) -> Dict[str, Any]:
 
 
 def explain(problem: str, result: Dict[str, Any], user_id: Optional[int]) -> Optional[str]:
-    """2–4 sentences on why the model chose what it chose, or None when the AI can't write them."""
-    top = result["recommendations"][0]
-    f = result["detected_features"]
+    """3–5 sentences on the verdict and its limits, built only from the Advisor's facts; None when the AI can't write them."""
+    today, quantum, f = result["today"], result["quantum"], result["detected_features"]
     note = (
-        f"Model decision: {result['approach']} approach, best algorithm {top['algorithm_name']} "
-        f"(complexity {top['complexity']}, {top['speedup']} speed-up), model confidence {result['top_confidence']}%.\n"
-        f"The model's reasons: {result['approach_reason']}\n"
+        f"Best approach today: {today['approach']}, using {today['algorithm']['algorithm_name']}. "
+        f"{today['algorithm']['reason']} {today['reason']}\n"
+        f"Quantum algorithm that fits this problem: {quantum['name']} (speed-up: {quantum['speedup']}). "
+        f"On a future, error-corrected quantum computer the verdict is {quantum['verdict']}: {quantum['reason']}\n"
+        f"Limits today: {' '.join(result['limits'])}\n"
         f"Problem type: {f['category_label']}; size N = {f['data_size']:,}."
     )
     try:
