@@ -20,6 +20,7 @@ from app.models import benchmark as _benchmark_models  # noqa: E402,F401 — reg
 from app.models import contact as _contact_models  # noqa: E402,F401 — registers ContactMessage
 from app.models import learn as _learn_models  # noqa: E402,F401 — registers LearnProgress
 from app.models import work as _work_models  # noqa: E402,F401 — registers Project, SavedCircuit, ChallengeProgress
+from app.models import ai as _ai_models  # noqa: E402,F401 — registers AIUsage, AppSetting
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

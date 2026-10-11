@@ -1,26 +1,25 @@
 import apiClient from './client';
+import type { AIStatus } from './ai';
 
 export type ProblemType =
   | 'search' | 'database' | 'factoring' | 'tsp' | 'knapsack' | 'maxcut' | 'partition' | 'portfolio' | 'boolean' | 'unsupported';
 
-export interface EngineStatus {
-  enabled: boolean;
-  provider: string | null;
-  model: string | null;
-  mode: string;
-  how_to_enable: string | null;
-}
+/** Whether the AI can read code for me right now (the built-in reader is used when it can't). */
+export type EngineStatus = AIStatus;
 
 export interface ProblemSpec {
   problem_type: ProblemType;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   confidence: number;
   evidence: string[];
   explanation: string;
   quantum_algorithm: string;
   engine: 'llm' | 'local';
   incomplete?: boolean;
-  llm?: { provider: string; model: string; latency_ms: number };
+  /** Read by the AI: which model, and whether it came from a saved copy. */
+  llm?: { model: string; saved: boolean; latency_ms: number };
+  /** Why the built-in reader was used instead of the AI. */
+  ai_note?: string;
 }
 
 export interface Stage { title: string; detail: string }
@@ -31,7 +30,8 @@ export interface TransformResult {
   supported: boolean;
   reason?: string;
   stages: Stage[];
-  details?: any;
+  /** The run's full numbers; their shape depends on the problem type. */
+  details?: Record<string, unknown>;
   verification?: { match: boolean; detail: string };
   qiskit?: string | null;
   total_ms?: number;

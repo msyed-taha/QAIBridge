@@ -14,11 +14,11 @@ const ms = (x: number | null | undefined) =>
 
 function Badge({ ok, yes = 'Correct', no = 'Incorrect' }: { ok: boolean; yes?: string; no?: string }) {
   return ok ? (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
       <CheckCircle2 className="w-3 h-3" /> {yes}
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-300 bg-red-500/10 border border-red-500/30 rounded-full px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-300 bg-red-500/10 border border-red-500/30 rounded-full px-2 py-0.5">
       <XCircle className="w-3 h-3" /> {no}
     </span>
   );
@@ -41,7 +41,7 @@ export function Card({ title, icon, children, className = '' }: {
 function Row({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1.5 border-b border-quantum-700/50 last:border-0">
-      <span className="text-gray-500 text-xs">{label}</span>
+      <span className="text-gray-400 text-xs">{label}</span>
       <span className={`text-xs font-mono text-right ${accent ? 'text-quantum-neon font-semibold' : 'text-gray-200'}`}>{value}</span>
     </div>
   );
@@ -96,7 +96,7 @@ export function VerdictBanner({ result }: { result: ComparisonResult<any> }) {
   return (
     <div className="rounded-2xl border border-quantum-neon/30 p-5 mb-5"
       style={{ background: 'linear-gradient(135deg, rgba(0,255,204,0.06), rgba(204,68,255,0.06))' }}>
-      <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-1">Result</p>
+      <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Result</p>
       <p className="text-white font-bold text-base leading-snug">{headline}</p>
       <div className="flex flex-wrap gap-2 mt-3">
         <span className="text-xs text-gray-400">Classical answer: <span className="text-gray-200">{answerText(result, 'classical')}</span></span>
@@ -233,14 +233,14 @@ export function GroverViews({ result }: { result: ComparisonResult<GroverQuantum
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         <Card title="Amplitude amplification — probability of the answer" icon={<Zap className="w-4 h-4 text-quantum-neon" />}>
           <AmplificationChart q={q} />
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-400 text-xs mt-1">
             Starts at 1/N = {pct(q.uniform_probability, 3)} (uniform superposition) and rises to {pct(q.success_probability)} after
             {' '}{q.iterations} iteration(s). The kernel's values sit exactly on the theoretical curve.
           </p>
         </Card>
         <Card title={`Measurement histogram (${q.shots} simulated shots)`} icon={<Zap className="w-4 h-4 text-quantum-neon" />}>
           <HistogramChart q={q} label={label} />
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-400 text-xs mt-1">
             Green bars are marked items. {pct(q.measured_success_rate)} of the shots returned a correct answer.
           </p>
         </Card>
@@ -248,7 +248,7 @@ export function GroverViews({ result }: { result: ComparisonResult<GroverQuantum
       {result.algorithm === 'search' && result.comparison.scaling && (
         <Card title="Why it matters at scale — queries needed vs dataset size" className="mb-5">
           <ScalingChart rows={result.comparison.scaling} />
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-400 text-xs mt-1">
             For a billion items a classical scan needs ~500 million comparisons on average; Grover needs ~24,800 oracle queries.
           </p>
         </Card>
@@ -268,14 +268,14 @@ export function GroverViews({ result }: { result: ComparisonResult<GroverQuantum
 }
 
 function RecordList({ rows }: { rows: { index: number; text: string; extra?: string }[] }) {
-  if (!rows.length) return <p className="text-gray-500 text-xs">No records.</p>;
+  if (!rows.length) return <p className="text-gray-400 text-xs">No records.</p>;
   return (
     <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
       {rows.map(r => (
         <div key={r.index} className="flex items-center gap-2 bg-quantum-900/60 rounded-lg px-2.5 py-1.5">
-          <span className="text-gray-600 font-mono text-[10px] w-10 flex-shrink-0">#{r.index}</span>
+          <span className="text-gray-400 font-mono text-xs w-10 flex-shrink-0">#{r.index}</span>
           <span className="text-gray-300 text-xs flex-1 truncate">{r.text}</span>
-          {r.extra && <span className="text-quantum-neon font-mono text-[10px]">{r.extra}</span>}
+          {r.extra && <span className="text-quantum-neon font-mono text-xs">{r.extra}</span>}
         </div>
       ))}
     </div>
@@ -309,7 +309,7 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
               config={PLOT_CONFIG}
               style={{ width: '100%', height: 260 }}
             />
-            <p className="text-gray-500 text-xs mt-1">
+            <p className="text-gray-400 text-xs mt-1">
               Peaks sit at multiples of 2^{d.counting_qubits}/r = {(2 ** (d.counting_qubits ?? 0) / (d.true_period || 1)).toFixed(2)}
               {' '}— the period r = {d.true_period} of {d.a}^x mod {result.input.N} is encoded in their spacing.
               Circuit: {d.qubits} qubits ({d.counting_qubits} counting + {d.work_qubits} work), {num(d.gates)} gates, depth {num(d.depth)}.
@@ -317,9 +317,9 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
           </Card>
           <Card title="Classical post-processing (continued fractions)" className="lg:col-span-2">
             <div className="overflow-x-auto">
-              <table className="w-full text-[11px]">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-gray-500 text-left">
+                  <tr className="text-gray-400 text-left">
                     <th className="py-1 pr-2">y</th><th className="pr-2">shots</th><th className="pr-2">y/2^t</th>
                     <th className="pr-2">≈ s/r</th><th>period?</th>
                   </tr>
@@ -331,7 +331,7 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
                       <td className="pr-2">{pp.count}</td>
                       <td className="pr-2">{pp.phase.toFixed(4)}</td>
                       <td className="pr-2">{pp.fraction}</td>
-                      <td className={pp.period ? 'text-quantum-neon' : 'text-gray-500'}>{pp.period ?? '✗'}</td>
+                      <td className={pp.period ? 'text-quantum-neon' : 'text-gray-400'}>{pp.period ?? '✗'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,7 +373,7 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
             config={PLOT_CONFIG}
             style={{ width: '100%', height: 260 }}
           />
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-400 text-xs mt-1">
             RSA-2048 would need ≈ {num(table[table.length - 1].logical_qubits)} error-corrected logical qubits (2n+3) —
             far beyond today's hardware, but only polynomial effort, which is why post-quantum cryptography is being standardised.
           </p>
@@ -432,7 +432,7 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
             config={PLOT_CONFIG}
             style={{ width: '100%', height: 300 }}
           />
-          <p className="text-gray-500 text-xs mt-1 font-mono">
+          <p className="text-gray-400 text-xs mt-1 font-mono">
             γ = [{q.gammas.map(g => g.toFixed(3)).join(', ')}] · β = [{q.betas.map(b => b.toFixed(3)).join(', ')}]
           </p>
         </Card>
@@ -440,9 +440,9 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         <Card title="Most frequently measured bit-strings">
           <div className="overflow-x-auto max-h-64">
-            <table className="w-full text-[11px]">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500 text-left">
+                <tr className="text-gray-400 text-left">
                   <th className="py-1 pr-2">bits</th><th className="pr-2">shots</th><th className="pr-2">valid?</th><th>route</th>
                 </tr>
               </thead>
@@ -458,7 +458,7 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
               </tbody>
             </table>
           </div>
-          <p className="text-gray-500 text-xs mt-2">
+          <p className="text-gray-400 text-xs mt-2">
             Valid tours: {pct(q.p_feasible)} of the probability (random guessing: {pct(q.random_p_feasible, 2)}). Highlighted rows are optimal.
           </p>
         </Card>
@@ -466,10 +466,10 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
           <ul className="space-y-1 mb-3">
             {q.bridge.steps.map((s, i) => <li key={i} className="text-gray-400 text-xs leading-relaxed">{i + 1}. {s}</li>)}
           </ul>
-          <p className="text-[10px] font-mono text-quantum-neon/80 bg-quantum-900/60 rounded-lg p-2 max-h-24 overflow-y-auto break-words">
+          <p className="text-xs font-mono text-quantum-neon/80 bg-quantum-900/60 rounded-lg p-2 max-h-24 overflow-y-auto break-words">
             {q.bridge.ising.hamiltonian}
           </p>
-          <p className="text-gray-500 text-[11px] mt-2">
+          <p className="text-gray-400 text-xs mt-2">
             {q.bridge.qubo.n} qubits · {q.bridge.qubo.nonzero_terms} QUBO terms · {q.layers} QAOA layer(s) · {num(q.circuit.gates)} gates
           </p>
         </Card>

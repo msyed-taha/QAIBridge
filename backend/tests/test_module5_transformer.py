@@ -1,22 +1,27 @@
 """
-Module 5 — Classical → Quantum Logic Transformer — tests.
+Code to Quantum — tests.
 
 Run from backend/:  python -m pytest tests/test_module5_transformer.py -v
 
 Covers the offline analyzer on every built-in example, the Boolean-logic
 translation (reversible circuit verified on all inputs, exact Hamiltonian),
-the end-to-end pipeline with verification against classical answers, the
-LLM engine (with a mocked provider — no network), and the sandbox.
+the end-to-end pipeline with verification against classical answers, reading
+code with the AI (a fake Claude from conftest.py — nothing is sent or paid,
+with every way it falls back to the built-in reader), and the sandbox.
 """
 from __future__ import annotations
 
 import itertools
 import json
+import uuid
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.security import hash_password, token_for
+from app.database import SessionLocal
+from app.models.user import ROLE_USER, User
 from app.modules.module5_transformer import llm as llm_mod
 from app.modules.module5_transformer.analyzer import analyze_code
 from app.modules.module5_transformer.boolean_logic import (
@@ -31,6 +36,20 @@ from app.modules.module5_transformer.sandbox import run_python, static_check
 def client():
     from main import app
     return TestClient(app)
+
+
+@pytest.fixture(scope="module")
+def auth():
+    tag = uuid.uuid4().hex[:10]
+    with SessionLocal() as db:
+        u = User(username=f"c2q_{tag}", email=f"c2q_{tag}@example.com", hashed_password=hash_password("TestPass123"),
+                 role=ROLE_USER, is_active=True)
+        db.add(u); db.commit(); db.refresh(u)
+        headers = {"Authorization": f"Bearer {token_for(u)}"}
+    yield headers
+    with SessionLocal() as db:
+        db.query(User).filter(User.email == f"c2q_{tag}@example.com").delete()
+        db.commit()
 
 
 EXPECTED_TYPES = {"search": "search", "factoring": "factoring", "tsp": "tsp", "knapsack": "knapsack",
@@ -114,45 +133,64 @@ def test_sorting_gets_an_honest_answer():
     assert not result["supported"] and "no quantum speed-up" in result["reason"].lower()
 
 
-def test_llm_engine_with_mocked_provider(monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", "sk-ant-test")
-    monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+FACTOR_35 = json.dumps({"problem_type": "factoring", "parameters": {"N": 35},
+                        "explanation": "Trial division of 35.", "confidence": 0.9, "off_topic": False})
 
-    class FakeResponse:
-        status_code = 200
 
-        def json(self):
-            return {"content": [{"type": "text", "text": json.dumps({
-                "problem_type": "factoring", "parameters": {"N": 35},
-                "explanation": "Trial division of 35.", "confidence": 0.9})}]}
-
-    calls = {}
-
-    def fake_post(url, headers=None, json=None, timeout=None):
-        calls["url"], calls["model"] = url, json["model"]
-        return FakeResponse()
-
-    monkeypatch.setattr(llm_mod.httpx, "post", fake_post)
-    assert llm_mod.llm_status()["enabled"] and llm_mod.llm_status()["provider"] == "anthropic"
+def test_the_ai_reads_the_code(fake_ai):
+    fake_ai.reply = FACTOR_35
+    assert llm_mod.llm_status()["available"]
     spec = analyze("n = 35\nfor i in range(2, n): ...", mode="auto")
-    assert spec["engine"] == "llm" and spec["parameters"] == {"N": 35}
-    assert calls["url"].endswith("/v1/messages") and calls["model"] == "claude-opus-5-5"
+    assert spec["engine"] == "llm" and spec["parameters"] == {"N": 35} and spec["confidence"] == 0.9
+    assert spec["llm"]["model"] == "claude-haiku-5-5" and not spec["llm"]["saved"]
+    sent = fake_ai.calls[0]
+    assert "<data>\nn = 35" in sent["user"] and "Code to Quantum" in sent["system"]
+    # the same code again is answered from the saved copy, for free
+    assert analyze("n = 35\nfor i in range(2, n): ...", mode="auto")["llm"]["saved"] and len(fake_ai.calls) == 1
 
-    # A broken reply falls back to the offline analyzer in auto mode …
-    monkeypatch.setattr(llm_mod.httpx, "post", lambda *a, **k: type("R", (), {"status_code": 500, "text": "boom"})())
+
+def test_when_the_ai_fails_the_built_in_reader_takes_over(fake_ai):
+    from app.ai.service import AIServiceError
+    fake_ai.error = AIServiceError("HTTP 529 overloaded_error")
     spec = analyze(EXAMPLES[1]["code"], mode="auto")
-    assert spec["engine"] == "local" and "LLM engine unavailable" in spec["evidence"][0]
-    # … but is an error when the LLM is explicitly required.
-    with pytest.raises(ValueError):
+    assert spec["engine"] == "local"
+    assert spec["ai_note"] == "The AI couldn't answer just now. The built-in code reader was used instead."
+    assert spec["evidence"][0] == spec["ai_note"]
+    with pytest.raises(ValueError):                   # … but "AI only" says so instead
         analyze(EXAMPLES[1]["code"], mode="llm")
 
 
-def test_llm_disabled_without_key(monkeypatch):
-    for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LLM_PROVIDER"):
-        monkeypatch.delenv(k, raising=False)
+def test_an_unusable_answer_falls_back_and_is_asked_again_next_time(fake_ai):
+    fake_ai.replies = ["Sorry, I can't help with that.", FACTOR_35]
+    spec = analyze("n = 35\nfor i in range(2, n): ...", mode="auto")
+    assert spec["engine"] == "local" and "couldn't be used" in spec["ai_note"]
+    assert analyze("n = 35\nfor i in range(2, n): ...", mode="auto")["engine"] == "llm" and len(fake_ai.calls) == 2
+    fake_ai.reply = json.dumps({"problem_type": "teleport", "parameters": {}})
+    with pytest.raises(ValueError):
+        analyze("print('hello there')", mode="llm")
+
+
+def test_off_topic_text_gets_a_polite_redirect(fake_ai):
+    fake_ai.reply = json.dumps({"problem_type": "unsupported", "off_topic": True, "explanation": "",
+                                "parameters": {"reason": "This tool turns code, or a computing problem, into a "
+                                                         "quantum circuit. Try one of the examples."}})
+    spec = analyze("What's the weather like in Lahore today?", mode="auto")
+    assert spec["problem_type"] == "unsupported" and spec["parameters"]["category"] == "off_topic"
+    result = execute(spec)
+    assert not result["supported"] and result["reason"].startswith("This tool turns code")
+
+
+def test_gibberish_never_reaches_the_ai(fake_ai):
+    spec = analyze("asdfg qwrtz xcvbn", mode="auto")
+    assert spec["engine"] == "local" and fake_ai.calls == [] and "doesn't look like" in spec["ai_note"]
+
+
+def test_without_a_key_the_built_in_reader_is_used():
     status = llm_mod.llm_status()
-    assert not status["enabled"] and status["how_to_enable"]
+    assert not status["available"] and status["reason"] == "no_key"
+    spec = analyze(EXAMPLES[1]["code"], mode="auto")
+    assert spec["engine"] == "local" and spec["ai_note"].startswith("AI isn't set up on this server.")
+    assert analyze(EXAMPLES[1]["code"], mode="local").get("ai_note") is None
     with pytest.raises(ValueError):
         analyze("x = 1", mode="llm")
 
@@ -174,18 +212,29 @@ def test_sandbox_runs_normal_code_and_limits_memory():
     assert not hog["success"]
 
 
-def test_module5_api(client):
-    assert client.get("/api/module5/status").status_code == 200
+def test_module5_api(client, auth):
+    for url in ("/api/module5/analyze", "/api/module5/transform", "/api/module5/execute"):
+        assert client.post(url, json={}).status_code in (401, 403), url
+    assert client.get("/api/module5/status").status_code in (401, 403)
+    engine = client.get("/api/module5/status", headers=auth).json()["engine"]
+    assert engine["reason"] == "no_key" and engine["message"]
     ex = client.get("/api/module5/examples").json()["examples"]
     assert len(ex) >= 9
-    spec = client.post("/api/module5/analyze", json={"code": ex[0]["code"], "mode": "local"}).json()["spec"]
-    result = client.post("/api/module5/execute", json={"spec": spec, "seed": 2}).json()
+    spec = client.post("/api/module5/analyze", headers=auth, json={"code": ex[0]["code"], "mode": "local"}).json()["spec"]
+    result = client.post("/api/module5/execute", headers=auth, json={"spec": spec, "seed": 2}).json()
     assert result["verification"]["match"]
     logic = client.post("/api/module5/logic", json={"expression": "(a or b) and not c"}).json()
     assert logic["verification"]["verified"] and "qiskit" in logic
-    bad = client.post("/api/module5/execute", json={"spec": {"problem_type": "knapsack", "parameters": {}}})
+    bad = client.post("/api/module5/execute", headers=auth, json={"spec": {"problem_type": "knapsack", "parameters": {}}})
     assert bad.status_code == 422
     assert client.post("/api/module5/run-classical", json={"code": "print(1)"}).status_code in (401, 403)
+
+
+def test_transform_uses_the_ai_with_the_users_allowance(client, auth, fake_ai):
+    fake_ai.reply = FACTOR_35
+    r = client.post("/api/module5/transform", headers=auth, json={"code": "n = 35\nprint(factor(n))", "seed": 3}).json()
+    assert r["spec"]["engine"] == "llm" and r["result"]["verification"]["match"]
+    assert r["engine"]["used_today"] == 1 and r["engine"]["remaining_today"] == r["engine"]["daily_limit"] - 1
 
 
 def test_portfolio_bridge_matches_brute_force():

@@ -5,6 +5,7 @@ import { adminApi } from '../../api/admin';
 import { getApiErrorMessage } from '../../api/client';
 import type { AdminStats } from '../../types';
 import { AdminLayout } from './AdminLayout';
+import { AIUsageCard } from './AIUsageCard';
 
 function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; label: string; value: number; tint: string }) {
   return (
@@ -57,6 +58,8 @@ export function AdminDashboard() {
               <StatCard icon={Inbox}     label="Unread messages"         value={stats.unread_messages}       tint="#38bdf8" />
             </Link>
           </div>
+
+          <AIUsageCard />
 
           <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">

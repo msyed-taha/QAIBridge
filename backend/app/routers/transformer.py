@@ -1,11 +1,14 @@
 """
-Module 5 – Classical → Quantum Logic Transformer
-Paste classical code → the engine (LLM or offline analyzer) understands it → the
+Code to Quantum
+Paste classical code → the AI (or the built-in reader) understands it → the
 Mathematical Bridge builds the QUBO / Ising Hamiltonian / oracle → the circuit
-runs on the Module 1 kernel → the answer is verified against the classical one.
+runs on QAIbridge's simulator → the answer is verified against the classical one.
+
+Reading code, running and transforming need a signed-in user (the AI has a
+daily allowance per user).
 
 Routes:
-  GET  /api/module5/status          – Which understanding engine is active (LLM / offline)
+  GET  /api/module5/status          – Can the AI read code for me right now (or is the built-in reader used)
   GET  /api/module5/examples        – Built-in example programs
   POST /api/module5/analyze         – Step 1 only: code → problem spec (editable by the user)
   POST /api/module5/execute         – Steps 2-6: spec → bridge → circuit → run → verify → Qiskit
@@ -31,9 +34,9 @@ from ..modules.module5_transformer.boolean_logic import run_logic_pipeline
 from ..modules.module5_transformer.examples import EXAMPLES
 from ..modules.module5_transformer.llm import llm_status
 from ..modules.module5_transformer.sandbox import run_python
-from ..routers.auth import get_current_user, get_optional_user
+from ..routers.auth import get_current_user
 
-router = APIRouter(prefix="/api/module5", tags=["Module 5 – Classical→Quantum Logic Transformer"])
+router = APIRouter(prefix="/api/module5", tags=["Code to Quantum"])
 
 Mode = Literal["auto", "llm", "local"]
 
@@ -86,8 +89,8 @@ def _guard(fn):
 
 
 @router.get("/status")
-def status():
-    return {"module": 5, "name": "Classical→Quantum Logic Transformer", "engine": llm_status()}
+def status(user: User = Depends(get_current_user)):
+    return {"name": "Code to Quantum", "engine": llm_status(user.id)}
 
 
 @router.get("/examples")
@@ -96,29 +99,29 @@ def get_examples():
 
 
 @router.post("/analyze")
-def analyze(req: CodeRequest):
+def analyze(req: CodeRequest, user: User = Depends(get_current_user)):
     try:
-        return {"spec": pipeline.analyze(req.code, req.mode), "engine": llm_status()}
+        return {"spec": pipeline.analyze(req.code, req.mode, user.id), "engine": llm_status(user.id)}
     except ValueError as e:
         raise HTTPException(422, str(e))
 
 
-def _record(user: Optional[User], spec: Dict[str, Any], result: Dict[str, Any]) -> None:
-    if user is not None:
-        title, summary = history.transform_summary(spec, result)
-        history.record_run(user.id, KIND_TRANSFORM, title, summary, duration_ms=result.get("total_ms"))
+def _record(user: User, spec: Dict[str, Any], result: Dict[str, Any]) -> None:
+    title, summary = history.transform_summary(spec, result)
+    history.record_run(user.id, KIND_TRANSFORM, title, summary, duration_ms=result.get("total_ms"))
 
 
 @router.post("/execute")
-def execute(req: ExecuteRequest, user: Optional[User] = Depends(get_optional_user)):
+def execute(req: ExecuteRequest, user: User = Depends(get_current_user)):
     result = _guard(lambda: pipeline.execute(req.spec, layers=req.layers, shots=req.shots, seed=req.seed))
     _record(user, req.spec, result)
     return result
 
 
 @router.post("/transform")
-def transform(req: TransformRequest, user: Optional[User] = Depends(get_optional_user)):
-    out = _guard(lambda: pipeline.transform(req.code, req.mode, layers=req.layers, shots=req.shots, seed=req.seed))
+def transform(req: TransformRequest, user: User = Depends(get_current_user)):
+    out = _guard(lambda: pipeline.transform(req.code, req.mode, layers=req.layers, shots=req.shots, seed=req.seed,
+                                            user_id=user.id))
     _record(user, out["spec"], out["result"])
     return out
 

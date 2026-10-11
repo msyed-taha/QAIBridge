@@ -2,7 +2,7 @@
 Module 5 – Classical → Quantum Logic Transformer
 pipeline.py  –  The end-to-end transformation:
 
-    classical code ──(1) understand──▶ problem spec            (LLM engine or offline analyzer)
+    classical code ──(1) understand──▶ problem spec            (the AI, or the built-in reader)
                    ──(2) bridge──────▶ QUBO / Ising / oracle    (bridge.py, boolean_logic.py)
                    ──(3) circuit─────▶ gates on the kernel      (Module 1)
                    ──(4) run─────────▶ measured answer          (Grover · Shor · QAOA)
@@ -27,6 +27,7 @@ from .boolean_logic import run_logic_pipeline
 from .bridge import (
     Bridge, _bit_matrix, knapsack_bridge, maxcut_bridge, number_partition_bridge, portfolio_bridge, tsp_bridge,
 )
+from ...ai.service import AIUnavailable
 from .llm import LLMError, analyze_with_llm, llm_status
 
 QAOA_KINDS = ("tsp", "knapsack", "maxcut", "partition", "portfolio")
@@ -34,23 +35,24 @@ QAOA_KINDS = ("tsp", "knapsack", "maxcut", "partition", "portfolio")
 
 # ── (1) understand ────────────────────────────────────────────────────────────
 
-def analyze(code: str, mode: str = "auto") -> Dict[str, Any]:
-    """mode: 'auto' (LLM when configured, else offline), 'llm' (LLM only), 'local' (offline only)."""
+def analyze(code: str, mode: str = "auto", user_id: Optional[int] = None) -> Dict[str, Any]:
+    """mode: 'auto' (the AI when it can answer, else the built-in reader), 'llm' (AI only), 'local' (built-in only)."""
     note = None
-    if mode in ("auto", "llm") and llm_status()["enabled"]:
+    if mode in ("auto", "llm"):
         try:
-            spec, meta = analyze_with_llm(code)
-            spec["llm"] = meta
-            return spec
-        except (LLMError, Exception) as e:           # network, auth, quota, bad JSON …
+            return analyze_with_llm(code, user_id)
+        except AIUnavailable as e:
             if mode == "llm":
-                raise ValueError(f"The LLM engine failed: {e}")
-            note = f"LLM engine unavailable ({str(e)[:160]}) — used the offline analyzer instead."
-    elif mode == "llm":
-        raise ValueError("The LLM engine is not configured. Add LLM_API_KEY to backend/.env, or use offline mode.")
+                raise ValueError(e.message)
+            note = f"{e.message} The built-in code reader was used instead."
+        except LLMError:
+            if mode == "llm":
+                raise ValueError("The AI's answer couldn't be used. Try again, or use the built-in reader.")
+            note = "The AI's answer couldn't be used, so the built-in code reader was used instead."
     spec = analyze_code(code)
     if note:
         spec["evidence"].insert(0, note)
+        spec["ai_note"] = note
     return spec
 
 
@@ -257,7 +259,7 @@ def execute(spec: Dict[str, Any], layers: int = 2, shots: int = 1024, seed: Opti
 
 
 def transform(code: str, mode: str = "auto", layers: int = 2, shots: int = 1024,
-              seed: Optional[int] = None) -> Dict[str, Any]:
-    spec = analyze(code, mode)
+              seed: Optional[int] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
+    spec = analyze(code, mode, user_id)
     result = execute(spec, layers=layers, shots=shots, seed=seed)
-    return {"spec": spec, "result": result, "engine": llm_status()}
+    return {"spec": spec, "result": result, "engine": llm_status(user_id)}

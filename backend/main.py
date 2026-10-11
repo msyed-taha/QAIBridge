@@ -18,7 +18,7 @@ load_dotenv()
 
 from app.database import SessionLocal
 from app.legal import purge_expired
-from app.routers import kernel, dashboard, sfod, education, recommender, transformer, optimizer, qnn, auth, admin, account, contact, learn, work
+from app.routers import kernel, dashboard, sfod, education, recommender, transformer, optimizer, qnn, auth, admin, account, contact, learn, work, ai
 
 # Schema is managed by Alembic migrations (backend/migrations/) — run
 # `alembic upgrade head` before starting the server instead of relying
@@ -87,6 +87,8 @@ app.include_router(admin.router)        # Admin actor (user management, stats, c
 app.include_router(contact.router)      # Public "Contact us" form
 app.include_router(learn.router)        # Learn course progress (signed-in users)
 app.include_router(work.router)         # My work: saved circuits, projects, challenge stars
+app.include_router(ai.router)           # AI status for the signed-in user
+app.include_router(ai.admin_router)     # AI usage and settings (admins)
 app.include_router(kernel.router)       # Module 1
 app.include_router(sfod.router)         # Module 2
 app.include_router(education.router)    # Module 3
