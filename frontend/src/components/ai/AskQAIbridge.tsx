@@ -88,6 +88,11 @@ function AskQAIbridge({ details }: { details: string }) {
     aiApi.status().then(setStatus).catch(() => undefined);
   }, [open]);
 
+  // Once signed in: a server without AI shows no Ask button at all.
+  useEffect(() => {
+    if (isAuthed) aiApi.status().then(setStatus).catch(() => undefined);
+  }, [isAuthed]);
+
   useEffect(() => {
     const log = logRef.current;
     if (log) log.scrollTop = log.scrollHeight;
@@ -95,7 +100,7 @@ function AskQAIbridge({ details }: { details: string }) {
 
   const close = useCallback(() => { setOpen(false); buttonRef.current?.focus(); }, []);
 
-  if (!isAuthed || HIDDEN_ON.test(location.pathname)) return null;
+  if (!isAuthed || status?.reason === 'no_key' || HIDDEN_ON.test(location.pathname)) return null;
 
   const send = async (text: string) => {
     const question = text.trim();

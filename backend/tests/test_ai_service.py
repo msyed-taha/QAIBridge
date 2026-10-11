@@ -150,6 +150,15 @@ def test_daily_limit_for_the_whole_app(fake_ai, user):
         _delete_user(other)
 
 
+def test_a_limit_of_0_reads_as_paused(fake_ai, user):
+    uid, _ = user
+    service.update_settings(SessionLocal(), {"user_daily_limit": 0})
+    with pytest.raises(AIUnavailable) as e:
+        service.ask("test", TASK, "A question about qubits", user_id=uid)
+    assert e.value.reason == "limit" and e.value.message == "AI requests are paused for now." and fake_ai.calls == []
+    assert service.status(uid)["message"] == "AI requests are paused for now."
+
+
 def test_an_admin_can_switch_it_off(fake_ai, user):
     uid, _ = user
     service.update_settings(SessionLocal(), {"enabled": False})

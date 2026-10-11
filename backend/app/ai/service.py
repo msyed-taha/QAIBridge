@@ -163,6 +163,8 @@ def _sent_today(db: Session, user_id: Optional[int] = None) -> int:
 
 
 def _limit_message(db: Session, s: Dict[str, Any], user_id: Optional[int]) -> Optional[str]:
+    if (user_id is not None and s["user_daily_limit"] == 0) or s["app_daily_limit"] == 0:
+        return "AI requests are paused for now."              # an admin set a limit of 0
     if user_id is not None and _sent_today(db, user_id) >= s["user_daily_limit"]:
         return f"You've used today's {s['user_daily_limit']} AI requests. They reset {_resets_in()}."
     if _sent_today(db) >= s["app_daily_limit"]:
