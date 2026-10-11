@@ -10,6 +10,7 @@ import { QasmEditor, goToLine, scrollToLine } from './QasmEditor';
 import { MAX_STEPS, MAX_STEP_QUBITS, StepThrough } from './StepThrough';
 import { AmplitudesView } from './AmplitudesView';
 import { QubitsView } from './QubitsView';
+import { ResultDownloads } from './ResultDownloads';
 import { formatBytes, formatChance, formatDuration, ket } from './format';
 
 interface Example { id: ExampleId; name: string; expect: ReactNode }
@@ -23,7 +24,7 @@ const EXAMPLES: Example[] = [
 const SIZES = Array.from({ length: 27 }, (_, i) => i + 2);
 const MAX_QUBITS = 28;
 const MAX_FILE_CHARS = 200_000;
-const SHOTS = 1024;
+const SHOT_CHOICES = [100, 1024, 10000];
 const SOCKET_FAILED = 'socket-failed';
 
 class Stopped extends Error {}
@@ -104,7 +105,9 @@ export function SimulationKernel() {
   const [elapsed, setElapsed]     = useState(0);
   const [runError, setRunError]   = useState<QasmProblem | null>(null);
   const [notice, setNotice]       = useState<string | null>(null);
+  const [shots, setShots]         = useState(1024);
   const [ranSource, setRanSource] = useState('');            // the circuit text the result belongs to
+  const [ranShots, setRanShots]   = useState(1024);
   const [runId, setRunId]         = useState(0);
   const [tab, setTab]             = useState<Tab>('outcomes');
   const [activeLine, setActiveLine] = useState<number | null>(null);
@@ -113,7 +116,7 @@ export function SimulationKernel() {
   const editorRef   = useRef<HTMLTextAreaElement>(null);
   const fileRef     = useRef<HTMLInputElement>(null);
   const inspectSeq  = useRef(0);
-  const ids = { circuit: useId(), editor: useId(), summary: useId(), example: useId(), size: useId(), result: useId() };
+  const ids = { circuit: useId(), editor: useId(), summary: useId(), example: useId(), size: useId(), result: useId(), shots: useId() };
 
   // The editor still holds an example, untouched.
   const current = loaded && source === loaded.text ? loaded : null;
@@ -195,7 +198,7 @@ export function SimulationKernel() {
     setRunError(null);
   };
 
-  const runOverSocket = (text: string) => new Promise<SimulationResult>((resolve, reject) => {
+  const runOverSocket = (text: string, shots: number) => new Promise<SimulationResult>((resolve, reject) => {
     const ws = kernelApi.socket();
     socketRef.current = ws;
     let opened = false;
@@ -206,7 +209,7 @@ export function SimulationKernel() {
       opened = true;
       window.clearTimeout(timer);
       setTransport('websocket');
-      ws.send(JSON.stringify({ action: 'qasm', payload: { source: text, shots: SHOTS } }));
+      ws.send(JSON.stringify({ action: 'qasm', payload: { source: text, shots } }));
     };
     ws.onmessage = (m) => {
       const msg = JSON.parse(m.data);
@@ -233,6 +236,7 @@ export function SimulationKernel() {
   const run = async () => {
     if (loading) return;
     const text = source;
+    const measurements = shots;
     setNotice(null);
     if (!text.trim()) {
       showProblem({ message: 'Write a circuit first, upload a .qasm file, or choose an example.', line: null });
@@ -247,15 +251,16 @@ export function SimulationKernel() {
     try {
       let data: SimulationResult;
       try {
-        data = await runOverSocket(text);
+        data = await runOverSocket(text, measurements);
       } catch (e) {
         if (!(e instanceof Error) || e.message !== SOCKET_FAILED) throw e;
         setTransport('rest');
         setProgress({ percent: 40, step: 'Applying gates…', detail: '' });
-        data = await kernelApi.runQasm(text, SHOTS);
+        data = await kernelApi.runQasm(text, measurements);
       }
       setResult(data);
       setRanSource(text);
+      setRanShots(measurements);
       setRunId(id => id + 1);
       setTab('outcomes');
     } catch (e) {
@@ -316,7 +321,7 @@ export function SimulationKernel() {
           <>Press <strong>Run</strong> and watch the gates being applied. You can stop at any time.</>,
           <>Read the most likely outcomes. Examples are also checked against the maths.</>,
         ]}
-        outcome={<>Your circuit's most likely outcomes with their exact chances, how often each came up when measured, and for examples a ✓ when the result matches the textbook answer.</>}
+        outcome={<>Your circuit's most likely outcomes with their exact chances and how often each came up when measured, a gate-by-gate replay, the amplitudes and each qubit on its own, downloads of your results, and for examples a ✓ when the result matches the textbook answer.</>}
       />
 
       <div className="grid gap-6 lg:grid-cols-2 items-start">
@@ -397,7 +402,14 @@ export function SimulationKernel() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label htmlFor={ids.shots} className="block text-xs text-gray-400 mb-1">Measurements</label>
+              <select id={ids.shots} value={shots} disabled={loading} onChange={e => setShots(Number(e.target.value))}
+                className="bg-quantum-700 border border-quantum-600 rounded-lg px-3 py-2.5 text-sm text-gray-100 disabled:opacity-50">
+                {SHOT_CHOICES.map(s => <option key={s} value={s}>{s.toLocaleString()}</option>)}
+              </select>
+            </div>
             <button type="button" onClick={run} disabled={loading}
               className="flex-1 min-w-[10rem] flex items-center justify-center gap-2 py-2.5 px-4 bg-quantum-neon text-black font-semibold rounded-lg hover:bg-teal-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
               <Play className="w-4 h-4" aria-hidden="true" />
@@ -474,7 +486,7 @@ export function SimulationKernel() {
                 <div role="tabpanel" id={`${ids.result}-panel`} aria-labelledby={`${ids.result}-tab-${tab}`}>
                   {tab === 'outcomes' ? (
                     <>
-                      <OutcomeTable result={r} shots={SHOTS} />
+                      <OutcomeTable result={r} shots={ranShots} />
                       {canStep && (
                         <p className="text-sm text-gray-300 mt-3">
                           Want to see how it got here?{' '}
@@ -494,9 +506,8 @@ export function SimulationKernel() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-gray-400">
-                {transport === 'rest' ? 'Run on the QAIbridge server.' : 'Run on the QAIbridge server, with live progress.'}
-              </p>
+              <ResultDownloads result={r} source={ranSource} shots={ranShots}
+                slug={(nameOf(r.example) ?? 'circuit').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
             </>
           ) : notice ? (
             <p role="status" className="text-sm text-gray-200">{notice}</p>

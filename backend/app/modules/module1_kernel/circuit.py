@@ -475,13 +475,13 @@ class QuantumCircuit:
             circuit._add(op["gate"], op["qubits"], op.get("params", []))
         return circuit
 
-    def to_qiskit(self, measure: bool = True) -> str:
+    def to_qiskit(self, measure: bool = True, shots: int = 1024) -> str:
         """
         Export as runnable Qiskit code (for running on IBM hardware / Aer).
         Black-box operations are expanded into standard gates.
         """
         from .qiskit_export import circuit_to_qiskit
-        return circuit_to_qiskit(self, measure=measure)
+        return circuit_to_qiskit(self, measure=measure, shots=shots)
 
     # ── Internals ─────────────────────────────────────────────────────────
 

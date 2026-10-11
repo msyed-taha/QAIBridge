@@ -38,6 +38,12 @@ export const kernelApi = {
     return data;
   },
 
+  /** The circuit as a runnable Qiskit file (prints counts in QAIbridge's outcome order) */
+  exportQiskit: async (source: string, shots: number): Promise<string> => {
+    const { data } = await apiClient.post<{ code: string }>(`${BASE}/qasm/export`, { source, shots });
+    return data.code;
+  },
+
   /** Run OpenQASM text without live progress (used when the WebSocket can't connect) */
   runQasm: async (source: string, shots = 1024): Promise<SimulationResult> => {
     const { data } = await apiClient.post<{ result: SimulationResult }>(`${BASE}/qasm`, { source, shots });

@@ -34,19 +34,19 @@ def _num(x: float) -> str:
     return repr(round(float(x), 12))
 
 
-def circuit_to_qiskit(circ: "QuantumCircuit", measure: bool = True) -> str:
+def circuit_to_qiskit(circ: "QuantumCircuit", measure: bool = True, shots: int = 1024) -> str:
     n = circ.n_qubits
     ops = circ.operations
     uses = {op.gate for op in ops}
 
     head: List[str] = [
         '"""',
-        f"{circ.name} — exported from QAIBridge (Module 1 simulation kernel).",
+        f"{circ.name} — exported from QAIbridge's Quantum Simulator.",
         "",
         "Run it:  pip install qiskit qiskit-aer   then   python this_file.py",
-        "QAIBridge labels basis states big-endian (qubit 0 = leftmost bit) while",
-        "Qiskit prints little-endian (qubit 0 = rightmost), so the counts printed at",
-        "the end are re-keyed to QAIBridge's convention for a direct comparison.",
+        "QAIbridge writes outcomes with qubit 0 on the left, while Qiskit puts qubit 0",
+        "on the right, so the counts printed at the end are turned round to match",
+        "QAIbridge's results for a direct comparison.",
         '"""',
         "from qiskit import QuantumCircuit, transpile",
         "from qiskit_aer import AerSimulator",
@@ -141,8 +141,8 @@ def circuit_to_qiskit(circ: "QuantumCircuit", measure: bool = True) -> str:
             f"qc.measure(range({n}), range({n}))",
             "",
             "sim = AerSimulator()",
-            "counts = sim.run(transpile(qc, sim), shots=1024).result().get_counts()",
-            "# Re-key to QAIBridge's big-endian labels (qubit 0 first):",
+            f"counts = sim.run(transpile(qc, sim), shots={shots}).result().get_counts()",
+            "# Turn each outcome round to QAIbridge's order (qubit 0 first):",
             "counts = {k[::-1]: v for k, v in sorted(counts.items(), key=lambda kv: -kv[1])}",
             "print(counts)",
         ]

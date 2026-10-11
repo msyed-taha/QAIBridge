@@ -6,6 +6,7 @@ Routes (all but /ram-table and /gates need a signed-in user):
   POST  /api/kernel/qasm/inspect      – Read OpenQASM text: its size, or the line of the first problem
   POST  /api/kernel/qasm              – Run OpenQASM text (examples are checked against the maths)
   POST  /api/kernel/qasm/steps        – Replay a small circuit gate by gate (chances after every gate)
+  POST  /api/kernel/qasm/export       – The circuit as a runnable Qiskit file, to check results independently
   POST  /api/kernel/export/qiskit     – Export a circuit as runnable Qiskit code
   GET   /api/kernel/memory            – RAM check for a given qubit count
   GET   /api/kernel/ram-table         – Full qubit → RAM table
@@ -239,6 +240,16 @@ def qasm_steps(req: InspectRequest, _user: User = Depends(get_current_user)) -> 
                       "probs": [round(float(p), 6) for p in new_probs], "phase_only": turned and not moved})
         amps, probs = new_amps, new_probs
     return {"n_qubits": n, "labels": program.labels, "steps": steps}
+
+
+@router.post("/qasm/export")
+def qasm_export(req: QasmRequest, _user: User = Depends(get_current_user)) -> Dict:
+    """Runnable Qiskit code for an OpenQASM circuit: anyone can check our results on their own machine."""
+    try:
+        program = parse_qasm(req.source)
+    except QasmError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"code": program.circuit.to_qiskit(shots=req.shots)}
 
 
 @router.post("/qasm")

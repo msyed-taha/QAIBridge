@@ -306,3 +306,27 @@ def test_runs_report_every_qubit_and_the_amplitudes_behind_the_chances(client, t
 def test_amplitudes_cover_every_listed_outcome(client, token):
     result = _run(client, token, 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[11];\nh q;\n')
     assert len(result["probabilities"]) == 1024 and len(result["amplitudes"]) == 1024 and result["truncated"]
+
+
+# ── Downloads ────────────────────────────────────────────────────────────────
+
+def test_runs_take_the_chosen_number_of_measurements(client, token):
+    r = client.post("/api/kernel/qasm", headers=_auth(token), json={"source": BELL, "shots": 10000})
+    assert sum(r.json()["result"]["counts"].values()) == 10000
+
+
+def test_the_qiskit_download_runs_and_prints_our_outcome_order(client, token, capsys):
+    pytest.importorskip("qiskit_aer")
+    src = 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\nx q[0];\nsxdg q[1];\nsxdg q[1];\ncu(pi, 0, pi, 0) q[0], q[2];\n'
+    r = client.post("/api/kernel/qasm/export", headers=_auth(token), json={"source": src, "shots": 300})
+    assert r.status_code == 200, r.text
+    code = r.json()["code"]
+    assert "Module" not in code and "shots=300" in code
+    exec(compile(code, "<download>", "exec"), {})
+    printed = capsys.readouterr().out.strip()
+    assert printed == "{'111': 300}"         # q[0] on the left, as on the page: x, then √X† twice, then a controlled flip
+
+
+def test_the_qiskit_download_reports_mistakes_by_line(client, token):
+    r = client.post("/api/kernel/qasm/export", headers=_auth(token), json={"source": BELL.replace("h q[0];", "h q[5];")})
+    assert r.status_code == 422 and r.json()["detail"].startswith("Line 5:")
