@@ -31,6 +31,7 @@ quantum formulation fits it. Reply with ONE JSON object and nothing else:
   "parameters": { ... exactly the fields listed below for that type ... },
   "explanation": "2-4 plain-English sentences: what the classical code does and why this quantum approach fits",
   "confidence": 0.0-1.0,
+  "example_data": false,
   "off_topic": false
 }
 
@@ -49,6 +50,9 @@ parameters by problem_type (use the concrete data found in the code; keep lists 
   unsupported: {"reason": "why no quantum speed-up applies"}   — e.g. sorting (no quantum speed-up),
              dense matrix products, simple arithmetic, I/O. Never invent a speed-up that does not exist.
 
+If the material describes one of these problems but gives no concrete data (or not enough to fill the
+parameters), still choose its problem_type, fill the parameters with a small made-up example of that problem,
+set "example_data": true and say in the explanation that the data is an example. Otherwise "example_data" is false.
 If the material is not a program or a computing problem at all (a greeting, a general question, a request
 for an essay), set "off_topic": true and "problem_type": "unsupported", and put one polite sentence in
 parameters.reason saying that this tool turns code, or a computing problem, into a quantum circuit.
@@ -105,6 +109,10 @@ def _spec_from(answer: ai.Answer) -> Dict[str, Any]:
         "incomplete": False,
         "llm": {"model": answer.model, "saved": answer.saved, "latency_ms": answer.latency_ms},
     }
+    if data.get("example_data") is True and kind != "unsupported":
+        spec["ai_note"] = ("Your description gave no data to use, so the AI made up a small example. "
+                           "Edit the parameters below to try your own.")
+        spec["evidence"].append("Example data made up by the AI: the description gave none")
     if kind == "unsupported":
         category = "off_topic" if data.get("off_topic") is True else "llm"
         spec["parameters"] = {"reason": str(params.get("reason") or spec["explanation"])[:400], "category": category}

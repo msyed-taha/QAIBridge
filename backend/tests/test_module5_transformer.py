@@ -170,6 +170,17 @@ def test_an_unusable_answer_falls_back_and_is_asked_again_next_time(fake_ai):
         analyze("print('hello there')", mode="llm")
 
 
+def test_a_description_without_data_gets_a_marked_example(fake_ai):
+    fake_ai.reply = json.dumps({"problem_type": "partition", "parameters": {"numbers": [3, 1, 4, 2]}, "example_data": True,
+                                "explanation": "Splitting numbers into two equal-sum groups; these numbers are an example."})
+    spec = analyze("Split a list of numbers into two groups with equal sums.", mode="auto")
+    assert spec["engine"] == "llm" and spec["problem_type"] == "partition"
+    assert "made up a small example" in spec["ai_note"] and "Example data made up by the AI" in spec["evidence"][-1]
+    assert execute(spec)["verification"]["match"]                   # the example still runs end to end
+    fake_ai.reply = FACTOR_35                                          # real data: no note
+    assert "ai_note" not in analyze("n = 35\nfor i in range(2, n): ...", mode="auto")
+
+
 def test_off_topic_text_gets_a_polite_redirect(fake_ai):
     fake_ai.reply = json.dumps({"problem_type": "unsupported", "off_topic": True, "explanation": "",
                                 "parameters": {"reason": "This tool turns code, or a computing problem, into a "

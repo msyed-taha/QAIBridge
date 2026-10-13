@@ -1,0 +1,1156 @@
+{
+ "when": "2026-10-13T12:05:10+00:00",
+ "model": "claude-haiku-5-5",
+ "fake": false,
+ "seconds": 60.0,
+ "requests": 90,
+ "cost_usd": 0.0175,
+ "results": {
+  "describe": [
+   {
+    "id": "bell",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 2,
+    "got": {
+     "00": 0.5,
+     "11": 0.5
+    }
+   },
+   {
+    "id": "ghz3",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 3,
+    "got": {
+     "000": 0.5,
+     "111": 0.5
+    }
+   },
+   {
+    "id": "quarter",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 1,
+    "got": {
+     "0": 0.75,
+     "1": 0.25
+    }
+   },
+   {
+    "id": "grover2",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 12,
+    "qubits": 2,
+    "got": {
+     "11": 1.0
+    }
+   },
+   {
+    "id": "uniform2",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 2,
+    "got": {
+     "00": 0.25,
+     "01": 0.25,
+     "10": 0.25,
+     "11": 0.25
+    }
+   },
+   {
+    "id": "one",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 1,
+    "got": {
+     "1": 1.0
+    }
+   },
+   {
+    "id": "ghz4",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 4,
+    "qubits": 4,
+    "got": {
+     "0000": 0.5,
+     "1111": 0.5
+    }
+   },
+   {
+    "id": "w3",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 11,
+    "qubits": 3,
+    "got": {
+     "001": 0.3333,
+     "010": 0.3333,
+     "100": 0.3333
+    }
+   },
+   {
+    "id": "q0one",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 2,
+    "got": {
+     "10": 1.0
+    }
+   },
+   {
+    "id": "psiplus",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 2,
+    "got": {
+     "01": 0.5,
+     "10": 0.5
+    }
+   },
+   {
+    "id": "threequarters",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 1,
+    "got": {
+     "1": 0.75,
+     "0": 0.25
+    }
+   },
+   {
+    "id": "uniform3",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 3,
+    "got": {
+     "000": 0.125,
+     "001": 0.125,
+     "010": 0.125,
+     "011": 0.125
+    }
+   },
+   {
+    "id": "grover3",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 43,
+    "qubits": 3,
+    "got": {
+     "101": 0.9453,
+     "000": 0.0078,
+     "001": 0.0078,
+     "010": 0.0078
+    }
+   },
+   {
+    "id": "coin",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 1,
+    "got": {
+     "0": 0.5,
+     "1": 0.5
+    }
+   },
+   {
+    "id": "copy",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 2,
+    "got": {
+     "00": 0.5,
+     "11": 0.5
+    }
+   },
+   {
+    "id": "hh",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 1,
+    "got": {
+     "0": 1.0
+    }
+   },
+   {
+    "id": "ghz_q1",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 3,
+    "got": {
+     "010": 0.5,
+     "111": 0.5
+    }
+   },
+   {
+    "id": "ry2pi3",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 1,
+    "got": {
+     "1": 0.75,
+     "0": 0.25
+    }
+   },
+   {
+    "id": "ket01",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 2,
+    "got": {
+     "01": 1.0
+    }
+   },
+   {
+    "id": "toffoli",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 3,
+    "got": {
+     "111": 1.0
+    }
+   },
+   {
+    "id": "swap",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 2,
+    "got": {
+     "01": 1.0
+    }
+   },
+   {
+    "id": "qft2",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 2,
+    "qubits": 2,
+    "got": {
+     "00": 0.25,
+     "01": 0.25,
+     "10": 0.25,
+     "11": 0.25
+    }
+   },
+   {
+    "id": "mixed",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 2,
+    "got": {
+     "00": 0.75,
+     "10": 0.25
+    }
+   },
+   {
+    "id": "only_q2",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 3,
+    "got": {
+     "001": 1.0
+    }
+   },
+   {
+    "id": "ghz5",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 5,
+    "qubits": 5,
+    "got": {
+     "00000": 0.5,
+     "11111": 0.5
+    }
+   },
+   {
+    "id": "half_q0",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 2,
+    "got": {
+     "00": 0.5,
+     "10": 0.5
+    }
+   },
+   {
+    "id": "phase",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 1,
+    "got": {
+     "1": 1.0
+    }
+   },
+   {
+    "id": "uniform4",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 4,
+    "qubits": 4,
+    "got": {
+     "0000": 0.0625,
+     "0001": 0.0625,
+     "0010": 0.0625,
+     "0011": 0.0625
+    }
+   },
+   {
+    "id": "edit_x",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 3,
+    "qubits": 2,
+    "got": {
+     "01": 0.5,
+     "10": 0.5
+    }
+   },
+   {
+    "id": "edit_undo",
+    "off_topic": false,
+    "right": true,
+    "gap": 0.0,
+    "self_check": true,
+    "gates": 1,
+    "qubits": 2,
+    "got": {
+     "00": 0.5,
+     "10": 0.5
+    }
+   },
+   {
+    "id": "off_poem",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   },
+   {
+    "id": "off_capital",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   }
+  ],
+  "advisor_auto": [
+   {
+    "id": "unsorted_lookup",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "rsa",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "qpe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "vrp",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "caffeine",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "exams",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "communities",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "eigen",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "qpe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "digits",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "amplitude_amp",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "orders",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "ecc",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "portfolio",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "tour",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "factor91",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "passwords",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "bridge",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "qpe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "battery",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "independent_set",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "knapsack",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "movies",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "amplitude_amp",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "sat",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "off_pasta",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   },
+   {
+    "id": "off_joke",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   }
+  ],
+  "advisor_local": [
+   {
+    "id": "unsorted_lookup",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "rsa",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "vrp",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "caffeine",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "exams",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "communities",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "eigen",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "qpe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "digits",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "orders",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "ecc",
+    "off_topic": false,
+    "right": false,
+    "category_right": false,
+    "quantum_right": false,
+    "outcome": "turned away"
+   },
+   {
+    "id": "portfolio",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "tour",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "factor91",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "passwords",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "bridge",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "battery",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "independent_set",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "knapsack",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "movies",
+    "off_topic": false,
+    "right": false,
+    "category_right": false,
+    "quantum_right": false,
+    "outcome": "turned away"
+   },
+   {
+    "id": "sat",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "off_pasta",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   },
+   {
+    "id": "off_joke",
+    "off_topic": true,
+    "right": true,
+    "outcome": "turned away"
+   }
+  ],
+  "code_llm": [
+   {
+    "id": "linear_search",
+    "expected": "search",
+    "found": "search",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "trial_division",
+    "expected": "factoring",
+    "found": "factoring",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "mystery_factor",
+    "expected": "factoring",
+    "found": "factoring",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "not_run": "N = 143 needs 24 qubits for exact simulation; this laptop-scale kernel runs Shor's algorithm for N \u2264 127 (21 qubits). Try 15, 21, 33, 35, 51, 55, 77, 85, 91 or "
+   },
+   {
+    "id": "tsp",
+    "expected": "tsp",
+    "found": "tsp",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "knapsack",
+    "expected": "knapsack",
+    "found": "knapsack",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "maxcut",
+    "expected": "maxcut",
+    "found": "maxcut",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "partition",
+    "expected": "partition",
+    "found": "partition",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "portfolio",
+    "expected": "portfolio",
+    "found": "portfolio",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "sat",
+    "expected": "boolean",
+    "found": "boolean",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "filter_records",
+    "expected": "database",
+    "found": "database",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "bubble_sort",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "matmul",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "js_search",
+    "expected": "search",
+    "found": "search",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "english_tsp",
+    "expected": "tsp",
+    "found": "tsp",
+    "right": true,
+    "fell_back": true,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "injection",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "off_topic",
+    "expected": "off_topic",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": true
+   }
+  ],
+  "code_local": [
+   {
+    "id": "linear_search",
+    "expected": "search",
+    "found": "search",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "trial_division",
+    "expected": "factoring",
+    "found": "factoring",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "mystery_factor",
+    "expected": "factoring",
+    "found": "factoring",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "tsp",
+    "expected": "tsp",
+    "found": "tsp",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "knapsack",
+    "expected": "knapsack",
+    "found": "knapsack",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "not_run": "Missing parameter 'values' for this problem type."
+   },
+   {
+    "id": "maxcut",
+    "expected": "maxcut",
+    "found": "unsupported",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "partition",
+    "expected": "partition",
+    "found": "partition",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "portfolio",
+    "expected": "portfolio",
+    "found": "unsupported",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "sat",
+    "expected": "boolean",
+    "found": "unsupported",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "filter_records",
+    "expected": "database",
+    "found": "database",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false,
+    "verified": true
+   },
+   {
+    "id": "bubble_sort",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "matmul",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "js_search",
+    "expected": "search",
+    "found": "unsupported",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "english_tsp",
+    "expected": "tsp",
+    "found": "unsupported",
+    "right": false,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "injection",
+    "expected": "unsupported",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   },
+   {
+    "id": "off_topic",
+    "expected": "off_topic",
+    "found": "unsupported",
+    "right": true,
+    "fell_back": false,
+    "off_topic_seen": false
+   }
+  ]
+ }
+}

@@ -1,0 +1,229 @@
+{
+ "about": "Problems with the categories and quantum algorithms a sound advisor would pick (any one in each list counts; quantum null: no fixed answer).",
+ "items": [
+  {
+   "id": "unsorted_lookup",
+   "text": "Find one customer record in an unsorted list of 10 million entries, given their customer number.",
+   "categories": [
+    "Search",
+    "Database"
+   ],
+   "quantum": [
+    "grovers",
+    "amplitude_amp"
+   ]
+  },
+  {
+   "id": "rsa",
+   "text": "We need to factor a 2048-bit RSA modulus to recover the private key.",
+   "categories": [
+    "Factoring",
+    "Cryptography"
+   ],
+   "quantum": [
+    "shors"
+   ]
+  },
+  {
+   "id": "vrp",
+   "text": "Plan delivery routes for 40 vans visiting 300 customers, each with a delivery time window.",
+   "categories": [
+    "Optimisation",
+    "Graph"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "caffeine",
+   "text": "Calculate the ground-state energy of a caffeine molecule for a drug study.",
+   "categories": [
+    "Simulation"
+   ],
+   "quantum": [
+    "vqe",
+    "qpe"
+   ]
+  },
+  {
+   "id": "exams",
+   "text": "Schedule 200 university exams into rooms and time slots so that no student has two exams at once.",
+   "categories": [
+    "Optimisation",
+    "Graph"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "communities",
+   "text": "Split a social network of 5,000 people into two groups with as few friendships between the groups as possible.",
+   "categories": [
+    "Graph",
+    "Optimisation"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "eigen",
+   "text": "Estimate the eigenvalues of a large unitary operator that describes a physical system.",
+   "categories": [
+    "Simulation"
+   ],
+   "quantum": [
+    "qpe",
+    "vqe"
+   ]
+  },
+  {
+   "id": "digits",
+   "text": "Train a model to classify images of handwritten digits.",
+   "categories": [
+    "Machine Learning"
+   ],
+   "quantum": null
+  },
+  {
+   "id": "orders",
+   "text": "Query a database of 50,000 orders for every order over $500 placed in March.",
+   "categories": [
+    "Database",
+    "Search"
+   ],
+   "quantum": [
+    "amplitude_amp",
+    "grovers"
+   ]
+  },
+  {
+   "id": "ecc",
+   "text": "Break the elliptic-curve key that protects a Bitcoin wallet.",
+   "categories": [
+    "Cryptography",
+    "Factoring"
+   ],
+   "quantum": [
+    "shors"
+   ]
+  },
+  {
+   "id": "portfolio",
+   "text": "Pick the best 5 of 30 stocks to balance expected return against risk.",
+   "categories": [
+    "Optimisation"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "tour",
+   "text": "Find the shortest round trip that visits 15 cities exactly once.",
+   "categories": [
+    "Optimisation",
+    "Graph"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "factor91",
+   "text": "Is 91 a prime number? If not, what are its factors?",
+   "categories": [
+    "Factoring"
+   ],
+   "quantum": [
+    "shors"
+   ]
+  },
+  {
+   "id": "passwords",
+   "text": "Find which of 1 million candidate passwords produces a given SHA-256 hash.",
+   "categories": [
+    "Search",
+    "Cryptography"
+   ],
+   "quantum": [
+    "grovers"
+   ]
+  },
+  {
+   "id": "bridge",
+   "text": "Find the natural vibration frequencies of a bridge from the eigenvalues of its stiffness matrix.",
+   "categories": [
+    "Simulation"
+   ],
+   "quantum": [
+    "qpe",
+    "vqe"
+   ]
+  },
+  {
+   "id": "battery",
+   "text": "Design a new battery cathode material by computing the electronic energies of candidate molecules.",
+   "categories": [
+    "Simulation"
+   ],
+   "quantum": [
+    "vqe",
+    "qpe"
+   ]
+  },
+  {
+   "id": "independent_set",
+   "text": "Find the largest set of nodes in a network where no two chosen nodes are connected.",
+   "categories": [
+    "Graph",
+    "Optimisation"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "knapsack",
+   "text": "Pack items with different weights and values into a backpack that can carry at most 20 kg, maximising the value.",
+   "categories": [
+    "Optimisation"
+   ],
+   "quantum": [
+    "qaoa"
+   ]
+  },
+  {
+   "id": "movies",
+   "text": "Recommend movies to users from their past ratings.",
+   "categories": [
+    "Machine Learning"
+   ],
+   "quantum": null
+  },
+  {
+   "id": "sat",
+   "text": "Find values for 30 true/false variables that satisfy a list of logical clauses.",
+   "categories": [
+    "Search",
+    "Optimisation"
+   ],
+   "quantum": [
+    "grovers",
+    "qaoa"
+   ]
+  },
+  {
+   "id": "off_pasta",
+   "text": "What's a good recipe for pasta with tomatoes?",
+   "off_topic": true
+  },
+  {
+   "id": "off_joke",
+   "text": "Tell me a joke about cats please.",
+   "off_topic": true
+  }
+ ]
+}

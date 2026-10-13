@@ -1,0 +1,279 @@
+{
+ "about": "Circuit descriptions with the chances the right circuit gives (outcomes written q0 first).",
+ "items": [
+  {
+   "id": "bell",
+   "text": "A Bell pair",
+   "truth": {
+    "00": 0.5,
+    "11": 0.5
+   }
+  },
+  {
+   "id": "ghz3",
+   "text": "Three qubits that are all 0 or all 1",
+   "truth": {
+    "000": 0.5,
+    "111": 0.5
+   }
+  },
+  {
+   "id": "quarter",
+   "text": "A qubit that is 1 a quarter of the time",
+   "truth": {
+    "0": 0.75,
+    "1": 0.25
+   }
+  },
+  {
+   "id": "grover2",
+   "text": "Grover's search for 11 on two qubits",
+   "truth": {
+    "11": 1
+   }
+  },
+  {
+   "id": "uniform2",
+   "text": "Put two qubits in an equal superposition of all four states",
+   "truth": {
+    "00": 0.25,
+    "01": 0.25,
+    "10": 0.25,
+    "11": 0.25
+   }
+  },
+  {
+   "id": "one",
+   "text": "One qubit that always reads 1",
+   "truth": {
+    "1": 1
+   }
+  },
+  {
+   "id": "ghz4",
+   "text": "A 4-qubit GHZ state",
+   "truth": {
+    "0000": 0.5,
+    "1111": 0.5
+   }
+  },
+  {
+   "id": "w3",
+   "text": "A W state on three qubits",
+   "truth": {
+    "100": 0.3333333333333333,
+    "010": 0.3333333333333333,
+    "001": 0.3333333333333333
+   }
+  },
+  {
+   "id": "q0one",
+   "text": "Two qubits where q0 is 1 and q1 is 0",
+   "truth": {
+    "10": 1
+   }
+  },
+  {
+   "id": "psiplus",
+   "text": "A Bell state where the two qubits always disagree",
+   "truth": {
+    "01": 0.5,
+    "10": 0.5
+   }
+  },
+  {
+   "id": "threequarters",
+   "text": "A qubit that is 1 three quarters of the time",
+   "truth": {
+    "0": 0.25,
+    "1": 0.75
+   }
+  },
+  {
+   "id": "uniform3",
+   "text": "Three qubits in an equal superposition of all eight states",
+   "truth": {
+    "000": 0.125,
+    "001": 0.125,
+    "010": 0.125,
+    "011": 0.125,
+    "100": 0.125,
+    "101": 0.125,
+    "110": 0.125,
+    "111": 0.125
+   }
+  },
+  {
+   "id": "grover3",
+   "text": "Grover's search for 101 on three qubits, with the best number of rounds",
+   "truth": {
+    "000": 0.007812499999999984,
+    "001": 0.007812499999999984,
+    "010": 0.007812499999999984,
+    "011": 0.007812499999999984,
+    "100": 0.007812499999999984,
+    "101": 0.9453125000000001,
+    "110": 0.007812499999999984,
+    "111": 0.007812499999999984
+   }
+  },
+  {
+   "id": "coin",
+   "text": "A quantum coin flip: one qubit, 50/50",
+   "truth": {
+    "0": 0.5,
+    "1": 0.5
+   }
+  },
+  {
+   "id": "copy",
+   "text": "Two qubits: q0 is 50/50 and q1 copies it",
+   "truth": {
+    "00": 0.5,
+    "11": 0.5
+   }
+  },
+  {
+   "id": "hh",
+   "text": "Apply a Hadamard and then another Hadamard to one qubit",
+   "truth": {
+    "0": 1
+   }
+  },
+  {
+   "id": "ghz_q1",
+   "text": "Three qubits where q0 and q2 always match each other and q1 is always 1",
+   "truth": {
+    "010": 0.5,
+    "111": 0.5
+   }
+  },
+  {
+   "id": "ry2pi3",
+   "text": "One qubit turned by RY of 2π/3",
+   "truth": {
+    "0": 0.25,
+    "1": 0.75
+   }
+  },
+  {
+   "id": "ket01",
+   "text": "Make the two-qubit state |01⟩, with q0 written first",
+   "truth": {
+    "01": 1
+   }
+  },
+  {
+   "id": "toffoli",
+   "text": "A Toffoli gate with both controls set to 1 and the target starting at 0",
+   "truth": {
+    "111": 1
+   }
+  },
+  {
+   "id": "swap",
+   "text": "Two qubits, q0 starts as 1, then swap them",
+   "truth": {
+    "01": 1
+   }
+  },
+  {
+   "id": "qft2",
+   "text": "Apply the quantum Fourier transform to the two-qubit state |00⟩",
+   "truth": {
+    "00": 0.25,
+    "01": 0.25,
+    "10": 0.25,
+    "11": 0.25
+   }
+  },
+  {
+   "id": "mixed",
+   "text": "Two qubits: q0 is 1 a quarter of the time and q1 is always 0",
+   "truth": {
+    "00": 0.75,
+    "10": 0.25
+   }
+  },
+  {
+   "id": "only_q2",
+   "text": "Three qubits where only q2 is 1",
+   "truth": {
+    "001": 1
+   }
+  },
+  {
+   "id": "ghz5",
+   "text": "A GHZ state on 5 qubits",
+   "truth": {
+    "00000": 0.5,
+    "11111": 0.5
+   }
+  },
+  {
+   "id": "half_q0",
+   "text": "Put qubit 0 in superposition and leave qubit 1 at 0",
+   "truth": {
+    "00": 0.5,
+    "10": 0.5
+   }
+  },
+  {
+   "id": "phase",
+   "text": "A qubit in superposition, then a Z gate, then a Hadamard",
+   "truth": {
+    "1": 1
+   }
+  },
+  {
+   "id": "uniform4",
+   "text": "Four qubits in an equal superposition of all sixteen states",
+   "truth": {
+    "0000": 0.0625,
+    "0001": 0.0625,
+    "0010": 0.0625,
+    "0011": 0.0625,
+    "0100": 0.0625,
+    "0101": 0.0625,
+    "0110": 0.0625,
+    "0111": 0.0625,
+    "1000": 0.0625,
+    "1001": 0.0625,
+    "1010": 0.0625,
+    "1011": 0.0625,
+    "1100": 0.0625,
+    "1101": 0.0625,
+    "1110": 0.0625,
+    "1111": 0.0625
+   }
+  },
+  {
+   "id": "edit_x",
+   "text": "Add an X gate on q1 at the end",
+   "current_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[2];\nh q[0];\ncx q[0],q[1];\n",
+   "truth": {
+    "01": 0.5,
+    "10": 0.5
+   }
+  },
+  {
+   "id": "edit_undo",
+   "text": "Undo the entanglement so only q0 is in superposition",
+   "current_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[2];\nh q[0];\ncx q[0],q[1];\n",
+   "truth": {
+    "00": 0.5,
+    "10": 0.5
+   }
+  },
+  {
+   "id": "off_poem",
+   "text": "Write me a poem about the sea",
+   "off_topic": true
+  },
+  {
+   "id": "off_capital",
+   "text": "What is the capital of France?",
+   "off_topic": true
+  }
+ ]
+}
