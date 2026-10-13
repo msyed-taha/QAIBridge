@@ -10,14 +10,89 @@ export interface SuitesResponse {
   limits: Record<string, { min: number; max: number }>;
 }
 
+// ── One point of each benchmark ──────────────────────────────────────────────
+
+export interface SearchPoint {
+  qubits: number; items: number;
+  classical_comparisons: number; classical_expected: number; classical_ms: number;
+  grover_queries: number; success_probability: number; measured_success_rate: number;
+  quantum_sim_ms: number; gates: number; depth: number; query_speedup: number;
+}
+
+export interface FactoringPoint {
+  N: number; bits: number; qubits: number | null; gates: number | null; depth: number | null;
+  quantum_sim_ms: number | null; success: boolean; attempts: number;
+  a: number | null; period: number | null; factors: string;
+  classical_divisions: number; classical_ms: number;
+}
+
+export interface OptimizationPoint {
+  nodes: number; edges: number; qubits: number; max_cut: number;
+  expected_cut: number; approx_ratio: number; best_sampled_cut: number; best_is_optimal: boolean;
+  p_optimal: number; random_p_optimal: number; amplification: number;
+  circuit_evaluations: number; quantum_ms: number; brute_force_evaluations: number; classical_ms: number; gates: number;
+}
+
+/** A size the machine had no room for comes back as skipped, with the reason. */
+export interface KernelPoint {
+  qubits: number; skipped?: boolean; reason?: string;
+  amplitudes?: number; memory_mb?: number; ghz_gates?: number; ghz_ms?: number; qft_gates?: number; qft_ms?: number;
+}
+
+export interface AiPoint {
+  experiment: 'qnn_vs_mlp' | 'angle_optimizer';
+  label: string;
+  classical_accuracy: number;
+  quantum_accuracy: number;
+  classical_curve: number[];
+  quantum_curve: number[];
+  total_ms: number;
+  qubits: number;
+  classical_params?: number;
+  quantum_params?: number;
+  classical_iters_to_converge?: number;
+  neural_iters_to_converge?: number;
+  plateau_events?: number;
+}
+
+export interface SuitePoints {
+  search: SearchPoint[];
+  factoring: FactoringPoint[];
+  optimization: OptimizationPoint[];
+  kernel: KernelPoint[];
+  ai: AiPoint[];
+}
+
+/** What each benchmark found overall (every summary also has its point count and time, or an error). */
+export interface SuiteSummaries {
+  search: { max_items: number; best_query_speedup: number; min_success_probability: number };
+  factoring: { success_rate: number; max_qubits: number };
+  optimization: { mean_approx_ratio: number; optimal_found: number };
+  kernel: { max_qubits: number; max_memory_mb: number };
+  ai: { qnn_accuracy: number; mlp_accuracy: number; qnn_params: number; mlp_params: number; neural_optimizer_accuracy: number };
+}
+export type SuiteSummary<K extends SuiteKey> = SuiteSummaries[K] & { points: number; duration_ms?: number; error?: string };
+
+/** The headline numbers kept with a saved run: a benchmark's, or a tool run's (Quantum vs Classical, Problem Solver, Code to Quantum). */
+export interface RunSummary {
+  grover_speedup?: number; grover_items?: number; shor_success_rate?: number; qaoa_approx_ratio?: number;
+  kernel_max_qubits?: number; qnn_accuracy?: number; mlp_accuracy?: number;
+  algorithm?: string; problem_type?: string; engine?: string; supported?: boolean;
+  quantum_correct?: boolean; classical_correct?: boolean; qubits?: number | null;
+  quantum_steps?: number | null; quantum_label?: string | null; classical_steps?: number | null; classical_label?: string | null;
+  success_probability?: number | null; quantum_ms?: number | null;
+}
+
+export type SavedSuites = { [K in SuiteKey]?: { title: string; points: SuitePoints[K]; summary: SuiteSummary<K> } };
+
 export interface HistoryRun {
   id: number;
   kind: 'benchmark' | 'sfod' | 'solve' | 'transform';
   title: string;
-  summary: Record<string, any>;
+  summary: RunSummary;
   duration_ms: number | null;
   created_at: string | null;
-  payload?: { suites: Record<string, { title: string; points: any[]; summary: Record<string, any> }> } | null;
+  payload?: { suites: SavedSuites } | null;
 }
 
 export interface Overview {
@@ -27,13 +102,16 @@ export interface Overview {
   last_run_at: string | null;
 }
 
+type PointEvent = { [K in SuiteKey]: { type: 'point'; suite: K; index: number; data: SuitePoints[K][number] } }[SuiteKey];
+type SuiteDoneEvent = { [K in SuiteKey]: { type: 'suite_done'; suite: K; summary: SuiteSummary<K> } }[SuiteKey];
+
 export type BenchmarkEvent =
   | { type: 'start'; suites: SuiteKey[]; options: Record<string, number> }
   | { type: 'suite_start'; suite: SuiteKey; title: string }
-  | { type: 'point'; suite: SuiteKey; index: number; data: any }
-  | { type: 'suite_done'; suite: SuiteKey; summary: Record<string, any> }
+  | PointEvent
+  | SuiteDoneEvent
   | { type: 'suite_error'; suite: SuiteKey; detail: string }
-  | { type: 'done'; run_id: number | null; headline: Record<string, any>; duration_ms: number }
+  | { type: 'done'; run_id: number | null; headline: RunSummary; duration_ms: number }
   | { type: 'error'; detail: string };
 
 export const dashboardApi = {
