@@ -11,11 +11,11 @@ import {
 import { getApiErrorMessage } from '../api/client';
 
 const SUITE_META: Record<SuiteKey, { icon: React.ElementType; color: string; short: string; module: string }> = {
-  search:       { icon: Search,      color: '#00ffcc', short: 'Grover vs linear search', module: 'Module 2' },
-  factoring:    { icon: Hash,        color: '#cc44ff', short: 'Shor vs trial division', module: 'Module 2' },
-  optimization: { icon: Shuffle,     color: '#f97316', short: 'QAOA vs exhaustive (Max-Cut)', module: 'Modules 2 + 5' },
-  kernel:       { icon: MemoryStick, color: '#fbbf24', short: 'Memory wall (kernel scaling)', module: 'Module 1' },
-  ai:           { icon: Brain,       color: '#60a5fa', short: 'Quantum vs classical AI', module: 'Modules 6 + 7' },
+  search:       { icon: Search,      color: '#00ffcc', short: 'Grover vs linear search', module: 'Quantum vs Classical' },
+  factoring:    { icon: Hash,        color: '#cc44ff', short: 'Shor vs trial division', module: 'Quantum vs Classical' },
+  optimization: { icon: Shuffle,     color: '#f97316', short: 'QAOA vs exhaustive (Max-Cut)', module: 'Quantum vs Classical + Code to Quantum' },
+  kernel:       { icon: MemoryStick, color: '#fbbf24', short: 'Memory wall (kernel scaling)', module: 'Quantum Simulator' },
+  ai:           { icon: Brain,       color: '#60a5fa', short: 'Quantum vs classical AI', module: 'Neural Optimizer + Neural Network Converter' },
 };
 const ORDER: SuiteKey[] = ['search', 'factoring', 'optimization', 'kernel', 'ai'];
 const KIND_BADGE: Record<string, string> = {
@@ -56,7 +56,7 @@ function ChartCard({ suite, status, count, children, note }: {
       <div className="flex items-center gap-2 mb-3">
         <Icon className="w-4 h-4" style={{ color: m.color }} />
         <h3 className="text-white font-bold text-sm">{m.short}</h3>
-        <span className="text-[10px] text-gray-500">{m.module}</span>
+        <span className="text-xs text-gray-400">{m.module}</span>
         <span className="ml-auto text-[11px] text-gray-400 flex items-center gap-1">
           {status === 'running' && <Loader2 className="w-3.5 h-3.5 animate-spin text-quantum-neon" />}
           {status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />}
@@ -261,7 +261,7 @@ export function DashboardPage() {
                   <Icon className="w-4 h-4" style={{ color: m.color }} />
                   <span className="text-xs text-white font-semibold">{m.short}</span>
                 </div>
-                <span className="text-[10px] text-gray-500">{m.module}</span>
+                <span className="text-xs text-gray-400">{m.module}</span>
               </button>
             );
           })}
@@ -317,7 +317,7 @@ export function DashboardPage() {
           <KernelChart points={data.kernel} />
         </ChartCard>
         <ChartCard suite="ai" status={status.ai} count={data.ai.length}
-          note={qnn ? `QNN accuracy ${Math.round(qnn.quantum_accuracy * 100)}% with ${qnn.quantum_params} trainable angles vs classical MLP ${Math.round(qnn.classical_accuracy * 100)}% with ${qnn.classical_params} weights (toy dataset, Modules 6–7).` : 'Loss curves of a classical MLP vs the converted QNN, and raw-angle SGD vs the Neural Angle Optimizer.'}>
+          note={qnn ? `On unseen XOR test points the quantum network scored ${Math.round(qnn.quantum_accuracy * 100)}% with ${qnn.quantum_params} trainable numbers, against ${Math.round(qnn.classical_accuracy * 100)}% for the classical network it was converted from, with ${qnn.classical_params} (one seed).` : 'Training loss of a classical network and the quantum network it becomes, and of a random start and the Neural Angle Optimizer.'}>
           <AiChart points={data.ai} />
         </ChartCard>
         <div className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5">

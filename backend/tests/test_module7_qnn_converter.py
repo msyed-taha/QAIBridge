@@ -1,219 +1,268 @@
 """
-Module 7 - QNN Converter - test suite.
+Neural Network Converter — test suite.
 
 Run from backend/:  python -m pytest tests/test_module7_qnn_converter.py -v
 
-Sections:
-  1. Architecture parsing (Parser)
-  2. Mapping (Mapping Engine / converter.py)
-  3. Qubit calculation
-  4. Parameter mapping (classical weights -> quantum angles)
-  5. Circuit generation / simulation (real kernel)
-  6. API endpoints
-  7. Edge cases
+  1. Reading the classical network (what converts, what doesn't, and why)
+  2. The conversion rules and report
+  3. The quantum network: checked against the QAIbridge simulator and the
+     parameter-shift rule; the batched classical network against PyTorch's own
+  4. The warm start
+  5. The datasets
+  6. The fair comparison
+  7. API endpoints (signed in)
 """
 from __future__ import annotations
 
 import math
+import random
 
-import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 from fastapi.testclient import TestClient
 
-from app.modules.module6_optimizer.dataset import FEATURE_DIM, get_toy_classification_dataset
+from app.auth.security import hash_password, token_for
+from app.database import SessionLocal
+from app.models.user import ROLE_USER, User
+from app.modules.module1_kernel import QuantumCircuit, QuantumStateVector
 from app.modules.module7_qnn import (
+    DATASETS,
     ArchitectureError,
+    compare,
     convert_architecture,
-    map_classical_weights_to_angles,
+    dataset,
     parse_architecture,
-    run_qnn_forward,
-    train_classical_mlp,
-    train_qnn_warm_started,
+    warm_start,
 )
-from app.modules.module7_qnn.classical_nn import build_mlp
+from app.modules.module7_qnn import trainer
+from app.modules.module7_qnn.circuit import (
+    classical_probability,
+    classical_size,
+    classical_start,
+    quantum_probability,
+    quantum_start,
+)
+from app.modules.module7_qnn.data import INPUT_SCALE, REAL
 
 
-# ── 1. Architecture parsing ─────────────────────────────────────────────────
+def dense(units: int, activation: str = "relu") -> dict:
+    return {"type": "dense", "units": units, "activation": activation}
 
-class TestArchitectureParsing:
-    def test_valid_dense_only_architecture(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"}, {"type": "dense", "units": 3, "activation": "tanh"}],
-            input_dim=2, output_dim=1,
-        )
-        assert parsed.input_dim == 2
-        assert len(parsed.dense_layers) == 2
-        assert parsed.warnings == []
 
-    def test_dropout_layer_recorded_but_skipped_from_dense_layers(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"}, {"type": "dropout"}],
-            input_dim=2, output_dim=1,
-        )
-        assert len(parsed.layers) == 2
-        assert len(parsed.dense_layers) == 1
-        assert any("Dropout" in w for w in parsed.warnings)
+DROPOUT = {"type": "dropout"}
 
-    def test_empty_architecture_rejected(self):
+
+def parse(layers):
+    return parse_architecture(layers, input_dim=2, output_dim=1)
+
+
+# ── 1. Reading the classical network ─────────────────────────────────────────
+
+class TestParser:
+    def test_a_valid_network(self):
+        p = parse([dense(4), DROPOUT, dense(3, "tanh")])
+        assert [l.type for l in p.layers] == ["dense", "dropout", "dense"] and len(p.dense_layers) == 2
+        assert len(p.warnings) == 1 and "Dropout" in p.warnings[0] and "skips" in p.warnings[0]
+
+    @pytest.mark.parametrize("layers, words", [
+        ([], "at least one layer"),
+        ([dense(4)] * 5, "at most 4"),
+        ([dense(9)], "1 to 8"),
+        ([dense(0)], "1 to 8"),
+        ([dense(4, "softmax")], "one chance"),
+        ([dense(4, "swish")], "isn't available"),
+        ([{"type": "conv2d", "units": 4}], "can't be converted"),
+        ([DROPOUT], "at least one Dense"),
+    ])
+    def test_what_cannot_convert_is_turned_away_with_a_reason(self, layers, words):
+        with pytest.raises(ArchitectureError) as e:
+            parse(layers)
+        assert words in str(e.value) and "FYP" not in str(e.value) and "module" not in str(e.value).lower()
+
+    def test_only_one_output(self):
         with pytest.raises(ArchitectureError):
-            parse_architecture([], input_dim=2, output_dim=1)
-
-    def test_too_many_layers_rejected(self):
-        layers = [{"type": "dense", "units": 4, "activation": "relu"}] * 5
-        with pytest.raises(ArchitectureError):
-            parse_architecture(layers, input_dim=2, output_dim=1)
-
-    def test_unsupported_layer_type_rejected_with_explanation(self):
-        with pytest.raises(ArchitectureError, match="unsupported layer type"):
-            parse_architecture([{"type": "conv2d", "units": 4}], input_dim=2, output_dim=1)
-
-    def test_unsupported_activation_rejected(self):
-        with pytest.raises(ArchitectureError, match="unsupported activation"):
-            parse_architecture([{"type": "dense", "units": 4, "activation": "gelu"}], input_dim=2, output_dim=1)
-
-    def test_softmax_rejected_with_specific_explanation(self):
-        """Softmax must fail loudly with a reason, not silently become sigmoid."""
-        with pytest.raises(ArchitectureError, match="[Ss]oftmax"):
-            parse_architecture([{"type": "dense", "units": 4, "activation": "softmax"}], input_dim=2, output_dim=1)
-
-    def test_invalid_units_rejected(self):
-        with pytest.raises(ArchitectureError):
-            parse_architecture([{"type": "dense", "units": 0, "activation": "relu"}], input_dim=2, output_dim=1)
-        with pytest.raises(ArchitectureError):
-            parse_architecture([{"type": "dense", "units": 999, "activation": "relu"}], input_dim=2, output_dim=1)
-
-    def test_multi_class_output_rejected(self):
-        with pytest.raises(ArchitectureError):
-            parse_architecture([{"type": "dense", "units": 4, "activation": "relu"}], input_dim=2, output_dim=3)
-
-    def test_dropout_only_rejected(self):
-        with pytest.raises(ArchitectureError, match="Dense layer is required"):
-            parse_architecture([{"type": "dropout"}], input_dim=2, output_dim=1)
+            parse_architecture([dense(4)], input_dim=2, output_dim=3)
 
 
-# ── 2. Mapping (Mapping Engine) ─────────────────────────────────────────────
+# ── 2. The conversion ────────────────────────────────────────────────────────
 
-class TestMappingEngine:
-    def test_dense_layer_count_drives_variational_blocks(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"},
-             {"type": "dropout"},
-             {"type": "dense", "units": 3, "activation": "relu"}],
-            input_dim=2, output_dim=1,
-        )
-        report = convert_architecture(parsed)
-        assert report.qnn.n_layers == 2  # dropout contributes no block
+class TestConversion:
+    def test_one_qubit_per_neuron_and_one_block_per_dense_layer(self):
+        r = convert_architecture(parse([dense(3), DROPOUT, dense(6, "tanh"), dense(2)]))
+        assert r.qnn.n_qubits == 6 and r.qnn.blocks == [3, 6, 2]
+        assert r.qnn.trainable == 4 * (3 + 6 + 2)
+        assert r.qnn.gates == {"RY": 11, "RZ": 11, "CNOT": 2 + 5 + 1}
+        assert r.classical_layer_sizes == [2, 3, 6, 2, 1]
 
-    def test_trainable_angles_formula(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"}] * 2, input_dim=2, output_dim=1,
-        )
-        report = convert_architecture(parsed)
-        assert report.qnn.trainable_angles == report.qnn.n_qubits * report.qnn.n_layers * 2
+    def test_the_network_shape_changes_the_circuit(self):
+        a = convert_architecture(parse([dense(2), dense(2)])).qnn
+        b = convert_architecture(parse([dense(8), dense(8)])).qnn
+        c = convert_architecture(parse([dense(2)])).qnn
+        assert (a.n_qubits, b.n_qubits, len(c.blocks)) == (2, 8, 1) and a.trainable < b.trainable
 
-    def test_comparison_rows_include_required_metrics(self):
-        parsed = parse_architecture([{"type": "dense", "units": 4, "activation": "relu"}], input_dim=2, output_dim=1)
-        report = convert_architecture(parsed)
-        metrics = {row["metric"] for row in report.comparison_rows}
-        for required in ("Activation", "Gates", "Encoding", "Measurement", "Entanglement"):
-            assert required in metrics
+    def test_the_parameter_count_matches_pytorch(self):
+        layers = [dense(5), DROPOUT, dense(3)]
+        torch_net = nn.Sequential(nn.Linear(2, 5), nn.ReLU(), nn.Dropout(), nn.Linear(5, 3), nn.ReLU(), nn.Linear(3, 1))
+        assert classical_size(layers) == convert_architecture(parse(layers)).classical_params \
+            == sum(p.numel() for p in torch_net.parameters())
 
-    def test_dropout_warning_propagates_to_approximation_notes(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"}, {"type": "dropout"}], input_dim=2, output_dim=1,
-        )
-        report = convert_architecture(parsed)
-        assert any("Dropout" in note for note in report.approximation_notes)
-
-    def test_classical_param_count_matches_actual_model(self):
-        parsed = parse_architecture(
-            [{"type": "dense", "units": 4, "activation": "relu"}, {"type": "dense", "units": 3, "activation": "tanh"}],
-            input_dim=2, output_dim=1,
-        )
-        report = convert_architecture(parsed)
-        model = build_mlp(parsed)
-        actual_params = sum(p.numel() for p in model.parameters())
-        assert report.classical_params == actual_params
+    def test_the_report_says_what_maps_and_what_does_not(self):
+        r = convert_architecture(parse([dense(4), DROPOUT, dense(1)]))
+        assert [row["quantum_params"] for row in r.rows] == [16, None, 4, 0]
+        assert r.rows[1]["quantum"].startswith("Nothing")
+        assert "CNOT" not in r.rows[2]["quantum"]                       # one qubit: nothing to pass on
+        text = " ".join(r.notes)
+        assert "re-uploading" in text and "built-in activation" in text and "not exactly what it computes" in text
 
 
-# ── 3. Qubit calculation ─────────────────────────────────────────────────────
+# ── 3. The quantum network ───────────────────────────────────────────────────
 
-class TestQubitCalculation:
-    def test_qubit_count_equals_input_dim_not_hidden_width(self):
-        """Common misconception check: qubits map to input FEATURES (angle
-        encoding), not to hidden-layer neuron counts -- a wide hidden layer
-        must not inflate the qubit count."""
-        parsed_narrow = parse_architecture([{"type": "dense", "units": 2, "activation": "relu"}], input_dim=2, output_dim=1)
-        parsed_wide = parse_architecture([{"type": "dense", "units": 16, "activation": "relu"}], input_dim=2, output_dim=1)
-        assert convert_architecture(parsed_narrow).qnn.n_qubits == 2
-        assert convert_architecture(parsed_wide).qnn.n_qubits == 2
+def _kernel_chance(x, params, units, k=0):
+    """The same circuit on the QAIbridge simulator (Module 1): the chance q0 reads 1."""
+    n = max(units)
+    qc = QuantumCircuit(n, "check")
+    xs = [v * INPUT_SCALE for v in x]
+    for block, u in zip(params, units):
+        for j in range(u):
+            angle = float(block["w"][k, j, 0] * xs[0] + block["w"][k, j, 1] * xs[1] + block["b"][k, j])
+            qc._add("RY", [j], [angle])
+            qc._add("RZ", [j], [float(block["phi"][k, j])])
+        for c in range(u - 1, 0, -1):
+            qc._add("CNOT", [c, c - 1])
+    sv = QuantumStateVector(n)
+    qc.execute(sv)
+    p = sv.probabilities()
+    return float(sum(p[i] for i in range(2 ** n) if i & (1 << (n - 1))))
 
-    def test_qubit_count_scales_with_input_dim(self):
-        parsed = parse_architecture([{"type": "dense", "units": 4, "activation": "relu"}], input_dim=FEATURE_DIM, output_dim=1)
-        assert convert_architecture(parsed).qnn.n_qubits == FEATURE_DIM
 
+class TestQuantumNetwork:
+    @pytest.mark.parametrize("units", [[1], [2, 2], [3, 2], [2, 4, 1], [5]])
+    def test_matches_the_qaibridge_simulator(self, units):
+        params = quantum_start(units, 2, torch.Generator().manual_seed(len(units)))
+        X = torch.tensor([[0.3, -0.7], [-0.9, 0.1], [0.5, 0.5]], dtype=REAL)
+        ours = quantum_probability(params, units, X)
+        for k in range(2):
+            for i in range(3):
+                assert float(ours[k, i]) == pytest.approx(_kernel_chance(X[i].tolist(), params, units, k), abs=1e-10)
 
-# ── 4. Parameter mapping (classical weights -> quantum angles) ─────────────
+    def test_a_one_layer_network_reads_both_inputs(self):
+        """The old conversion ignored the second input when there was one layer, so it could never learn XOR."""
+        units = [4]
+        params = quantum_start(units, 1, torch.Generator().manual_seed(0))
+        X = torch.tensor([[0.5, v] for v in (-0.8, 0.0, 0.8)], dtype=REAL)
+        p = quantum_probability(params, units, X)[0]
+        assert float(p.max() - p.min()) > 0.01
 
-class TestParameterMapping:
-    def test_output_shape_and_layer_reuse(self):
-        model = torch.nn.Sequential(torch.nn.Linear(2, 4), torch.nn.ReLU(), torch.nn.Linear(4, 1), torch.nn.Sigmoid())
-        angles = map_classical_weights_to_angles(model, n_qubits=2, n_layers=3)
-        assert angles.shape == (2 * 3 * 2,)
+    def test_exact_gradient_equals_parameter_shift(self):
+        units = [3, 2]
+        params = quantum_start(units, 1, torch.Generator().manual_seed(5))
+        x = torch.tensor([[0.4, -0.6]], dtype=REAL)
+        for block in params:
+            for t in block.values():
+                t.requires_grad_(True)
+        quantum_probability(params, units, x).sum().backward()
+        for block in params:
+            for key in ("b", "phi"):                                 # each is an RY or RZ angle on its own
+                for j in range(block[key].shape[1]):
+                    shifted = []
+                    for s in (math.pi / 2, -math.pi / 2):
+                        moved = [{k: t.detach().clone() for k, t in b.items()} for b in params]
+                        target = moved[[id(b) for b in params].index(id(block))]
+                        target[key][0, j] += s
+                        shifted.append(float(quantum_probability(moved, units, x)[0, 0]))
+                    assert float(block[key].grad[0, j]) == pytest.approx((shifted[0] - shifted[1]) / 2, abs=1e-12)
 
-    def test_angles_bounded_by_pi(self):
-        """The whole point of the tanh-squash normalisation: however large the
-        classical weights are, mapped angles must stay in the principal
-        (-pi, pi) range rather than aliasing/wrapping."""
-        model = torch.nn.Sequential(torch.nn.Linear(2, 4), torch.nn.ReLU(), torch.nn.Linear(4, 1), torch.nn.Sigmoid())
+    def test_networks_in_a_batch_are_independent(self):
+        units = [2, 3]
+        params = quantum_start(units, 3, torch.Generator().manual_seed(1))
+        X, _, _, _ = dataset("moons")
+        together = quantum_probability(params, units, X[:10])
+        alone = quantum_probability([{k: t[1:2] for k, t in b.items()} for b in params], units, X[:10])
+        assert torch.allclose(together[1:2], alone, atol=1e-12)
+
+    def test_the_classical_network_matches_pytorch(self):
+        layers = [dense(4, "tanh"), DROPOUT, dense(3, "sigmoid")]
+        params = classical_start(layers, 1, torch.Generator().manual_seed(2))
+        net = nn.Sequential(nn.Linear(2, 4), nn.Tanh(), nn.Dropout(0.2), nn.Linear(4, 3), nn.Sigmoid(), nn.Linear(3, 1),
+                            nn.Sigmoid()).double().eval()
         with torch.no_grad():
-            model[0].weight.fill_(1000.0)  # deliberately extreme weights
-        angles = map_classical_weights_to_angles(model, n_qubits=2, n_layers=1)
-        assert np.all(np.abs(angles) <= math.pi + 1e-9)
-
-    def test_small_weights_map_to_small_angles(self):
-        model = torch.nn.Sequential(torch.nn.Linear(2, 4), torch.nn.ReLU(), torch.nn.Linear(4, 1), torch.nn.Sigmoid())
-        with torch.no_grad():
-            model[0].weight.zero_()
-        angles = map_classical_weights_to_angles(model, n_qubits=2, n_layers=1)
-        assert np.all(np.abs(angles) < 0.1)
-
-    def test_no_linear_layers_raises(self):
-        model = torch.nn.Sequential(torch.nn.ReLU())
-        with pytest.raises(ValueError):
-            map_classical_weights_to_angles(model, n_qubits=2, n_layers=1)
+            for lin, p in zip([m for m in net if isinstance(m, nn.Linear)], params):
+                lin.weight.copy_(p["W"][0]); lin.bias.copy_(p["b"][0])
+        X, _, _, _ = dataset("xor")
+        ours = classical_probability(params, layers, X[:20])[0]
+        assert torch.allclose(ours, net(X[:20] * INPUT_SCALE)[:, 0], atol=1e-12)
 
 
-# ── 5. Circuit generation / simulation (real kernel) ────────────────────────
+# ── 4. The warm start ────────────────────────────────────────────────────────
 
-class TestSimulation:
-    def test_run_qnn_forward_uses_real_kernel_bounded_output(self):
-        X, _ = get_toy_classification_dataset()
-        predictions, angles = run_qnn_forward(n_qubits=2, layers=1, X=X)
-        assert len(predictions) == len(X)
-        assert all(0.0 <= p <= 1.0 for p in predictions)
-        assert angles.shape == (2 * 1 * 2,)
-
-    def test_run_qnn_forward_respects_provided_angles(self):
-        X, _ = get_toy_classification_dataset()
-        fixed = np.zeros(2 * 1 * 2)
-        predictions, angles = run_qnn_forward(n_qubits=2, layers=1, X=X, angles=fixed)
-        np.testing.assert_array_equal(angles, fixed)
-
-    def test_warm_started_training_runs_end_to_end(self):
-        """Full pipeline: classical model -> parameter mapping -> quantum
-        fine-tuning, using the real parameter-shift-gradient kernel."""
-        parsed = parse_architecture([{"type": "dense", "units": 4, "activation": "relu"}], input_dim=2, output_dim=1)
-        report = convert_architecture(parsed)
-        X, y = get_toy_classification_dataset()
-        _, _, classical_model = train_classical_mlp(parsed, X, y, iterations=5)
-        curve, acc = train_qnn_warm_started(report.qnn.n_qubits, report.qnn.n_layers, X, y, classical_model, iterations=5)
-        assert len(curve) == 5
-        assert 0.0 <= acc <= 1.0
+class TestWarmStart:
+    def test_each_qubit_follows_its_neuron_over_half_a_turn(self):
+        layers, units = [dense(4), dense(3)], [4, 3]
+        classical = classical_start(layers, 2, torch.Generator().manual_seed(3))
+        X, _, _, _ = dataset("circles")
+        q = warm_start(classical, units, X)
+        z = torch.einsum("mud,bd->mbu", classical[0]["W"], X * INPUT_SCALE) + classical[0]["b"][:, None, :]
+        angle = torch.einsum("mud,bd->mbu", q[0]["w"], X * INPUT_SCALE) + q[0]["b"][:, None, :]
+        assert torch.allclose(angle.min(1).values, torch.zeros(2, 4, dtype=REAL), atol=1e-12)
+        assert torch.allclose(angle.max(1).values, torch.full((2, 4), math.pi, dtype=REAL), atol=1e-12)
+        for m in range(2):
+            for j in range(4):                                       # the angle rises in step with the neuron's input
+                pair = torch.stack([z[m, :, j], angle[m, :, j]])
+                assert float(torch.corrcoef(pair)[0, 1]) == pytest.approx(1.0, abs=1e-9)
+        assert float(q[0]["phi"].abs().max()) == 0
+        assert all(float(t.abs().max()) == 0 for t in q[1].values())     # later blocks start doing nothing
 
 
-# ── 6. API endpoints ─────────────────────────────────────────────────────────
+# ── 5. The datasets ──────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("name", list(DATASETS))
+def test_datasets_are_split_scaled_and_repeatable(name):
+    X, y, Xt, yt = dataset(name)
+    assert X.shape == (140, 2) and Xt.shape == (60, 2)
+    assert float(torch.cat([X, Xt]).abs().max()) == pytest.approx(1.0)
+    assert set(y.tolist()) == {0.0, 1.0} and set(yt.tolist()) == {0.0, 1.0}
+    dataset.cache_clear()
+    assert torch.equal(dataset(name)[0], X)
+
+
+# ── 6. The fair comparison ───────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def no_warm_up(monkeypatch):
+    monkeypatch.setattr(trainer, "WARM_UP", False)
+
+
+class TestCompare:
+    def test_same_budget_three_seeds_and_repeatable(self):
+        layers = [dense(2), DROPOUT, dense(2)]
+        r = compare(layers, "groups", steps=20)
+        assert set(r["methods"]) == {"classical", "quantum", "warm"} and r["seeds"] == 3
+        assert (r["train_points"], r["test_points"]) == (140, 60) and len(r["grid"]) == trainer.GRID
+        for key, m in r["methods"].items():
+            assert len(m["curve_mean"]) == 21
+            assert all(lo <= mid <= hi for lo, mid, hi in zip(m["curve_min"], m["curve_mean"], m["curve_max"]))
+            assert m["learning_rate"] in m["learning_rates_tried"] == list(trainer.LEARNING_RATES[key])
+            assert len(m["test_accuracy"]["runs"]) == 3 and 0 <= m["test_accuracy"]["mean"] <= 1
+            assert len(m["map"]) == trainer.GRID and all(0 <= v <= 1 for row in m["map"] for v in row)
+        assert r["methods"]["quantum"]["params"] == r["methods"]["warm"]["params"] == 16
+        assert r["methods"]["classical"]["params"] == 2 * 3 + 2 * 3 + 3
+        trainer._cache.clear()
+        again = compare(layers, "groups", steps=20)
+        assert again["methods"] == r["methods"] and not again["cached"]      # fixed seeds: the same numbers
+        assert compare(layers, "groups", steps=20)["cached"]
+
+    def test_all_three_learn_xor(self):
+        r = compare(trainer.DEFAULT_LAYERS, "xor", steps=100)
+        for m in r["methods"].values():
+            assert m["test_accuracy"]["mean"] >= 0.85 and m["final_loss"]["mean"] < m["start_loss"]["mean"]
+
+    def test_a_one_layer_network_learns_too(self):
+        r = compare([dense(4)], "xor", steps=100)
+        assert r["methods"]["quantum"]["test_accuracy"]["mean"] >= 0.8
+
+
+# ── 7. API endpoints ─────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def client():
@@ -221,80 +270,52 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(scope="module")
+def auth():
+    tag = random.getrandbits(40)
+    with SessionLocal() as db:
+        u = User(username=f"conv_{tag}", email=f"conv_{tag}@example.com", hashed_password=hash_password("TestPass123"),
+                 role=ROLE_USER, is_active=True)
+        db.add(u); db.commit(); db.refresh(u)
+        headers = {"Authorization": f"Bearer {token_for(u)}"}
+    yield headers
+    with SessionLocal() as db:
+        db.query(User).filter(User.email == f"conv_{tag}@example.com").delete()
+        db.commit()
+
+
 class TestAPI:
-    def test_status(self, client):
-        resp = client.get("/api/module7/status")
-        assert resp.status_code == 200
-        assert resp.json()["module"] == 7
+    def test_needs_sign_in(self, client):
+        assert client.get("/api/module7/datasets").status_code in (401, 403)
+        for path in ("/api/module7/analyze", "/api/module7/convert", "/api/module7/simulate", "/api/module7/train-compare"):
+            assert client.post(path, json={}).status_code in (401, 403)
 
-    def test_analyze(self, client):
-        resp = client.post("/api/module7/analyze", json={
-            "layers": [{"type": "dense", "units": 4, "activation": "relu"}, {"type": "dropout"}],
-        })
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["dense_layer_count"] == 1
-        assert len(body["warnings"]) == 1
+    def test_datasets(self, client, auth):
+        body = client.get("/api/module7/datasets", headers=auth).json()
+        assert set(body) == set(DATASETS)
+        assert len(body["xor"]["train"]["x"]) == 140 and len(body["xor"]["test"]["y"]) == 60 and body["xor"]["about"]
 
-    def test_convert(self, client):
-        resp = client.post("/api/module7/convert", json={
-            "layers": [{"type": "dense", "units": 4, "activation": "relu"}],
-        })
-        assert resp.status_code == 200
-        body = resp.json()
-        assert "qnn" in body and "comparison_rows" in body
+    def test_analyze_and_convert(self, client, auth):
+        layers = [dense(3), DROPOUT, dense(5, "tanh")]
+        parsed = client.post("/api/module7/analyze", headers=auth, json={"layers": layers}).json()
+        assert parsed["dense_layer_count"] == 2 and len(parsed["warnings"]) == 1
+        body = client.post("/api/module7/convert", headers=auth, json={"layers": layers}).json()
+        assert body["ok"] and body["qnn"]["n_qubits"] == 5 and body["qnn"]["blocks"] == [3, 5] and body["parsed"]["warnings"]
 
-    def test_simulate(self, client):
-        resp = client.post("/api/module7/simulate", json={"n_qubits": 2, "layers": 1})
-        assert resp.status_code == 200
-        body = resp.json()
-        assert len(body["predictions"]) == len(body["labels"])
+    @pytest.mark.parametrize("layers, words", [([dense(9)], "1 to 8"), ([dense(4, "softmax")], "one chance"), ([DROPOUT], "Dense")])
+    def test_a_network_that_cannot_convert_gets_a_plain_reason(self, client, auth, layers, words):
+        r = client.post("/api/module7/convert", headers=auth, json={"layers": layers})      # asked after every edit
+        assert r.status_code == 200 and r.json()["ok"] is False and words in r.json()["error"]
+        r = client.post("/api/module7/train-compare", headers=auth, json={"layers": layers, "steps": 20})
+        assert r.status_code == 400 and words in r.json()["detail"]
 
-    def test_simulate_rejects_wrong_angle_count(self, client):
-        resp = client.post("/api/module7/simulate", json={"n_qubits": 2, "layers": 1, "angles": [0.1, 0.2]})
-        assert resp.status_code == 400
+    @pytest.mark.parametrize("bad", [{"steps": 10}, {"steps": 500}, {"dataset": "spirals"}, {"layers": []}])
+    def test_train_compare_rejects_bad_settings(self, client, auth, bad):
+        assert client.post("/api/module7/train-compare", headers=auth, json=bad).status_code == 422
 
-    def test_train_compare(self, client):
-        resp = client.post("/api/module7/train-compare", json={
-            "layers": [{"type": "dense", "units": 4, "activation": "relu"}],
-            "iterations": 10,
-        })
-        assert resp.status_code == 200
-        body = resp.json()
-        for key in ("classical_loss_curve", "quantum_loss_curve", "quantum_warm_loss_curve",
-                    "classical_accuracy", "quantum_accuracy", "quantum_warm_accuracy"):
-            assert key in body
-        assert len(body["classical_loss_curve"]) == 10
-
-
-# ── 7. Edge cases ────────────────────────────────────────────────────────────
-
-class TestEdgeCases:
-    def test_convert_rejects_unsupported_layer(self, client):
-        resp = client.post("/api/module7/convert", json={"layers": [{"type": "lstm", "units": 4}]})
-        assert resp.status_code == 400
-        assert "unsupported layer type" in resp.json()["detail"]
-
-    def test_convert_rejects_softmax_with_explanation(self, client):
-        resp = client.post("/api/module7/convert", json={
-            "layers": [{"type": "dense", "units": 4, "activation": "softmax"}],
-        })
-        assert resp.status_code == 400
-        assert "Softmax" in resp.json()["detail"]
-
-    def test_convert_rejects_too_many_layers(self, client):
-        """Caught by the Pydantic schema (max_length=4) before the parser even
-        runs -- 422, not 400. See test_too_many_layers_rejected above for the
-        equivalent check against the parser itself when called directly with
-        more layers than the schema would even accept."""
-        resp = client.post("/api/module7/convert", json={
-            "layers": [{"type": "dense", "units": 4, "activation": "relu"}] * 5,
-        })
-        assert resp.status_code == 422
-
-    def test_convert_rejects_invalid_units(self, client):
-        """Caught by the Pydantic schema (ge=1) -- 422, not 400."""
-        resp = client.post("/api/module7/convert", json={
-            "layers": [{"type": "dense", "units": 0, "activation": "relu"}],
-        })
-        assert resp.status_code == 422
+    def test_train_compare_and_simulate(self, client, auth):
+        r = client.post("/api/module7/train-compare", headers=auth, json={"layers": [dense(2)], "dataset": "moons", "steps": 20})
+        assert r.status_code == 200, r.text
+        assert r.json()["conversion"]["qnn"]["n_qubits"] == 2 and r.json()["dataset"] == "moons"
+        s = client.post("/api/module7/simulate", headers=auth, json={"layers": [dense(2)], "dataset": "moons"}).json()
+        assert len(s["chances"]) == 60 and 0 <= s["accuracy"] <= 1

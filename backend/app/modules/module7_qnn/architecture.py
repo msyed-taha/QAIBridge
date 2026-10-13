@@ -1,24 +1,13 @@
 """
-Module 7 - QNN Converter
-architecture.py - Architecture Parser: validates a user-described classical
-network *before* anything is mapped to quantum. This is the "Parser" stage
-of the module's data flow:
+Neural Network Converter — reads the described classical network and checks it
+before anything is converted.
 
-    Classical Model -> Parser -> Feature Representation -> Mapping Engine
-    -> QNN Generator -> Quantum Circuit -> Simulator -> Measurement
-    -> Classical Output
-
-Scope is deliberately small: two layer types are recognised (Dense,
-Dropout), matching an FYP-practical activation set (ReLU / Tanh / Sigmoid).
-Softmax is recognised by name but explicitly rejected with an explanation
-rather than silently mapped to something else -- and anything outside this
-set (Conv2D, LSTM, attention, ...) is rejected with a clear message, per
-the module's "do not claim every classical network converts" requirement
-(§4 of the spec). Dropout is recognised-but-not-mapped: it's a
-training-time regulariser with no gate-level analogue, so it's kept in the
-parsed architecture for bookkeeping but skipped when the Mapping Engine
-builds the quantum circuit, and that skip is surfaced as a warning rather
-than happening silently.
+Two layer types: Dense (1 to 8 neurons, relu, tanh or sigmoid) and Dropout. Each
+neuron becomes one qubit, so 8 neurons is the widest layer (8 qubits). Softmax
+is turned away with the reason (the quantum read-out is one chance, so the
+network must answer yes or no), and so is any other layer type, rather than
+being converted into something it isn't. Dropout is kept for the classical
+network but has nothing to become in the circuit, and the report says so.
 """
 
 from __future__ import annotations
@@ -30,13 +19,11 @@ SUPPORTED_LAYER_TYPES = {"dense", "dropout"}
 SUPPORTED_ACTIVATIONS = {"relu", "tanh", "sigmoid"}
 UNSUPPORTED_ACTIVATIONS_WITH_REASON = {
     "softmax": (
-        "Softmax implies a multi-class readout, but this module's quantum "
-        "readout is a single Z-expectation mapped to one probability "
-        "(binary classification only). Use 'sigmoid', or express the "
-        "problem as binary."
+        "Softmax picks between many classes, but the quantum network answers with one "
+        "chance (class 1 or not). Use relu, tanh or sigmoid."
     ),
 }
-MIN_UNITS, MAX_UNITS = 1, 16
+MIN_UNITS, MAX_UNITS = 1, 8          # one qubit per unit
 MAX_LAYERS = 4
 
 
@@ -71,13 +58,12 @@ class ParsedArchitecture:
 
 def parse_architecture(raw_layers: List[Dict], input_dim: int, output_dim: int = 1) -> ParsedArchitecture:
     if not raw_layers:
-        raise ArchitectureError("At least one layer is required (nothing between input and output).")
+        raise ArchitectureError("Add at least one layer between the input and the output.")
     if len(raw_layers) > MAX_LAYERS:
-        raise ArchitectureError(f"At most {MAX_LAYERS} layers are supported in this FYP-scope build.")
+        raise ArchitectureError(f"A network can have at most {MAX_LAYERS} layers here.")
     if output_dim != 1:
         raise ArchitectureError(
-            "Only single-output (binary classification) networks are supported: the quantum "
-            "readout is one Z-expectation. Multi-class output (output_dim > 1) is not implemented."
+            "The network must have one output (class 1 or not): the quantum network answers with one chance."
         )
 
     layers: List[LayerSpec] = []
@@ -87,38 +73,35 @@ def parse_architecture(raw_layers: List[Dict], input_dim: int, output_dim: int =
         layer_type = str(raw.get("type", "dense")).lower()
         if layer_type not in SUPPORTED_LAYER_TYPES:
             raise ArchitectureError(
-                f"Layer {i}: unsupported layer type '{layer_type}'. Supported: {sorted(SUPPORTED_LAYER_TYPES)}. "
-                "Convolutional / recurrent / attention layers have no direct gate-level analogue in "
-                "this module and are not approximated -- remove them or express the network with "
-                "Dense layers only."
+                f"Layer {i + 1}: '{layer_type}' layers can't be converted. Use Dense and Dropout layers: "
+                "convolution, recurrent and attention layers have no counterpart in this circuit, and "
+                "they aren't approximated."
             )
 
         if layer_type == "dropout":
             layers.append(LayerSpec(type="dropout"))
             warnings.append(
-                f"Layer {i}: Dropout is a training-time regulariser with no quantum-circuit "
-                "equivalent (a variational circuit has no 'units' to randomly drop). It is kept in "
-                "the parsed architecture for bookkeeping but skipped when generating the quantum circuit."
+                f"Layer {i + 1} (Dropout) has nothing to become in the circuit: it switches off random "
+                "neurons while the classical network trains, and a circuit has no neurons to switch off. "
+                "The classical network keeps it; the circuit skips it."
             )
             continue
 
         units = raw.get("units")
         if not isinstance(units, int) or isinstance(units, bool) or not (MIN_UNITS <= units <= MAX_UNITS):
-            raise ArchitectureError(f"Layer {i}: 'units' must be an integer in [{MIN_UNITS}, {MAX_UNITS}].")
+            raise ArchitectureError(f"Layer {i + 1}: the number of neurons must be a whole number from {MIN_UNITS} to {MAX_UNITS} (one qubit each).")
 
         activation = str(raw.get("activation", "relu")).lower()
         if activation in UNSUPPORTED_ACTIVATIONS_WITH_REASON:
-            raise ArchitectureError(f"Layer {i}: {UNSUPPORTED_ACTIVATIONS_WITH_REASON[activation]}")
+            raise ArchitectureError(f"Layer {i + 1}: {UNSUPPORTED_ACTIVATIONS_WITH_REASON[activation]}")
         if activation not in SUPPORTED_ACTIVATIONS:
-            raise ArchitectureError(
-                f"Layer {i}: unsupported activation '{activation}'. Supported: {sorted(SUPPORTED_ACTIVATIONS)}."
-            )
+            raise ArchitectureError(f"Layer {i + 1}: the activation '{activation}' isn't available. Use relu, tanh or sigmoid.")
 
         layers.append(LayerSpec(type="dense", units=units, activation=activation))
 
     dense_layers = [l for l in layers if l.type == "dense"]
     if not dense_layers:
-        raise ArchitectureError("At least one Dense layer is required -- Dropout alone has nothing to map.")
+        raise ArchitectureError("Add at least one Dense layer: Dropout on its own has nothing to convert.")
 
     return ParsedArchitecture(
         input_dim=input_dim, output_dim=output_dim,

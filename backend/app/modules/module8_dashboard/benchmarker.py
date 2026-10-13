@@ -32,11 +32,11 @@ from ..module5_transformer.bridge import maxcut_bridge
 Emit = Callable[[Dict[str, Any]], None]
 
 SUITES: Dict[str, Dict[str, str]] = {
-    "search":       {"title": "Search — Grover vs linear search", "module": "Module 2"},
-    "factoring":    {"title": "Factoring — Shor vs trial division", "module": "Module 2"},
-    "optimization": {"title": "Optimisation — QAOA vs exhaustive search (Max-Cut)", "module": "Modules 2 + 5"},
-    "kernel":       {"title": "Memory wall — simulation cost vs qubits", "module": "Module 1"},
-    "ai":           {"title": "AI — quantum vs classical learning", "module": "Modules 6 + 7"},
+    "search":       {"title": "Search — Grover vs linear search", "module": "Quantum vs Classical"},
+    "factoring":    {"title": "Factoring — Shor vs trial division", "module": "Quantum vs Classical"},
+    "optimization": {"title": "Optimisation — QAOA vs exhaustive search (Max-Cut)", "module": "Quantum vs Classical + Code to Quantum"},
+    "kernel":       {"title": "Memory wall — simulation cost vs qubits", "module": "Quantum Simulator"},
+    "ai":           {"title": "AI — quantum vs classical learning", "module": "Neural Optimizer + Neural Network Converter"},
 }
 
 DEFAULT_OPTIONS = {"search_max_qubits": 12, "factoring_max_n": 91, "maxcut_max_nodes": 10,
@@ -173,26 +173,20 @@ def _kernel(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
 
 def _ai(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
     from ..module6_optimizer import race
-    from ..module6_optimizer.dataset import FEATURE_DIM, get_toy_classification_dataset
-    from ..module7_qnn import convert_architecture, parse_architecture, train_classical_mlp, train_qnn
+    from ..module7_qnn import compare
+    from ..module7_qnn.trainer import DEFAULT_LAYERS
 
     iters = opt["ai_iterations"]
-    X, y = get_toy_classification_dataset()
-    parsed = parse_architecture([{"type": "dense", "units": 4, "activation": "relu"},
-                                 {"type": "dense", "units": 4, "activation": "relu"}],
-                                input_dim=FEATURE_DIM, output_dim=1)
-    conv = convert_architecture(parsed)
+    # The Neural Network Converter: a classical network (2 layers of 4) and the quantum network it becomes, one seed.
     t0 = time.perf_counter()
-    mlp_curve, mlp_acc, _ = train_classical_mlp(parsed, X, y, iters)
-    mlp_ms = (time.perf_counter() - t0) * 1000
-    t0 = time.perf_counter()
-    qnn_curve, qnn_acc = train_qnn(conv.qnn.n_qubits, conv.qnn.n_layers, X, y, iters)
-    qnn_ms = (time.perf_counter() - t0) * 1000
-    p1 = {"experiment": "qnn_vs_mlp", "label": "Classical MLP vs Quantum Neural Network (Module 7)",
-          "classical_accuracy": mlp_acc, "quantum_accuracy": qnn_acc,
-          "classical_params": conv.classical_params, "quantum_params": conv.qnn.trainable_angles,
-          "classical_curve": [round(v, 5) for v in mlp_curve], "quantum_curve": [round(v, 5) for v in qnn_curve],
-          "classical_ms": round(mlp_ms, 1), "quantum_ms": round(qnn_ms, 1), "qubits": conv.qnn.n_qubits}
+    rep = compare(DEFAULT_LAYERS, "xor", steps=iters, seeds=1)
+    m7_ms = (time.perf_counter() - t0) * 1000
+    cl, qn = rep["methods"]["classical"], rep["methods"]["quantum"]
+    p1 = {"experiment": "qnn_vs_mlp", "label": "Classical network vs the quantum network it becomes (XOR, 2 layers of 4)",
+          "classical_accuracy": cl["test_accuracy"]["mean"], "quantum_accuracy": qn["test_accuracy"]["mean"],
+          "classical_params": cl["params"], "quantum_params": qn["params"],
+          "classical_curve": cl["curve_mean"], "quantum_curve": qn["curve_mean"],
+          "total_ms": round(m7_ms, 1), "qubits": rep["conversion"]["qnn"]["n_qubits"]}
     emit(p1)
     # The Neural Optimizer's fair race on a deep circuit (6 qubits, 12 layers, 1,000 shots), one seed.
     t0 = time.perf_counter()
@@ -207,8 +201,8 @@ def _ai(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
           "plateau_events": len(rand["events"][0]),
           "total_ms": round(m6_ms, 1), "qubits": rep["n_qubits"]}
     emit(p2)
-    return {"points": 2, "qnn_accuracy": qnn_acc, "mlp_accuracy": mlp_acc,
-            "qnn_params": conv.qnn.trainable_angles, "mlp_params": conv.classical_params,
+    return {"points": 2, "qnn_accuracy": p1["quantum_accuracy"], "mlp_accuracy": p1["classical_accuracy"],
+            "qnn_params": p1["quantum_params"], "mlp_params": p1["classical_params"],
             "neural_optimizer_accuracy": neural["test_accuracy"]}
 
 

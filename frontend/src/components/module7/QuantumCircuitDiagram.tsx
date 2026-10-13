@@ -1,100 +1,91 @@
-import type { QNNSpec } from '../../types';
+const ROW_H = 46;
+const COL_W = 46;
+const LEFT = 40;
+const TOP = 44;
+const BOX = 32;
 
-interface Props {
-  qnn: QNNSpec;
-}
+const COLOR = { ry: '#cc44ff', rz: '#ff6bcb', cnot: '#00ffcc', wire: '#3a3a6a', block: '#5555cc', text: '#cccccc', measure: '#e5e7eb' };
 
-const ROW_H = 56;
-const COL_W = 64;
-const LEFT_PAD = 96;
-const TOP_PAD = 24;
-const GATE_R = 14;
+type Column = { kind: 'ry' | 'rz'; block: number; qubits: number } | { kind: 'cnot'; block: number; control: number } | { kind: 'measure' };
 
-type Column =
-  | { kind: 'rx' }
-  | { kind: 'ry' }
-  | { kind: 'rz' }
-  | { kind: 'cnot'; control: number; target: number }
-  | { kind: 'measure' };
-
-function buildColumns(n_qubits: number, n_layers: number): Column[] {
-  const cols: Column[] = [{ kind: 'rx' }];
-  for (let l = 0; l < n_layers; l++) {
-    cols.push({ kind: 'ry' });
-    cols.push({ kind: 'rz' });
-    for (let q = 0; q < n_qubits - 1; q++) cols.push({ kind: 'cnot', control: q, target: q + 1 });
-  }
+function columns(blocks: number[]): Column[] {
+  const cols: Column[] = [];
+  blocks.forEach((u, b) => {
+    cols.push({ kind: 'ry', block: b, qubits: u }, { kind: 'rz', block: b, qubits: u });
+    for (let c = u - 1; c >= 1; c--) cols.push({ kind: 'cnot', block: b, control: c });
+  });
   cols.push({ kind: 'measure' });
   return cols;
 }
 
-/** Static SVG rendering of the generated variational circuit — RX angle-encoding,
- * then (RY + RZ + CNOT-chain) per mapped Dense layer, then measurement — matching
- * exactly what quantum_layer.py executes, not an illustrative approximation. */
-export function QuantumCircuitDiagram({ qnn }: Props) {
-  const { n_qubits, n_layers } = qnn;
-  const columns = buildColumns(n_qubits, n_layers);
-  const width = LEFT_PAD + columns.length * COL_W + 40;
-  const height = TOP_PAD * 2 + (n_qubits - 1) * ROW_H + 20;
-
-  const yFor = (q: number) => TOP_PAD + q * ROW_H;
-  const xFor = (i: number) => LEFT_PAD + i * COL_W + COL_W / 2;
+/**
+ * The converted circuit exactly as it runs: one block per Dense layer, on as many qubits as that layer has
+ * neurons. Each qubit is turned by RY(w·x + b) and RZ(φ), then CNOTs pass each result down to q0, which is measured.
+ */
+export function QuantumCircuitDiagram({ blocks, labels }: { blocks: number[]; labels: string[] }) {
+  const n = Math.max(...blocks);
+  const cols = columns(blocks);
+  const width = LEFT + cols.length * COL_W + 16;
+  const height = TOP + (n - 1) * ROW_H + 30;
+  const y = (q: number) => TOP + q * ROW_H;
+  const x = (i: number) => LEFT + i * COL_W + COL_W / 2;
+  const spans = blocks.map((u, b) => {
+    const idx = cols.map((c, i) => ('block' in c && c.block === b ? i : -1)).filter(i => i >= 0);
+    return { b, u, first: idx[0], last: idx[idx.length - 1] };
+  });
+  const summary = `Circuit with ${n} qubit${n > 1 ? 's' : ''} and ${blocks.length} block${blocks.length > 1 ? 's' : ''}: `
+    + blocks.map((u, b) => `block ${b + 1} on ${u} qubit${u > 1 ? 's' : ''}`).join(', ') + '; q0 is measured.';
 
   return (
     <div className="overflow-x-auto">
-      <svg width={width} height={height} className="min-w-full" style={{ minWidth: width }}>
-        {/* Qubit wires + labels */}
-        {Array.from({ length: n_qubits }).map((_, q) => (
-          <g key={`wire-${q}`}>
-            <text x={8} y={yFor(q) + 4} fontSize={12} fill="#888" fontFamily="monospace">
-              q{q}
-            </text>
-            <line x1={LEFT_PAD} y1={yFor(q)} x2={width - 20} y2={yFor(q)} stroke="#3a3a6a" strokeWidth={1.5} />
+      <svg width={width} height={height} role="img" aria-label={summary} style={{ minWidth: width }}>
+        {spans.map(s => (
+          <g key={`block-${s.b}`}>
+            <rect x={x(s.first) - COL_W / 2 + 3} y={TOP - 34} width={(s.last - s.first + 1) * COL_W - 6}
+              height={(s.u - 1) * ROW_H + 34 + BOX / 2 + 8} rx={8} fill="rgba(85,85,204,0.08)" stroke={COLOR.block} strokeDasharray="4 4" />
+            <text x={x(s.first) - COL_W / 2 + 10} y={TOP - 20} fontSize={12} fill={COLOR.text}>{labels[s.b] ?? `Block ${s.b + 1}`}</text>
           </g>
         ))}
-
-        {columns.map((col, i) => {
-          const x = xFor(i);
-          if (col.kind === 'rx' || col.kind === 'ry' || col.kind === 'rz') {
-            const label = col.kind.toUpperCase();
-            const color = col.kind === 'rx' ? '#00ffcc' : col.kind === 'ry' ? '#cc44ff' : '#ff6bcb';
+        {Array.from({ length: n }, (_, q) => (
+          <g key={`wire-${q}`}>
+            <text x={6} y={y(q) + 4} fontSize={12} fill="#aaaaaa" fontFamily="monospace">q{q}</text>
+            <line x1={LEFT - 6} y1={y(q)} x2={q === 0 ? x(cols.length - 1) - BOX / 2 : width - 12} y2={y(q)} stroke={COLOR.wire} strokeWidth={1.5} />
+          </g>
+        ))}
+        {cols.map((c, i) => {
+          const cx = x(i);
+          if (c.kind === 'ry' || c.kind === 'rz') {
+            const color = c.kind === 'ry' ? COLOR.ry : COLOR.rz;
             return (
               <g key={i}>
-                {Array.from({ length: n_qubits }).map((_, q) => (
+                {Array.from({ length: c.qubits }, (_, q) => (
                   <g key={q}>
-                    <rect x={x - 18} y={yFor(q) - 14} width={36} height={28} rx={6} fill="#12122b" stroke={color} strokeWidth={1.5} />
-                    <text x={x} y={yFor(q) + 4} fontSize={11} fill={color} fontFamily="monospace" textAnchor="middle" fontWeight={700}>
-                      {label}
+                    <rect x={cx - BOX / 2} y={y(q) - BOX / 2} width={BOX} height={BOX} rx={6} fill="#12122b" stroke={color} strokeWidth={1.5} />
+                    <text x={cx} y={y(q) + 4} fontSize={12} fill={color} fontFamily="monospace" textAnchor="middle" fontWeight={700}>
+                      {c.kind === 'ry' ? 'RY' : 'RZ'}
                     </text>
                   </g>
                 ))}
               </g>
             );
           }
-          if (col.kind === 'cnot') {
-            const yC = yFor(col.control);
-            const yT = yFor(col.target);
+          if (c.kind === 'cnot') {
+            const yc = y(c.control);
+            const yt = y(c.control - 1);
             return (
               <g key={i}>
-                <line x1={x} y1={yC} x2={x} y2={yT} stroke="#00ffcc" strokeWidth={1.5} />
-                <circle cx={x} cy={yC} r={5} fill="#00ffcc" />
-                <circle cx={x} cy={yT} r={GATE_R} fill="none" stroke="#00ffcc" strokeWidth={1.5} />
-                <line x1={x - GATE_R} y1={yT} x2={x + GATE_R} y2={yT} stroke="#00ffcc" strokeWidth={1.5} />
-                <line x1={x} y1={yT - GATE_R} x2={x} y2={yT + GATE_R} stroke="#00ffcc" strokeWidth={1.5} />
+                <line x1={cx} y1={yc} x2={cx} y2={yt - 11} stroke={COLOR.cnot} strokeWidth={1.5} />
+                <circle cx={cx} cy={yc} r={5} fill={COLOR.cnot} />
+                <circle cx={cx} cy={yt} r={11} fill="none" stroke={COLOR.cnot} strokeWidth={1.5} />
+                <line x1={cx - 11} y1={yt} x2={cx + 11} y2={yt} stroke={COLOR.cnot} strokeWidth={1.5} />
+                <line x1={cx} y1={yt - 11} x2={cx} y2={yt + 11} stroke={COLOR.cnot} strokeWidth={1.5} />
               </g>
             );
           }
-          // measure
           return (
             <g key={i}>
-              {Array.from({ length: n_qubits }).map((_, q) => (
-                <g key={q}>
-                  <rect x={x - 22} y={yFor(q) - 14} width={44} height={28} rx={6} fill="#12122b" stroke="#8888aa" strokeWidth={1.5} />
-                  <text x={x} y={yFor(q) + 4} fontSize={9} fill="#aaa" fontFamily="monospace" textAnchor="middle">
-                    {q === 0 ? 'M ⟨Z⟩' : 'M'}
-                  </text>
-                </g>
-              ))}
+              <rect x={cx - BOX / 2} y={y(0) - BOX / 2} width={BOX} height={BOX} rx={6} fill="#12122b" stroke={COLOR.measure} strokeWidth={1.5} />
+              <text x={cx} y={y(0) + 4} fontSize={12} fill={COLOR.measure} fontFamily="monospace" textAnchor="middle" fontWeight={700}>M</text>
             </g>
           );
         })}

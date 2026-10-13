@@ -61,7 +61,7 @@ function Section({ step, title, icon, children }: { step: number; title: string;
   return (
     <section aria-labelledby={id} className="bg-quantum-800 border border-quantum-700 rounded-2xl p-5 sm:p-6 mb-6">
       <h2 id={id} className="flex items-center gap-2 text-white font-bold text-lg mb-2">
-        {icon}<span className="text-gray-400 font-normal">{step} ·</span> {title}
+        {icon}<span className="text-gray-400 font-normal flex-shrink-0 whitespace-nowrap">{step} ·</span> {title}
       </h2>
       {children}
     </section>

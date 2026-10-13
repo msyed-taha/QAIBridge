@@ -33,12 +33,12 @@ import math
 import os
 import threading
 import time
-from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 
+from ..kept_results import KeptResults
 from . import vqc
 from .angle_net import AngleNet
 from .barren_monitor import PlateauMonitor
@@ -62,37 +62,9 @@ DEFAULT_SHOTS = 1000
 WARM_UP = os.getenv("NEURAL_OPTIMIZER_WARM_UP", "1") == "1"
 
 # Results are the same every time for the same settings (fixed seeds), so they are kept.
-_cache: "OrderedDict[tuple, Dict[str, Any]]" = OrderedDict()
-_running: Dict[tuple, threading.Event] = {}
-_cache_lock = threading.Lock()
+_cache = KeptResults(32)
+_cached = _cache.get
 _warming = threading.Lock()
-
-
-def _cached(key: tuple, make) -> Dict[str, Any]:
-    """The kept result, or make it; if the same run is already being made, wait for it instead of repeating it."""
-    while True:
-        with _cache_lock:
-            if key in _cache:
-                _cache.move_to_end(key)
-                return {**_cache[key], "cached": True}
-            done = _running.get(key)
-            mine = done is None
-            if mine:
-                done = _running[key] = threading.Event()
-        if not mine:
-            done.wait(timeout=600)
-            continue
-        try:
-            value = make()
-            with _cache_lock:
-                _cache[key] = value
-                while len(_cache) > 32:
-                    _cache.popitem(last=False)
-            return {**value, "cached": False}
-        finally:
-            with _cache_lock:
-                _running.pop(key, None)
-            done.set()
 
 
 def warm_up() -> None:

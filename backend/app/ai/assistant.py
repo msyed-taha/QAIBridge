@@ -31,7 +31,7 @@ PAGES: Dict[str, str] = {
     "/module2": "Quantum vs Classical: Grover, Shor, QAOA and amplitude amplification next to the best classical method on the same input",
     "/solve": "Problem Solver: run search, factoring, route planning or a database query on your own data",
     "/module6": "Neural Optimizer: see barren plateaus (why big quantum circuits stop learning), race four ways to train a quantum classifier (random start, random start with a plateau monitor, near-zero start, a neural network that outputs the angles), and train a network that predicts QAOA angles",
-    "/module7": "Neural Network Converter: turn a classical neural network into a quantum one and compare them",
+    "/module7": "Neural Network Converter: describe a classical neural network; each neuron becomes a qubit and each layer a block of gates; then both networks (and the quantum one warm-started from the classical weights) train fairly on XOR, circles, moons or two groups, and are compared on unseen test points, with maps of what each learned",
     "/dashboard": "Dashboard: benchmarks, your saved runs and CSV export",
     "/work": "My work: your saved circuits and projects",
     "/account": "Account settings",

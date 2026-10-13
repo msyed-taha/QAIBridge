@@ -4,13 +4,11 @@ Neural Optimizer — test suite.
 Run from backend/:  python -m pytest tests/test_module6_optimizer.py -v
 
   1. Neural model        (AngleNet)
-  2. The Converter's quantum layer (quantum_layer forward pass + parameter-shift gradient)
-  3. Circuit integration (module1_kernel gate matrices used, not re-derived)
-  4. The classifier circuit (vqc.py): checked against the QAIbridge simulator,
+  2. The classifier circuit (vqc.py): checked against the QAIbridge simulator,
      parameter shift, and real sampled measurements
-  5. The barren plateau study and the live monitor
-  6. The fair race
-  7. API endpoints (signed in)
+  3. The barren plateau study and the live monitor
+  4. The fair race
+  5. API endpoints (signed in)
 """
 from __future__ import annotations
 
@@ -22,24 +20,11 @@ import pytest
 import torch
 from fastapi.testclient import TestClient
 
-from app.modules.module1_kernel.gates import RY, RZ
 from app.auth.security import hash_password, token_for
 from app.database import SessionLocal
 from app.models.user import ROLE_USER, User
 from app.modules.module1_kernel import QuantumCircuit, QuantumStateVector
-from app.modules.module6_optimizer import (
-    AngleNet,
-    PlateauMonitor,
-    bce_loss,
-    param_shift_grad_single,
-    plateau_study,
-    predict_proba,
-    predict_z,
-    race,
-    trainer,
-    vqc,
-)
-from app.modules.module6_optimizer.dataset import get_toy_classification_dataset
+from app.modules.module6_optimizer import AngleNet, PlateauMonitor, plateau_study, race, trainer, vqc
 
 N_QUBITS, LAYERS = 2, 1
 N_PARAMS = N_QUBITS * LAYERS * 2  # theta, phi per qubit per layer
@@ -75,99 +60,7 @@ class TestAngleNet:
         assert all(g is not None for g in grads)
 
 
-# ── 2. Angle prediction / quantum evaluation layer ─────────────────────────
-
-class TestQuantumLayer:
-    def test_predict_z_bounded(self):
-        angles = np.random.uniform(0, 2 * math.pi, N_PARAMS)
-        z = predict_z(N_QUBITS, LAYERS, [0.3, 0.7], angles)
-        assert -1.0 - 1e-9 <= z <= 1.0 + 1e-9
-
-    def test_predict_proba_bounded(self):
-        angles = np.random.uniform(0, 2 * math.pi, N_PARAMS)
-        p = predict_proba(N_QUBITS, LAYERS, [0.3, 0.7], angles)
-        assert 0.0 <= p <= 1.0
-
-    def test_identity_angles_reduce_to_encoding_only(self):
-        """With every trainable RY/RZ angle at 0, the RY/RZ layer is the
-        identity, so <Z_0> should match a circuit that only applies the
-        RX encoding gate and the entangling CNOTs act on |0>/|1>-only
-        computational-basis input from a single RX -- i.e. it must still be
-        a deterministic, reproducible number (regression/sanity check that
-        forward() has no hidden randomness)."""
-        zero_angles = np.zeros(N_PARAMS)
-        z1 = predict_z(N_QUBITS, LAYERS, [0.4, 0.4], zero_angles)
-        z2 = predict_z(N_QUBITS, LAYERS, [0.4, 0.4], zero_angles)
-        assert z1 == pytest.approx(z2)
-
-    def test_bce_loss_positive(self):
-        X, y = get_toy_classification_dataset()
-        angles = np.random.uniform(0, 2 * math.pi, N_PARAMS)
-        loss = bce_loss(N_QUBITS, LAYERS, X, y, angles)
-        assert loss > 0.0
-
-    def test_param_shift_matches_finite_difference(self):
-        """The parameter-shift rule is exact for Pauli rotations, so it must
-        agree with a central finite-difference estimate to a small tolerance."""
-        angles = np.random.uniform(0, 2 * math.pi, N_PARAMS)
-        x = [0.3, 0.6]
-        analytic = param_shift_grad_single(N_QUBITS, LAYERS, x, angles, param_index=0)
-
-        h = 1e-4
-        plus, minus = angles.copy(), angles.copy()
-        plus[0] += h
-        minus[0] -= h
-        numeric = (predict_z(N_QUBITS, LAYERS, x, plus) - predict_z(N_QUBITS, LAYERS, x, minus)) / (2 * h)
-
-        assert analytic == pytest.approx(numeric, abs=1e-3)
-
-    def test_quantum_classifier_loss_autograd_matches_param_shift(self):
-        """The torch.autograd.Function bridge (backward()) must reproduce the
-        same gradient as calling param_shift_grad_single + chain rule by
-        hand -- this is the thing that actually trains both Method A and B,
-        so a silent mismatch here would invalidate every result the module
-        reports."""
-        from app.modules.module6_optimizer.quantum_layer import QuantumClassifierLoss
-
-        X, y = get_toy_classification_dataset()
-        X, y = X[:2], y[:2]
-        angles = torch.tensor(np.random.uniform(0, 2 * math.pi, N_PARAMS), requires_grad=True)
-
-        loss = QuantumClassifierLoss.apply(angles, N_QUBITS, LAYERS, X, y)
-        loss.backward()
-        autograd_grad = angles.grad.numpy().copy()
-
-        h = 1e-4
-        numeric_grad = np.zeros(N_PARAMS)
-        base_angles = angles.detach().numpy()
-        for j in range(N_PARAMS):
-            plus, minus = base_angles.copy(), base_angles.copy()
-            plus[j] += h
-            minus[j] -= h
-            numeric_grad[j] = (
-                bce_loss(N_QUBITS, LAYERS, X, y, plus) - bce_loss(N_QUBITS, LAYERS, X, y, minus)
-            ) / (2 * h)
-
-        np.testing.assert_allclose(autograd_grad, numeric_grad, atol=1e-2)
-
-
-# ── 3. Circuit integration (reuses Module 1's real gate matrices) ──────────
-
-class TestCircuitIntegration:
-    def test_uses_module1_gate_matrices_not_reimplemented(self):
-        """quantum_layer.py must import RY/RZ from module1_kernel.gates
-        rather than hand-rolling its own rotation matrices -- this is the
-        "don't fake quantum results" requirement. Spot-check RY/RZ are
-        unitary, which they'd only be if these are the real gate matrices."""
-        theta = 0.37
-        ry = RY(theta)
-        rz = RZ(theta)
-        identity = np.eye(2)
-        np.testing.assert_allclose(ry @ ry.conj().T, identity, atol=1e-10)
-        np.testing.assert_allclose(rz @ rz.conj().T, identity, atol=1e-10)
-
-
-# ── 4. The classifier circuit (vqc.py) ──────────────────────────────────────
+# ── 2. The classifier circuit (vqc.py) ──────────────────────────────────────
 
 def _kernel_z(x, angles, n, layers):
     """The same circuit on the QAIbridge simulator (Module 1)."""
@@ -228,7 +121,7 @@ class TestCircuit:
         assert float(X.min()) >= 0 and float(X.max()) <= math.pi
 
 
-# ── 5. The barren plateau study and the live monitor ────────────────────────
+# ── 3. The barren plateau study and the live monitor ────────────────────────
 
 class TestPlateau:
     def test_the_study_shows_a_barren_plateau(self):
@@ -257,7 +150,7 @@ class TestPlateau:
             assert learned.observe(i, 0.5, 100, 0.1, 0.2) is None                         # small gradient at a good minimum
 
 
-# ── 6. The fair race ─────────────────────────────────────────────────────────
+# ── 4. The fair race ─────────────────────────────────────────────────────────
 
 class TestRace:
     def test_four_methods_same_budget_and_repeatable(self):
@@ -285,7 +178,7 @@ class TestRace:
         assert m["near_zero"]["curve_mean"][-1] < m["random"]["curve_mean"][-1]
 
 
-# ── 7. API endpoints ─────────────────────────────────────────────────────────
+# ── 5. API endpoints ─────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def client():

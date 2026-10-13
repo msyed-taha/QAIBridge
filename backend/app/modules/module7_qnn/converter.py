@@ -1,138 +1,102 @@
 """
-Module 7 - Classical to Quantum Neural Network (QNN) Converter
-converter.py - Mapping Engine: rule-based mapping from a *parsed* classical
-MLP architecture (architecture.py) to an equivalent quantum variational
-circuit spec, plus structural comparison metrics.
+Neural Network Converter — the conversion rules, and the report the page shows.
 
-Mapping rules (see architecture.py for the Parser stage that runs first):
-  * Input features -> one qubit each, angle-encoded via RX(x_i). Qubits are
-    fixed at the feature count and REUSED across every block -- unlike a
-    classical layer, a variational circuit doesn't grow a qubit per hidden
-    unit, so "neurons per layer" has no 1:1 quantum counterpart. This is
-    the single most important thing to get right in an FYP viva: the
-    mapping is structural (same number of *transformation stages*), not a
-    literal neuron-for-qubit substitution.
-  * Each classical Dense layer -> one variational block: RY(theta)+RZ(phi)
-    on every qubit (the trainable transformation, playing the role of that
-    layer's weights) followed by a CNOT entangling chain (there is no
-    classical analogue of entanglement -- it's what lets the circuit
-    represent correlations between features that a single qubit alone
-    could not, loosely analogous to why a Dense layer mixes all its
-    inputs rather than treating them independently).
-  * Dropout layers contribute no block (see architecture.py) -- this is
-    recorded as a warning, not silently dropped.
-  * Final layer -> Z-expectation of qubit 0, mapped through (<Z>+1)/2 into
-    a class probability -- the quantum analogue of an output neuron+sigmoid.
+    classical                         quantum (circuit.py)
+    a Dense layer of u units      →   a block on qubits q0…q(u−1)
+    neuron j: act(w_j · x + b_j)  →   qubit j turned by RY(w_j · x + b_j), then RZ(φ_j)
+    the next layer mixes them     →   CNOTs q(u−1)→…→q0 pass each qubit's result down to q0
+    Dropout                       →   nothing (no counterpart; the report says so)
+    output neuron + sigmoid       →   measure q0: its chance of 1
+
+The activation has no gate of its own: a qubit's chance of 1 follows a cosine
+curve of its angle, which is the circuit's built-in non-linearity. The report
+says that too, and that this converts the structure, not the exact function.
 """
-
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from .architecture import ParsedArchitecture
+from .circuit import classical_size, quantum_size
 
 
 @dataclass
 class QNNSpec:
-    n_qubits:          int
-    n_layers:           int
-    trainable_angles:   int
-    circuit_depth:       int
-    encoding:            str
-    gate_sequence:        List[str] = field(default_factory=list)  # e.g. ["RX x2", "RY x4", "RZ x4", "CNOT x2"]
+    n_qubits: int
+    blocks: List[int]                   # qubits used by each block, in order
+    trainable: int                      # weights, biases and phases: 4 per qubit per block
+    depth: int                          # gate steps, CNOTs one after another
+    gates: Dict[str, int]
 
 
 @dataclass
 class ConversionReport:
-    classical_layer_sizes: List[int]
-    classical_neurons:      int
-    classical_params:       int
-    classical_depth:        int
-    qnn:                     QNNSpec
-    mapping_steps:            List[str]
-    comparison_rows:           List[Dict[str, Union[str, int]]] = field(default_factory=list)
-    approximation_notes:        List[str] = field(default_factory=list)
+    classical_layer_sizes: List[int]    # inputs, each Dense layer, output
+    classical_params: int
+    qnn: QNNSpec
+    rows: List[Dict[str, Optional[Union[str, int]]]] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         return asdict(self)
 
 
-def _classical_param_count(layer_sizes: List[int]) -> int:
-    total = 0
-    for a, b in zip(layer_sizes[:-1], layer_sizes[1:]):
-        total += a * b + b  # weights + biases
-    return total
-
-
 def convert_architecture(parsed: ParsedArchitecture) -> ConversionReport:
-    n_qubits = parsed.input_dim  # one qubit per input feature (angle-encoding register)
-    n_hidden_layers = len(parsed.dense_layers)
+    layers = [{"type": l.type, "units": l.units, "activation": l.activation} for l in parsed.layers]
+    units = [l.units for l in parsed.dense_layers]
+    sizes = [parsed.input_dim, *units, parsed.output_dim]
 
-    layer_sizes = [parsed.input_dim, *(l.units for l in parsed.dense_layers), parsed.output_dim]
-    trainable_angles = n_qubits * n_hidden_layers * 2  # theta (RY) + phi (RZ) per qubit per layer
-    circuit_depth = 1 + n_hidden_layers * 2            # 1 encoding round + (rotation + entangle) per layer
-    n_entangling_gates = n_hidden_layers * max(n_qubits - 1, 0)
+    rows: List[Dict[str, Optional[Union[str, int]]]] = []
+    inputs, block = parsed.input_dim, 0
+    for layer in parsed.layers:
+        if layer.type == "dropout":
+            rows.append({"classical": "Dropout (switches off 20% of neurons while training)", "classical_params": 0,
+                         "quantum": "Nothing: a circuit has no neurons to switch off, so it skips this layer",
+                         "quantum_params": None})
+            continue
+        u = layer.units
+        block += 1
+        last = f"q{u - 1}"
+        rows.append({
+            "classical": f"Dense: {u} neuron{'s' if u > 1 else ''}, {layer.activation}",
+            "classical_params": u * (inputs + 1),
+            "quantum": f"Block {block}: qubit q0, turned by RY(w·x + b) and RZ(φ)" if u == 1 else
+                       f"Block {block}: qubits q0–{last}, each turned by RY(w·x + b) and RZ(φ), "
+                       f"then {u - 1} CNOT{'s' if u > 2 else ''} into q0",
+            "quantum_params": 4 * u,
+        })
+        inputs = u
+    rows.append({"classical": "Output: 1 neuron, sigmoid", "classical_params": inputs + 1,
+                 "quantum": "Measure q0: its chance of 1 is the chance of class 1", "quantum_params": 0})
 
-    gate_sequence = [f"RX x{n_qubits}"]
-    if n_hidden_layers:
-        gate_sequence += [
-            f"RY x{n_qubits * n_hidden_layers}",
-            f"RZ x{n_qubits * n_hidden_layers}",
-            f"CNOT x{n_entangling_gates}",
-        ]
-
-    classical_neurons = sum(layer_sizes)
-    classical_params = _classical_param_count(layer_sizes)
-    classical_depth = len(layer_sizes) - 1
-    activations_used = sorted({l.activation for l in parsed.dense_layers if l.activation})
-
-    mapping_steps = [
-        f"Scale the {parsed.input_dim} classical input feature(s) into [0, π] (MinMaxScaler) "
-        f"so they're ready for angle-encoding.",
-        f"Encode each feature onto its own qubit via an RX(x_i) rotation — {n_qubits} qubit(s) total.",
-        f"Map each of the {n_hidden_layers} classical Dense layer(s) to one variational block: "
-        f"RY(θ)+RZ(φ) on every qubit, followed by a CNOT entangling chain. Qubits are reused across "
-        f"blocks the same way neurons are reused across a forward pass — not one qubit per hidden unit.",
-        "Read out the final layer as the Z-expectation of qubit 0, mapped through (⟨Z⟩+1)/2 into a "
-        "class probability — the quantum analogue of a classical output neuron + sigmoid.",
+    notes = [
+        "Each neuron becomes one qubit, and its weights and bias become the angle that turns it: "
+        "the qubit's RY(w·x + b) uses the neuron's own w·x + b.",
+        "A classical neuron is fed numbers, but a qubit can only be turned, so every block reads the two inputs again "
+        "(this is called data re-uploading). The qubits carry their state forward from block to block.",
     ]
-
-    approximation_notes = [
-        "This is a structural mapping (same number of transformation stages), not a claim of "
-        "mathematical equivalence — a variational circuit's expressible function class is not "
-        "identical to an MLP's.",
-    ]
-    approximation_notes.extend(parsed.warnings)
-
-    comparison_rows: List[Dict[str, Union[str, int]]] = [
-        {"metric": "Neurons / Qubits",        "classical": classical_neurons,      "quantum": n_qubits},
-        {"metric": "Trainable parameters",    "classical": classical_params,       "quantum": trainable_angles},
-        {"metric": "Layers / Blocks",         "classical": len(layer_sizes) - 1,   "quantum": n_hidden_layers},
-        {"metric": "Network / Circuit depth", "classical": classical_depth,        "quantum": circuit_depth},
-        {"metric": "Activation",              "classical": ", ".join(activations_used) or "n/a",
-                                                "quantum": "n/a (fixed RY/RZ rotation, not a pointwise nonlinearity)"},
-        {"metric": "Gates",                   "classical": "n/a", "quantum": ", ".join(gate_sequence)},
-        {"metric": "Encoding",                "classical": "n/a", "quantum": "Angle encoding (RX)"},
-        {"metric": "Measurement",             "classical": "n/a (raw output activation)",
-                                                "quantum": "⟨Z⟩ on qubit 0 → class probability"},
-        {"metric": "Entanglement",            "classical": "n/a", "quantum": f"CNOT chain ({n_entangling_gates} gate(s))"},
-    ]
+    activations = sorted({l.activation for l in parsed.dense_layers if l.activation})
+    notes.append(
+        f"The activation ({', '.join(activations)}) has no gate of its own. A qubit's chance of 1 follows a cosine curve "
+        "of its angle, and that curve is the circuit's built-in activation, so relu, tanh and sigmoid all become the same gates."
+    )
+    notes.append(
+        "This converts the network's structure, not exactly what it computes: the two networks can learn different "
+        "functions, which is why the page trains both and compares them."
+    )
+    notes.extend(parsed.warnings)
 
     return ConversionReport(
-        classical_layer_sizes=layer_sizes,
-        classical_neurons=classical_neurons,
-        classical_params=classical_params,
-        classical_depth=classical_depth,
+        classical_layer_sizes=sizes,
+        classical_params=classical_size(layers),
         qnn=QNNSpec(
-            n_qubits=n_qubits,
-            n_layers=n_hidden_layers,
-            trainable_angles=trainable_angles,
-            circuit_depth=circuit_depth,
-            encoding="Angle encoding (RX) + RY/RZ variational blocks + CNOT chain",
-            gate_sequence=gate_sequence,
+            n_qubits=max(units),
+            blocks=units,
+            trainable=quantum_size(units),
+            depth=sum(u + 1 for u in units),
+            gates={"RY": sum(units), "RZ": sum(units), "CNOT": sum(u - 1 for u in units)},
         ),
-        mapping_steps=mapping_steps,
-        comparison_rows=comparison_rows,
-        approximation_notes=approximation_notes,
+        rows=rows,
+        notes=notes,
     )

@@ -117,7 +117,7 @@ export function AiChart({ points }: { points: any[] }) {
   const palette = [[COLORS.classical, COLORS.neon], ['#f59e0b', COLORS.purple]];
   points.forEach((p, i) => {
     const [cc, qc] = palette[i % 2];
-    const name = p.experiment === 'qnn_vs_mlp' ? ['Classical MLP', 'Quantum NN'] : ['Random start', 'Neural Angle Optimizer'];
+    const name = p.experiment === 'qnn_vs_mlp' ? ['Classical network', 'Quantum network'] : ['Random start', 'Neural Angle Optimizer'];
     traces.push({ type: 'scatter', mode: 'lines', name: name[0], x: p.classical_curve.map((_: number, k: number) => k + 1),
       y: p.classical_curve, line: { color: cc, width: 1.5, dash: 'dot' } });
     traces.push({ type: 'scatter', mode: 'lines', name: name[1], x: p.quantum_curve.map((_: number, k: number) => k + 1),

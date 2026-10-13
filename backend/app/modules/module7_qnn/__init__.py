@@ -1,18 +1,18 @@
-"""Module 7 - Classical to Quantum Neural Network (QNN) Converter."""
+"""Neural Network Converter: a classical network, the quantum network it becomes, and a fair comparison of the two."""
 from .architecture import (
     ArchitectureError, LayerSpec, ParsedArchitecture, parse_architecture,
-    MAX_LAYERS, SUPPORTED_LAYER_TYPES, SUPPORTED_ACTIVATIONS,
+    MAX_LAYERS, MAX_UNITS, SUPPORTED_LAYER_TYPES, SUPPORTED_ACTIVATIONS,
 )
 from .converter import ConversionReport, QNNSpec, convert_architecture
-from .classical_nn import build_mlp, train_classical_mlp
-from .parameter_mapping import map_classical_weights_to_angles
-from .qnn_trainer import run_qnn_forward, train_qnn, train_qnn_warm_started
+from .data import DATASETS, dataset, points
+from .parameter_mapping import warm_start
+from .trainer import METHODS, compare, untrained
 
 __all__ = [
     "ArchitectureError", "LayerSpec", "ParsedArchitecture", "parse_architecture",
-    "MAX_LAYERS", "SUPPORTED_LAYER_TYPES", "SUPPORTED_ACTIVATIONS",
+    "MAX_LAYERS", "MAX_UNITS", "SUPPORTED_LAYER_TYPES", "SUPPORTED_ACTIVATIONS",
     "ConversionReport", "QNNSpec", "convert_architecture",
-    "build_mlp", "train_classical_mlp",
-    "map_classical_weights_to_angles",
-    "run_qnn_forward", "train_qnn", "train_qnn_warm_started",
+    "DATASETS", "dataset", "points",
+    "warm_start",
+    "METHODS", "compare", "untrained",
 ]

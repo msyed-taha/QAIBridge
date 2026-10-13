@@ -47,7 +47,7 @@ export const TOOLS: Tool[] = [
     desc: 'See why big quantum circuits stop learning, race four ways to train one fairly, and let a neural network learn QAOA angles.' },
   { module: 7, path: '/module7', name: 'Neural Network Converter', group: 'research', icon: Network, color: '#3b82f6',
     short: 'Classical network → quantum network',
-    desc: 'Turn a classical neural network into a quantum one, then train both and compare.' },
+    desc: 'Turn a classical neural network into a quantum one, neuron by neuron, then train both fairly and see what each learned.' },
   { module: 8, path: '/dashboard', alsoAt: ['/module8'], name: 'Performance Dashboard', group: 'results', icon: BarChart2, color: '#fbbf24',
     short: 'Benchmarks and your saved runs',
     desc: 'Live quantum vs classical benchmarks, your saved runs, and CSV export.' },

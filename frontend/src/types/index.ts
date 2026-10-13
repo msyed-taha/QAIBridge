@@ -79,67 +79,6 @@ export type QasmInspect =
       labels: string[]; example: string | null }
   | { ok: false; error: QasmProblem };
 
-// ── Module 7 – QNN Converter Types ───────────────────────────────────────────
-
-export type LayerType = 'dense' | 'dropout';
-
-export interface LayerSpec {
-  type: LayerType;
-  units?: number;
-  activation?: 'relu' | 'tanh' | 'sigmoid';
-}
-
-export interface ParsedArchitecture {
-  input_dim: number;
-  output_dim: number;
-  layers: { type: LayerType; units: number | null; activation: string | null }[];
-  dense_layer_count: number;
-  warnings: string[];
-}
-
-export interface QNNSpec {
-  n_qubits: number;
-  n_layers: number;
-  trainable_angles: number;
-  circuit_depth: number;
-  encoding: string;
-  gate_sequence: string[];
-}
-
-export interface ComparisonRow {
-  metric: string;
-  classical: string | number;
-  quantum: string | number;
-}
-
-export interface ConversionReport {
-  classical_layer_sizes: number[];
-  classical_neurons: number;
-  classical_params: number;
-  classical_depth: number;
-  qnn: QNNSpec;
-  mapping_steps: string[];
-  comparison_rows: ComparisonRow[];
-  approximation_notes: string[];
-}
-
-export interface TrainCompareReport {
-  conversion: ConversionReport;
-  classical_loss_curve: number[];
-  quantum_loss_curve: number[];
-  quantum_warm_loss_curve: number[];
-  classical_accuracy: number;
-  quantum_accuracy: number;
-  quantum_warm_accuracy: number;
-}
-
-export interface SimulateResult {
-  predictions: number[];
-  labels: number[];
-  accuracy: number;
-  angles_used: number[];
-}
-
 // ── Admin actor ──────────────────────────────────────────────────────────────
 
 export type Role = 'user' | 'admin';
