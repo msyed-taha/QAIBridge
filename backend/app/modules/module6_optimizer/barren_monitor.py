@@ -1,100 +1,82 @@
 """
-Module 6 - Neural Angle Optimizer
-barren_monitor.py - Live Barren Plateau Monitor.
+Neural Optimizer — the live barren plateau monitor.
 
-`trainer.measure_barren_plateau()` is a separate, ex-post diagnostic: it
-samples random qubit counts and parameter vectors *outside* of any actual
-training run. This module is the complement -- it watches the real gradient
-signal produced at each step of an actual optimization run (classical or
-neural) and can trigger a mitigation while that run is still in progress.
+A barren plateau is a training landscape so flat that the true gradient is
+smaller than the error in measuring it (McClean et al., 2018). On a quantum
+computer every gradient is estimated from a finite number of shots, so the
+monitor asks the question that matters there: is there any signal left in
+this step's gradient, or is it only measurement noise?
 
-Two signals are tracked, both tied directly to how the Barren Plateau
-phenomenon is defined (McClean et al., 2018):
+    noise power   = (number of angles) × (noise per angle)²     known from the shot statistics
+    signal power  = |measured gradient|² − noise power           the part noise doesn't explain
+    signal/noise  = signal power ÷ noise power
 
-1. Gradient magnitude  -- ||dL/d(angles)||, read for free off the backward
-   pass the optimizer step already requires (no extra circuit evaluations).
-2. Gradient variance    -- variance of that magnitude over a sliding window.
-
-Magnitude alone is a weak signal: a run that is simply near a good minimum
-also has a small gradient. Requiring the *variance* to also be small
-distinguishes "converged" (small, but still changing/noisy near the optimum)
-from "stuck" (small AND flat, step after step) -- the actual signature of a
-barren plateau.
-
-If both signals stay under threshold for `patience` consecutive iterations,
-a PlateauEvent is raised and the caller may apply a mitigation. The only
-mitigation wired up here is parameter reinitialisation (restart the stuck
-parameters at a small-angle configuration) -- a real, explainable recovery
-technique, not five half-implemented ones. Layer-wise training, meta-learned
-restarts, adaptive-LR schedules etc. are noted as future work rather than
-bolted on half-finished.
+A device can work all of this out from its own measurements. One noisy step
+proves nothing (Adam still makes progress by averaging steps), so the monitor
+calls a plateau only when, over the last few steps, three things hold: the
+signal stayed below the noise on average, the loss barely fell, and the loss is
+still high. Then it restarts the angles near zero, once: a circuit close to the
+identity, whose gradients don't vanish as it grows (Grant et al., 2019). A run
+that has already learned (low loss) is never restarted, even though its
+gradient is small too.
 """
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import numpy as np
-
-GRAD_NORM_EPS = 1e-3
-GRAD_VAR_EPS = 1e-6
-WINDOW = 5
-PATIENCE = 4
+WINDOW = 6              # over the last 6 steps:
+SIGNAL_MIN = 1.0        #   the signal power stayed below the noise power on average,
+PROGRESS_MIN = 0.05     #   the loss fell by less than this,
+LOSS_LEARNED = 0.5      #   and it is still above this
 
 
 @dataclass
 class PlateauEvent:
-    iteration: int
-    grad_norm: float
-    grad_window_variance: float
-    mitigation: str
+    step: int
+    signal_to_noise: float
+    loss: float
+    action: str
 
 
-class BarrenPlateauMonitor:
-    """Stateful, per-training-run monitor. Call `observe` once per iteration."""
+class PlateauMonitor:
+    """Watches one training run. Call observe() once per step."""
 
-    def __init__(self, window: int = WINDOW, patience: int = PATIENCE,
-                 grad_norm_eps: float = GRAD_NORM_EPS, grad_var_eps: float = GRAD_VAR_EPS):
-        self.window = window
-        self.patience = patience
-        self.grad_norm_eps = grad_norm_eps
-        self.grad_var_eps = grad_var_eps
-        self._history: List[float] = []
-        self._below_threshold_streak = 0
+    def __init__(self, window: int = WINDOW, signal_min: float = SIGNAL_MIN, progress_min: float = PROGRESS_MIN,
+                 loss_learned: float = LOSS_LEARNED):
+        self.window, self.signal_min, self.progress_min, self.loss_learned = window, signal_min, progress_min, loss_learned
+        self.snr: List[Optional[float]] = []
+        self.losses: List[float] = []
         self.events: List[PlateauEvent] = []
+        self._quiet_until = 0
 
-    def observe(self, iteration: int, grad_norm: float) -> Optional[PlateauEvent]:
-        self._history.append(grad_norm)
-        window_vals = self._history[-self.window:]
-        window_var = float(np.var(window_vals)) if len(window_vals) >= 2 else float("inf")
+    @staticmethod
+    def signal_to_noise(grad_norm_sq: float, n_angles: int, noise_std: float) -> Optional[float]:
+        """None with exact gradients: there is no measurement noise to compare with."""
+        noise_power = n_angles * noise_std ** 2
+        if noise_power <= 0:
+            return None
+        return max(0.0, grad_norm_sq - noise_power) / noise_power
 
-        is_flat = grad_norm < self.grad_norm_eps and window_var < self.grad_var_eps
-        self._below_threshold_streak = self._below_threshold_streak + 1 if is_flat else 0
-
-        if self._below_threshold_streak >= self.patience:
-            event = PlateauEvent(
-                iteration=iteration,
-                grad_norm=grad_norm,
-                grad_window_variance=window_var,
-                mitigation="parameter_reinitialisation",
-            )
-            self.events.append(event)
-            self._below_threshold_streak = 0  # don't re-fire every subsequent flat iteration
-            return event
-        return None
+    def observe(self, step: int, grad_norm_sq: float, n_angles: int, noise_std: float, loss: float,
+                action: str = "detected") -> Optional[PlateauEvent]:
+        """`loss` is the training loss before this step. Returns an event when training is stuck."""
+        snr = self.signal_to_noise(grad_norm_sq, n_angles, noise_std)
+        self.snr.append(None if snr is None else round(snr, 4))
+        self.losses.append(loss)
+        if snr is None or step < self._quiet_until or len(self.losses) <= self.window:
+            return None
+        recent = [s for s in self.snr[-self.window:] if s is not None]
+        progress = self.losses[-1 - self.window] - loss
+        if sum(recent) / len(recent) >= self.signal_min or progress >= self.progress_min or loss <= self.loss_learned:
+            return None
+        self._quiet_until = step + self.window                 # give the run (or its restart) time before judging again
+        event = PlateauEvent(step, round(sum(recent) / len(recent), 4), round(loss, 4), action)
+        self.events.append(event)
+        return event
 
     def summary(self) -> Dict:
         return {
-            "plateau_detected": len(self.events) > 0,
-            "num_events": len(self.events),
-            "events": [
-                {
-                    "iteration": e.iteration,
-                    "grad_norm": e.grad_norm,
-                    "grad_window_variance": e.grad_window_variance,
-                    "mitigation": e.mitigation,
-                }
-                for e in self.events
-            ],
+            "signal_to_noise": self.snr,
+            "events": [e.__dict__ for e in self.events],
         }

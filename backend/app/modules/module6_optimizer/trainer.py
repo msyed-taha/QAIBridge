@@ -1,224 +1,253 @@
 """
-Module 6 - Neural Angle Optimizer
-trainer.py - Orchestrates the head-to-head comparison (mirrors
-module8_dashboard/benchmarker.py's style: one file that calls the other
-pieces and returns a single report dataclass).
+Neural Optimizer — the barren plateau study, and a fair training race.
 
-Method A (classical baseline): raw trainable angles, random init, plain SGD
-    directly on the parameter-shift gradient. This is where gradients vanish
-    at scale -- the Barren Plateau.
-Method B (Neural Angle Optimizer): AngleNet's weights are trained with Adam;
-    AngleNet's small-angle-initialised output IS the angle vector.
+The study measures how big a circuit's gradients are as it grows. With angles
+started at random, a circuit whose depth grows with its width (here 2 layers
+per qubit) has gradients that shrink exponentially with the number of qubits:
+a barren plateau (McClean et al., 2018). Started near zero, the same circuit is
+close to the identity and its gradients keep their size (Grant et al., 2019).
+A 1-layer circuit has no plateau at all, and the study shows that too.
+
+The race trains the same quantum classifier four ways, on the same data, with
+the same optimiser (Adam), the same number of steps, the same mini-batches and
+the same measurement noise. Only the start, and how the angles are learned,
+differ:
+
+    random      raw angles started at random (0 to 2π): the usual default
+    rescued     the same random start, watched by the plateau monitor, which
+                restarts it near zero when it gets stuck
+    near_zero   raw angles started near zero
+    neural      the Neural Angle Optimizer: a small network whose output is the
+                angles, starting near zero
+
+The best learning rate depends on the circuit (a small circuit likes bigger
+steps), so every race tries two learning rates for each method and keeps the
+one that did better for it: 0.05 or 0.1 for raw angles, 0.01 or 0.02 for the
+network. The rescued run uses exactly the random start's choice, so the only
+difference between those two is the monitor. Every race is repeated over
+several seeds, so the page shows the spread, not one lucky run.
 """
-
 from __future__ import annotations
 
 import math
-import random
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List
+import os
+import threading
+import time
+from collections import OrderedDict
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 
+from . import vqc
 from .angle_net import AngleNet
-from .barren_monitor import BarrenPlateauMonitor
-from .dataset import get_toy_classification_dataset
-from .quantum_layer import QuantumClassifierLoss, bce_loss, param_shift_grad_single, predict_proba
+from .barren_monitor import PlateauMonitor
 
-CONVERGENCE_THRESHOLD = 0.35
-BATCH_SIZE = 5  # parameter-shift backward cost scales with sample count; mini-batch keeps runs responsive
-SMALL_ANGLE_RANGE = 0.05  # reinitialisation mitigation restarts stuck angles in [-range, range]
+METHODS = {
+    "random": "Random start",
+    "rescued": "Random start + plateau monitor",
+    "near_zero": "Near-zero start",
+    "neural": "Neural Angle Optimizer",
+}
+LEARNING_RATES = {"random": (0.05, 0.1), "near_zero": (0.05, 0.1), "neural": (0.01, 0.02)}   # the rescued run uses random's
+NEAR_ZERO = 0.05            # near-zero starts draw every angle from [−0.05, 0.05]
+BATCH = 8                   # inputs per training step
+STEPS = 40
+SEEDS = 3
+TARGET_LOSS = 0.5           # "learned": the loss on the training data is below this
 
+# The page's presets, worked out in the background when the page is first opened, so they show at once.
+PRESETS = [(3, 2), (8, 16), (10, 20)]
+DEFAULT_SHOTS = 1000
+WARM_UP = os.getenv("NEURAL_OPTIMIZER_WARM_UP", "1") == "1"
 
-@dataclass
-class OptimizationReport:
-    n_qubits: int
-    layers: int
-    iterations: int
-    classical_loss_curve: List[float]
-    neural_loss_curve: List[float]
-    classical_accuracy: float
-    neural_accuracy: float
-    classical_iters_to_converge: int
-    neural_iters_to_converge: int
-    speedup_iterations: float
-    barren_plateau: Dict = field(default_factory=dict)
-    classical_grad_norm_curve: List[float] = field(default_factory=list)
-    neural_grad_norm_curve: List[float] = field(default_factory=list)
-    live_barren_plateau_monitor: Dict = field(default_factory=dict)
-
-    def to_dict(self) -> Dict:
-        return asdict(self)
+# Results are the same every time for the same settings (fixed seeds), so they are kept.
+_cache: "OrderedDict[tuple, Dict[str, Any]]" = OrderedDict()
+_running: Dict[tuple, threading.Event] = {}
+_cache_lock = threading.Lock()
+_warming = threading.Lock()
 
 
-def _accuracy(n_qubits: int, layers: int, X: List[List[float]], y: List[int], angles: np.ndarray) -> float:
-    correct = 0
-    for xi, yi in zip(X, y):
-        p = predict_proba(n_qubits, layers, xi, angles)
-        correct += int((p > 0.5) == bool(yi))
-    return correct / len(X)
+def _cached(key: tuple, make) -> Dict[str, Any]:
+    """The kept result, or make it; if the same run is already being made, wait for it instead of repeating it."""
+    while True:
+        with _cache_lock:
+            if key in _cache:
+                _cache.move_to_end(key)
+                return {**_cache[key], "cached": True}
+            done = _running.get(key)
+            mine = done is None
+            if mine:
+                done = _running[key] = threading.Event()
+        if not mine:
+            done.wait(timeout=600)
+            continue
+        try:
+            value = make()
+            with _cache_lock:
+                _cache[key] = value
+                while len(_cache) > 32:
+                    _cache.popitem(last=False)
+            return {**value, "cached": False}
+        finally:
+            with _cache_lock:
+                _running.pop(key, None)
+            done.set()
 
 
-def _iters_to_converge(curve: List[float], threshold: float = CONVERGENCE_THRESHOLD) -> int:
-    for i, v in enumerate(curve):
-        if v < threshold:
-            return i + 1
-    return len(curve)
+def warm_up() -> None:
+    """Start working out the presets in the background (once per server)."""
+    if not WARM_UP or not _warming.acquire(blocking=False):
+        return
+
+    def work() -> None:
+        for n, layers in PRESETS:
+            race(n, layers, DEFAULT_SHOTS)
+
+    threading.Thread(target=work, name="neural-optimizer-warm-up", daemon=True).start()
 
 
-def _sample_batch(X: List[List[float]], y: List[int], batch_size: int):
-    idx = random.sample(range(len(X)), min(batch_size, len(X)))
-    return [X[i] for i in idx], [y[i] for i in idx]
+# ── The barren plateau study ─────────────────────────────────────────────────
+
+def _gradient_size(n_qubits: int, layers: int, start: str, draws: int, seed: int) -> float:
+    """Root-mean-square of ∂⟨Z⟩/∂θ₁ over `draws` starts: how big a gradient typically is."""
+    g = torch.Generator().manual_seed(seed + 97 * n_qubits + layers)
+    P = vqc.n_angles(n_qubits, layers)
+    if start == "random":
+        angles = torch.rand(draws, P, generator=g, dtype=vqc.REAL) * 2 * math.pi
+    else:
+        angles = (torch.rand(draws, P, generator=g, dtype=vqc.REAL) * 2 - 1) * NEAR_ZERO
+    angles.requires_grad_(True)
+    x = torch.full((draws, 2), 0.5, dtype=vqc.REAL)
+    vqc.expectation(x, angles, n_qubits, layers).sum().backward()
+    return float(angles.grad[:, 0].pow(2).mean().sqrt())
 
 
-def train_classical_baseline(n_qubits: int, layers: int, iterations: int,
-                              X: List[List[float]], y: List[int], lr: float = 0.5):
-    """
-    Method A. Also runs a live BarrenPlateauMonitor against the real
-    per-step gradient norm (read off the same backward pass the optimizer
-    already needs -- no extra circuit evaluations). If the monitor detects
-    a plateau (small AND flat gradient for `patience` consecutive steps),
-    the stuck angles are reinitialised to a small-angle configuration in
-    place -- "parameter reinitialisation", a standard recovery technique --
-    and training continues from there.
-    """
-    n_params = n_qubits * layers * 2
-    angles = torch.tensor(np.random.uniform(0, 2 * math.pi, n_params), requires_grad=True)
-    optimizer = torch.optim.SGD([angles], lr=lr)
-    monitor = BarrenPlateauMonitor()
+def plateau_study(max_qubits: int = 10, draws: int = 200, seed: int = 0) -> Dict[str, Any]:
+    def make() -> Dict[str, Any]:
+        t0 = time.perf_counter()
+        qubits = list(range(2, max_qubits + 1))
+        lines = {
+            "shallow_random": [_gradient_size(n, 1, "random", draws, seed) for n in qubits],
+            "deep_random": [_gradient_size(n, 2 * n, "random", draws, seed) for n in qubits],
+            "deep_near_zero": [_gradient_size(n, 2 * n, "near_zero", draws, seed) for n in qubits],
+        }
+        # Telling a gradient g from measurement noise takes about 1 / (2 g²) shots per measured value.
+        shots = {k: [math.ceil(1 / (2 * v * v)) for v in vals] for k, vals in lines.items()}
+        slope = float(np.polyfit(qubits, np.log(lines["deep_random"]), 1)[0])
+        return {
+            "qubits": qubits,
+            "draws": draws,
+            "lines": {k: [round(v, 5) for v in vals] for k, vals in lines.items()},
+            "shots_needed": shots,
+            "deep_random_factor_per_qubit": round(math.exp(slope), 3),
+            "seconds": round(time.perf_counter() - t0, 2),
+        }
 
+    return _cached(("study", max_qubits, draws, seed), make)
+
+
+# ── The race ──────────────────────────────────────────────────────────────────
+
+def _near_zero(P: int) -> torch.Tensor:
+    return (torch.rand(P, dtype=vqc.REAL) * 2 - 1) * NEAR_ZERO
+
+
+def _train(method: str, n_qubits: int, layers: int, shots: int, steps: int, seed: int, lr: float) -> Dict[str, Any]:
+    X, y, X_test, y_test = vqc.classification_data()
+    P = vqc.n_angles(n_qubits, layers)
+    torch.manual_seed(seed)
+    if method == "neural":
+        net = AngleNet(P)
+        opt = torch.optim.Adam(net.parameters(), lr=lr)
+        angles = lambda: net().to(vqc.REAL)                                      # noqa: E731
+        raw = None
+    else:
+        start = torch.rand(P, dtype=vqc.REAL) * 2 * math.pi if method in ("random", "rescued") else _near_zero(P)
+        raw = start.requires_grad_(True)
+        opt = torch.optim.Adam([raw], lr=lr)
+        angles = lambda: raw                                                    # noqa: E731
+
+    batches = torch.Generator().manual_seed(10_000 + seed)                      # the same batches and noise for every method
+    noise = torch.Generator().manual_seed(20_000 + seed)
+    monitor = PlateauMonitor()
     curve: List[float] = []
-    grad_norm_curve: List[float] = []
-    for it in range(iterations):
-        X_batch, y_batch = _sample_batch(X, y, BATCH_SIZE)
-        loss = QuantumClassifierLoss.apply(angles, n_qubits, layers, X_batch, y_batch)
-        optimizer.zero_grad()
-        loss.backward()
-
-        grad_norm = float(angles.grad.norm().item())
-        grad_norm_curve.append(grad_norm)
-        event = monitor.observe(it, grad_norm)
-        if event is not None:
-            with torch.no_grad():
-                angles.copy_(torch.tensor(np.random.uniform(-SMALL_ANGLE_RANGE, SMALL_ANGLE_RANGE, n_params)))
-            optimizer = torch.optim.SGD([angles], lr=lr)  # fresh momentum buffer after the restart
-        else:
-            optimizer.step()
-
-        # Report full-dataset loss each step (cheap: forward-only) so the curve isn't noisy mini-batch loss.
-        curve.append(bce_loss(n_qubits, layers, X, y, angles.detach().numpy()))
-
-    final_angles = angles.detach().numpy()
-    acc = _accuracy(n_qubits, layers, X, y, final_angles)
-    return curve, acc, grad_norm_curve, monitor.summary()
-
-
-def train_neural_optimizer(n_qubits: int, layers: int, iterations: int,
-                            X: List[List[float]], y: List[int], lr: float = 0.05):
-    """
-    Method B. The same live monitor is attached here too, tracking the
-    gradient norm reaching AngleNet's *output* angles (via retain_grad, since
-    they're no longer a leaf tensor) -- the apples-to-apples equivalent of
-    what's tracked for the classical baseline. Because AngleNet already
-    starts near-identity (small-angle init baked into its own weight init,
-    see angle_net.py), this is expected to plateau far less often; the
-    monitor is here to demonstrate that empirically, not because Method B
-    needs the same rescue.
-    """
-    n_params = n_qubits * layers * 2
-    net = AngleNet(n_params)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    monitor = BarrenPlateauMonitor()
-
-    curve: List[float] = []
-    grad_norm_curve: List[float] = []
-    for it in range(iterations):
-        X_batch, y_batch = _sample_batch(X, y, BATCH_SIZE)
-        angles = net()
-        angles.retain_grad()
-        loss = QuantumClassifierLoss.apply(angles, n_qubits, layers, X_batch, y_batch)
-        optimizer.zero_grad()
-        loss.backward()
-
-        grad_norm = float(angles.grad.norm().item())
-        grad_norm_curve.append(grad_norm)
-        monitor.observe(it, grad_norm)  # recorded for comparison; no reinit -- see docstring above
-
-        optimizer.step()
+    for step in range(steps):
+        idx = torch.randperm(len(X), generator=batches)[:BATCH]
+        theta = angles()
         with torch.no_grad():
-            curve.append(bce_loss(n_qubits, layers, X, y, net().detach().numpy()))
-
-    final_angles = net().detach().numpy()
-    acc = _accuracy(n_qubits, layers, X, y, final_angles)
-    return curve, acc, grad_norm_curve, monitor.summary()
-
-
-def measure_barren_plateau(qubit_range=range(2, 9), trials: int = 20, layers: int = 1) -> Dict:
-    """
-    For each qubit count, sample `trials` random parameter vectors under two
-    initialisation strategies and measure the exact parameter-shift gradient
-    of the first rotation angle. Reports the variance of that gradient across
-    trials -- the standard way the Barren Plateau phenomenon is diagnosed
-    (McClean et al., 2018): variance collapsing exponentially with qubit
-    count for random init, staying materially higher for small-angle init.
-    """
-    qubits_axis: List[int] = []
-    random_variance: List[float] = []
-    small_variance: List[float] = []
-
-    for n_qubits in qubit_range:
-        n_params = n_qubits * layers * 2
-        x = [0.5] * n_qubits
-
-        random_grads = [
-            param_shift_grad_single(n_qubits, layers, x, np.random.uniform(0, 2 * math.pi, n_params))
-            for _ in range(trials)
-        ]
-        small_grads = [
-            param_shift_grad_single(n_qubits, layers, x, np.random.uniform(-0.05, 0.05, n_params))
-            for _ in range(trials)
-        ]
-
-        qubits_axis.append(n_qubits)
-        random_variance.append(float(np.var(random_grads)))
-        small_variance.append(float(np.var(small_grads)))
-
+            curve.append(float(vqc.loss(vqc.expectation(X, theta.detach(), n_qubits, layers), y)))
+        g, noise_std, _ = vqc.gradient(X[idx], y[idx], theta, n_qubits, layers, shots, noise)
+        rescue = method == "rescued" and not monitor.events                     # one restart per run
+        event = monitor.observe(step, float(g.pow(2).sum()), P, noise_std, curve[-1],
+                                action="restarted near zero" if rescue else "detected")
+        if event is not None and rescue:
+            with torch.no_grad():
+                raw.copy_(_near_zero(P))
+            opt = torch.optim.Adam([raw], lr=lr)
+            continue
+        opt.zero_grad()
+        theta.backward(g.to(theta.dtype))
+        opt.step()
+    with torch.no_grad():
+        theta = angles().detach()
+        z_train = vqc.expectation(X, theta, n_qubits, layers)
+        z_test = vqc.expectation(X_test, theta, n_qubits, layers)
+    curve.append(float(vqc.loss(z_train, y)))
+    reached = next((i for i, v in enumerate(curve) if v < TARGET_LOSS), None)
     return {
-        "qubits": qubits_axis,
-        "random_init_variance": random_variance,
-        "small_angle_init_variance": small_variance,
+        "curve": [round(v, 4) for v in curve],
+        "final_loss": round(curve[-1], 4),
+        "train_accuracy": vqc.accuracy(z_train, y),
+        "test_accuracy": vqc.accuracy(z_test, y_test),
+        "steps_to_target": reached,
+        "monitor": monitor.summary(),
     }
 
 
-def run_full_report(n_qubits: int = 3, layers: int = 2, iterations: int = 30) -> OptimizationReport:
-    X, y = get_toy_classification_dataset()
+def _together(method: str, lr: float, runs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    curves = np.array([r["curve"] for r in runs])
+    finals = [r["final_loss"] for r in runs]
+    return {
+        "label": METHODS[method],
+        "learning_rate": lr,
+        "learning_rates_tried": list(LEARNING_RATES["random" if method == "rescued" else method]),
+        "curve_mean": [round(float(v), 4) for v in curves.mean(axis=0)],
+        "curve_min": [round(float(v), 4) for v in curves.min(axis=0)],
+        "curve_max": [round(float(v), 4) for v in curves.max(axis=0)],
+        "final_loss": {"mean": round(float(np.mean(finals)), 4), "min": min(finals), "max": max(finals)},
+        "test_accuracy": round(float(np.mean([r["test_accuracy"] for r in runs])), 4),
+        "train_accuracy": round(float(np.mean([r["train_accuracy"] for r in runs])), 4),
+        "steps_to_target": [r["steps_to_target"] for r in runs],
+        "reached_target": sum(r["steps_to_target"] is not None for r in runs),
+        "events": [[e["step"] for e in r["monitor"]["events"]] for r in runs],
+        "signal_to_noise": runs[0]["monitor"]["signal_to_noise"],
+    }
 
-    classical_curve, classical_acc, classical_grad_curve, classical_monitor = \
-        train_classical_baseline(n_qubits, layers, iterations, X, y)
-    neural_curve, neural_acc, neural_grad_curve, neural_monitor = \
-        train_neural_optimizer(n_qubits, layers, iterations, X, y)
-    barren_plateau = measure_barren_plateau()
 
-    classical_conv = _iters_to_converge(classical_curve)
-    neural_conv = _iters_to_converge(neural_curve)
+def race(n_qubits: int, layers: int, shots: int, steps: int = STEPS, seeds: int = SEEDS) -> Dict[str, Any]:
+    def runs(method: str, lr: float) -> List[Dict[str, Any]]:
+        return [_train(method, n_qubits, layers, shots, steps, s, lr) for s in range(seeds)]
 
-    return OptimizationReport(
-        n_qubits=n_qubits,
-        layers=layers,
-        iterations=iterations,
-        classical_loss_curve=classical_curve,
-        neural_loss_curve=neural_curve,
-        classical_accuracy=classical_acc,
-        neural_accuracy=neural_acc,
-        classical_iters_to_converge=classical_conv,
-        neural_iters_to_converge=neural_conv,
-        speedup_iterations=round(classical_conv / max(neural_conv, 1), 2),
-        barren_plateau=barren_plateau,
-        classical_grad_norm_curve=classical_grad_curve,
-        neural_grad_norm_curve=neural_grad_curve,
-        live_barren_plateau_monitor={
-            "classical": classical_monitor,
-            "neural": neural_monitor,
-        },
-    )
+    def best_rate(method: str):
+        tried = {lr: runs(method, lr) for lr in LEARNING_RATES[method]}
+        lr = min(tried, key=lambda r: float(np.mean([run["final_loss"] for run in tried[r]])))
+        return lr, tried[lr]
+
+    def make() -> Dict[str, Any]:
+        t0 = time.perf_counter()
+        chosen = {m: best_rate(m) for m in ("random", "near_zero", "neural")}
+        chosen["rescued"] = (chosen["random"][0], runs("rescued", chosen["random"][0]))
+        methods = {m: _together(m, *chosen[m]) for m in METHODS}
+        best = min(methods, key=lambda m: methods[m]["final_loss"]["mean"])
+        return {
+            "n_qubits": n_qubits, "layers": layers, "shots": shots, "steps": steps, "seeds": seeds,
+            "angles": vqc.n_angles(n_qubits, layers), "batch": BATCH, "target_loss": TARGET_LOSS,
+            "data": {"train": 32, "test": 16, "pattern": "XOR"},
+            "circuit": vqc.describe(),
+            "methods": methods,
+            "best": best,
+            "seconds": round(time.perf_counter() - t0, 2),
+        }
+
+    return _cached(("race", n_qubits, layers, shots, steps, seeds), make)

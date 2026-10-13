@@ -1,49 +1,50 @@
 """
-Module 6 – Neural Angle Optimizer  (FastAPI Router)
-Routes:
-  GET  /api/module6/status  – Module status
-  POST /api/module6/train   – Train a variational classifier two ways
-                               (classical raw-angle gradient descent vs a
-                               PyTorch AngleNet hypernetwork) and return
-                               loss curves, accuracy, convergence speed, and
-                               a barren-plateau gradient-variance study.
-  POST /api/module6/qaoa-angles – Train a neural network that predicts QAOA
-                               angles (γ, β) from graph features and compare
-                               cold-start vs neural warm-start optimisation
-                               on unseen Max-Cut graphs.
+Neural Optimizer
+Routes (signed-in users):
+  POST /api/module6/plateau-study  – how gradient size changes with circuit size, from random and near-zero starts
+  POST /api/module6/race           – train one quantum classifier four ways, fairly, over several seeds
+  POST /api/module6/qaoa-angles    – a neural network that predicts QAOA angles (γ, β) from a graph, compared
+                                     with the full optimiser and with simple starts on the same budget
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Any, Dict, Literal
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..modules.module1_kernel.limits import simulation_slot
-from ..modules.module6_optimizer import run_full_report
+from ..modules.module6_optimizer import trainer
 from ..modules.module6_optimizer.qaoa_angles import train_and_evaluate
+from .auth import get_current_user
 
-router = APIRouter(prefix="/api/module6", tags=["Module 6 – Neural Angle Optimizer"])
-
-
-@router.get("/status")
-async def status():
-    return {"module": 6, "name": "Neural Angle Optimizer", "status": "active"}
+router = APIRouter(prefix="/api/module6", tags=["Neural Optimizer"], dependencies=[Depends(get_current_user)])
 
 
-class TrainRequest(BaseModel):
-    n_qubits:   int = Field(default=3, ge=2, le=4, description="Qubits in the variational classifier")
-    layers:     int = Field(default=2, ge=1, le=3, description="Rotation+entangle blocks")
-    iterations: int = Field(default=30, ge=10, le=100, description="Gradient-descent steps per method")
+def _heavy(work):
+    try:
+        with simulation_slot():
+            return work()
+    except MemoryError as e:
+        raise HTTPException(503, str(e))
 
 
-@router.post("/train")
-def train(req: TrainRequest):
-    """
-    Run both training methods on the shared toy classification dataset and
-    return a full comparison report (loss curves, accuracy, iterations-to-
-    converge, and the barren-plateau gradient-variance study).
-    """
-    report = run_full_report(req.n_qubits, req.layers, req.iterations)
-    return report.to_dict()
+@router.post("/plateau-study")
+def plateau_study() -> Dict[str, Any]:
+    """Gradient size vs number of qubits. Also starts preparing the race presets in the background."""
+    trainer.warm_up()
+    return _heavy(trainer.plateau_study)
+
+
+class RaceRequest(BaseModel):
+    n_qubits: int = Field(3, ge=2, le=10)
+    layers:   int = Field(2, ge=1, le=20)
+    shots:    Literal[0, 100, 1000] = trainer.DEFAULT_SHOTS     # 0: exact gradients, as a perfect simulator gives
+
+
+@router.post("/race")
+def race(req: RaceRequest) -> Dict[str, Any]:
+    return _heavy(lambda: trainer.race(req.n_qubits, req.layers, req.shots))
 
 
 class QaoaAnglesRequest(BaseModel):
@@ -54,11 +55,10 @@ class QaoaAnglesRequest(BaseModel):
 
 
 @router.post("/qaoa-angles")
-def qaoa_angles(req: QaoaAnglesRequest):
+def qaoa_angles(req: QaoaAnglesRequest) -> Dict[str, Any]:
     """
     Neural QAOA angle predictor: learns graph → (γ, β) from optimised training
     graphs, then compares cold-start optimisation with a neural warm start on
     unseen graphs (circuit evaluations needed and approximation ratio reached).
     """
-    with simulation_slot():
-        return train_and_evaluate(req.train_graphs, req.test_graphs, req.layers, req.seed)
+    return _heavy(lambda: train_and_evaluate(req.train_graphs, req.test_graphs, req.layers, req.seed))

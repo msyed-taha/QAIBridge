@@ -30,7 +30,7 @@ PAGES: Dict[str, str] = {
     "/module5": "Code to Quantum: paste Python code; it becomes a quantum circuit that is run and checked against the code",
     "/module2": "Quantum vs Classical: Grover, Shor, QAOA and amplitude amplification next to the best classical method on the same input",
     "/solve": "Problem Solver: run search, factoring, route planning or a database query on your own data",
-    "/module6": "Neural Optimizer: a neural network learns the gate angles of a quantum classifier",
+    "/module6": "Neural Optimizer: see barren plateaus (why big quantum circuits stop learning), race four ways to train a quantum classifier (random start, random start with a plateau monitor, near-zero start, a neural network that outputs the angles), and train a network that predicts QAOA angles",
     "/module7": "Neural Network Converter: turn a classical neural network into a quantum one and compare them",
     "/dashboard": "Dashboard: benchmarks, your saved runs and CSV export",
     "/work": "My work: your saved circuits and projects",

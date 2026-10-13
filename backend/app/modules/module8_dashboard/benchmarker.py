@@ -172,7 +172,7 @@ def _kernel(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
 
 
 def _ai(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
-    from ..module6_optimizer import run_full_report
+    from ..module6_optimizer import race
     from ..module6_optimizer.dataset import FEATURE_DIM, get_toy_classification_dataset
     from ..module7_qnn import convert_architecture, parse_architecture, train_classical_mlp, train_qnn
 
@@ -194,21 +194,22 @@ def _ai(opt: Dict[str, Any], emit: Emit) -> Dict[str, Any]:
           "classical_curve": [round(v, 5) for v in mlp_curve], "quantum_curve": [round(v, 5) for v in qnn_curve],
           "classical_ms": round(mlp_ms, 1), "quantum_ms": round(qnn_ms, 1), "qubits": conv.qnn.n_qubits}
     emit(p1)
+    # The Neural Optimizer's fair race on a deep circuit (6 qubits, 12 layers, 1,000 shots), one seed.
     t0 = time.perf_counter()
-    rep = run_full_report(3, 2, iters)
+    rep = race(6, 12, 1000, steps=iters, seeds=1)
     m6_ms = (time.perf_counter() - t0) * 1000
-    p2 = {"experiment": "angle_optimizer", "label": "Raw-angle gradient descent vs Neural Angle Optimizer (Module 6)",
-          "classical_accuracy": rep.classical_accuracy, "quantum_accuracy": rep.neural_accuracy,
-          "classical_curve": [round(v, 5) for v in rep.classical_loss_curve],
-          "quantum_curve": [round(v, 5) for v in rep.neural_loss_curve],
-          "classical_iters_to_converge": rep.classical_iters_to_converge,
-          "neural_iters_to_converge": rep.neural_iters_to_converge,
-          "plateau_events": rep.live_barren_plateau_monitor["classical"]["num_events"],
-          "total_ms": round(m6_ms, 1), "qubits": rep.n_qubits}
+    rand, neural = rep["methods"]["random"], rep["methods"]["neural"]
+    learned = lambda m: m["steps_to_target"][0] if m["steps_to_target"][0] is not None else iters   # noqa: E731
+    p2 = {"experiment": "angle_optimizer", "label": "Random start vs Neural Angle Optimizer (fair race, 6 qubits, 12 layers)",
+          "classical_accuracy": rand["test_accuracy"], "quantum_accuracy": neural["test_accuracy"],
+          "classical_curve": rand["curve_mean"], "quantum_curve": neural["curve_mean"],
+          "classical_iters_to_converge": learned(rand), "neural_iters_to_converge": learned(neural),
+          "plateau_events": len(rand["events"][0]),
+          "total_ms": round(m6_ms, 1), "qubits": rep["n_qubits"]}
     emit(p2)
     return {"points": 2, "qnn_accuracy": qnn_acc, "mlp_accuracy": mlp_acc,
             "qnn_params": conv.qnn.trainable_angles, "mlp_params": conv.classical_params,
-            "neural_optimizer_accuracy": rep.neural_accuracy}
+            "neural_optimizer_accuracy": neural["test_accuracy"]}
 
 
 RUNNERS: Dict[str, Callable[[Dict[str, Any], Emit], Dict[str, Any]]] = {

@@ -14,6 +14,10 @@ al. 2020). So we can LEARN them:
         cold start   – the full optimiser from scratch,
         neural only  – predicted angles, zero optimiser steps,
         neural warm  – predicted angles + a short COBYLA refinement.
+     For a fair comparison, three simple starts get the same short refinement
+     (the same 40-step budget): the average of the training angles, a standard
+     linear ramp, and a random start. If the network's start does better than
+     those, the saving comes from what it learned, not from the short budget.
 
 The report shows how many circuit evaluations the network saves and the
 approximation ratio each strategy reaches.
@@ -33,6 +37,7 @@ from ..module2_sfod.qaoa import QAOAEvaluator, run_qaoa
 from ..module5_transformer.bridge import maxcut_bridge
 
 N_FEATURES = 6
+WARM_STEPS = 40                 # the short refinement after a predicted (or simple) start
 _cache: Dict[Tuple[int, int, int, int], Dict[str, Any]] = {}
 
 
@@ -126,9 +131,12 @@ def train_and_evaluate(train_graphs: int = 40, test_graphs: int = 10, p: int = 2
             losses.append(round(float(loss.item()), 6))
     train_ms = (time.perf_counter() - t0) * 1000
 
-    # 3. unseen graphs: cold start vs neural-only vs neural warm start
+    # 3. unseen graphs: cold start vs neural-only vs neural warm start, and simple starts on the same budget
     rows = []
     model.eval()
+    average = Y_t.mean(dim=0).tolist()
+    ramp = [0.8 * (i + 1) / p for i in range(p)] + [0.8 * (1 - i / p) for i in range(p)]
+    starts_rng = np.random.default_rng(seed + 50_000)
     for k in range(test_graphs):
         n = int(rng.integers(5, 10))
         edges = random_graph(n, rng)
@@ -137,7 +145,14 @@ def train_and_evaluate(train_graphs: int = 40, test_graphs: int = 10, p: int = 2
             pred = model(torch.tensor(graph_features(n, edges)).unsqueeze(0))[0].tolist()
         neural_only = _ratio_at(cold["bridge"], cold["max_cut"], pred, p)
         warm = run_qaoa(cold["bridge"], p=p, objective="expectation", shots=0, seed=k,
-                        init={"gammas": pred[:p], "betas": pred[p:]}, maxiter=40)
+                        init={"gammas": pred[:p], "betas": pred[p:]}, maxiter=WARM_STEPS)
+        simple = {"average": average, "ramp": ramp,
+                  "random": list(starts_rng.uniform(0, math.pi, p)) + list(starts_rng.uniform(0, math.pi / 2, p))}
+        baselines = {}
+        for name, start in simple.items():
+            run = run_qaoa(cold["bridge"], p=p, objective="expectation", shots=0, seed=k,
+                           init={"gammas": start[:p], "betas": start[p:]}, maxiter=WARM_STEPS)
+            baselines[name] = round(-run["expected_energy"] / cold["max_cut"], 4)
         rows.append({
             "nodes": n, "edges": len(edges),
             "cold_evaluations": cold["evaluations"], "cold_ratio": round(cold["approx_ratio"], 4),
@@ -145,6 +160,7 @@ def train_and_evaluate(train_graphs: int = 40, test_graphs: int = 10, p: int = 2
             "warm_evaluations": warm["circuit_evaluations"],
             "warm_ratio": round(-warm["expected_energy"] / cold["max_cut"], 4),
             "predicted": [round(a, 4) for a in pred], "optimal": [round(a, 4) for a in cold["angles"]],
+            "baselines": baselines,
         })
 
     mean = lambda key: round(float(np.mean([r[key] for r in rows])), 4)  # noqa: E731
@@ -159,6 +175,10 @@ def train_and_evaluate(train_graphs: int = 40, test_graphs: int = 10, p: int = 2
             "neural_ratio": mean("neural_ratio"),
             "warm_evaluations": mean("warm_evaluations"), "warm_ratio": mean("warm_ratio"),
             "evaluations_saved_pct": round(100 * (1 - mean("warm_evaluations") / mean("cold_evaluations")), 1),
+            # the same short refinement from simple starts: what the network's start is worth
+            "baselines": {name: round(float(np.mean([r["baselines"][name] for r in rows])), 4)
+                          for name in ("average", "ramp", "random")},
+            "budget_steps": WARM_STEPS,
         },
         "total_ms": round((time.perf_counter() - t_start) * 1000, 1),
         "cached": False,

@@ -79,47 +79,6 @@ export type QasmInspect =
       labels: string[]; example: string | null }
   | { ok: false; error: QasmProblem };
 
-// ── Module 6 – Neural Angle Optimizer Types ──────────────────────────────────
-
-export interface BarrenPlateauData {
-  qubits: number[];
-  random_init_variance: number[];
-  small_angle_init_variance: number[];
-}
-
-export interface PlateauEvent {
-  iteration: number;
-  grad_norm: number;
-  grad_window_variance: number;
-  mitigation: string;
-}
-
-export interface LiveMonitorSummary {
-  plateau_detected: boolean;
-  num_events: number;
-  events: PlateauEvent[];
-}
-
-export interface OptimizationReport {
-  n_qubits: number;
-  layers: number;
-  iterations: number;
-  classical_loss_curve: number[];
-  neural_loss_curve: number[];
-  classical_accuracy: number;
-  neural_accuracy: number;
-  classical_iters_to_converge: number;
-  neural_iters_to_converge: number;
-  speedup_iterations: number;
-  barren_plateau: BarrenPlateauData;
-  classical_grad_norm_curve: number[];
-  neural_grad_norm_curve: number[];
-  live_barren_plateau_monitor: {
-    classical: LiveMonitorSummary;
-    neural: LiveMonitorSummary;
-  };
-}
-
 // ── Module 7 – QNN Converter Types ───────────────────────────────────────────
 
 export type LayerType = 'dense' | 'dropout';
