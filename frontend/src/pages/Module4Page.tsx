@@ -1,14 +1,15 @@
 import { useState, useRef, useCallback, useEffect, useId } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, AlertTriangle, ArrowRight, Atom, Brain, CheckCircle, ChevronDown, Cpu, FileText, Gauge, Info,
-  MessageCircleQuestion, Play, Upload, X,
+  AlertCircle, AlertTriangle, Atom, Brain, CheckCircle, ChevronDown, Cpu, FileText, Gauge, Info,
+  MessageCircleQuestion, Upload, X,
 } from 'lucide-react';
 import { advisorApi, type Advice, type AdvisorMode, type ModelInfo } from '../api/advisor';
 import { aiApi, type AIStatus } from '../api/ai';
 import { getApiErrorMessage } from '../api/client';
 import { AIStatusLine, WrittenByAI } from '../components/ai/AIStatus';
 import { usePageDetails } from '../components/ai/pageDetails';
+import { SolveHere } from '../components/module4/SolveHere';
 
 const MODES: { id: AdvisorMode; label: string; hint: string }[] = [
   { id: 'auto', label: 'Auto', hint: "The AI reads your problem and the model chooses. If the AI can't answer, the built-in reader takes over." },
@@ -21,12 +22,13 @@ const EXAMPLES = [
   { label: 'Optimisation', text: 'Find the shortest route visiting 500 cities — the Travelling Salesman Problem with a graph of nodes and edges.' },
   { label: 'Quantum chemistry', text: 'Simulate the ground state energy of a hydrogen molecule for drug discovery involving continuous molecular orbitals.' },
   { label: 'In your own words', text: 'Our bakery has 12 ovens and 40 cake orders each morning. Which oven should bake which order so everything is ready as early as possible?' },
+  { label: 'With your own data', text: 'Our van starts in Islamabad and delivers to Lahore, Multan, Faisalabad and Sialkot before coming back. Which order of stops gives the shortest trip?' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const FILE_ICONS: Record<string, string> = {
-  pdf: '📄', docx: '📝', doc: '📝', csv: '📊',
+  pdf: '📄', docx: '📝', csv: '📊', tsv: '📊',
   txt: '📃', md: '📃', json: '🗂️', tex: '📄',
 };
 
@@ -84,12 +86,14 @@ export function Module4Page() {
   const [showFeatures, setShowFeatures] = useState(false);
   const [revealResult, setRevealResult] = useState(false);
   const [modelInfo, setModelInfo]       = useState<ModelInfo | null>(null);
+  // What "Solve it here" reads its data from: the problem as analysed (and the uploaded file's rows)
+  const [solveFrom, setSolveFrom]       = useState<{ text: string; lines: string[]; key: number }>({ text: '', lines: [], key: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const handledKey = useRef<string | null>(null);
   const ids = { text: useId(), mode: useId(), hint: useId() };
 
-  const ACCEPTED = '.pdf,.docx,.doc,.csv,.txt,.md,.json,.tex,.rtf';
+  const ACCEPTED = '.pdf,.docx,.csv,.tsv,.txt,.md,.json,.tex,.log,.xml,.yaml,.yml';
 
   useEffect(() => {
     advisorApi.modelInfo().then(setModelInfo).catch(() => undefined);
@@ -126,6 +130,7 @@ export function Module4Page() {
         return;
       }
       setResult(data);
+      setSolveFrom(prev => ({ text: upload ? data.problem_text ?? '' : problem, lines: data.data_lines ?? [], key: prev.key + 1 }));
       setExpanded(data.quantum.algorithm_id);
       setRevealResult(reveal);
     } catch (e) {
@@ -189,7 +194,7 @@ export function Module4Page() {
             Type your problem in plain English, or upload a file (PDF, Word, CSV and more). The AI reads it, a trained
             model finds the quantum algorithm that fits, and a check against today's hardware says what to use{' '}
             <span className="text-red-300 font-medium">now</span> and what{' '}
-            <span className="text-quantum-neon font-medium">quantum computers</span> could offer later.
+            <span className="text-quantum-neon font-medium">quantum computers</span> could offer later. Then solve it here, with your own data.
           </p>
           <AIStatusLine status={aiStatus} reads="your problem" fallback="The built-in reader is used." />
         </div>
@@ -214,7 +219,7 @@ export function Module4Page() {
                 ? 'File selected — remove it to type instead.'
                 : 'Examples:\n• "I need to search 50 million unsorted records to find a match."\n• "I want to factorise a large RSA-2048 number to test cryptographic strength."\n• "Find the shortest route visiting 200 cities — the Travelling Salesman Problem."\n• "Our bakery has 12 ovens and 40 orders. Which oven should bake which order?"'
             }
-            className={`w-full bg-quantum-900 border border-quantum-600 text-white rounded-xl px-4 py-3 text-sm leading-relaxed resize-none focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-500 ${file ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className={`w-full bg-quantum-900 border border-quantum-600 text-white rounded-xl px-4 py-3 text-sm leading-relaxed resize-none focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-400 ${file ? 'opacity-40 cursor-not-allowed' : ''}`}
           />
           <p id={ids.hint} className="text-xs text-gray-400 mt-1.5">
             Write it however you like. Saying how big it is (how many records, cities or items) makes the advice more accurate.
@@ -418,31 +423,9 @@ export function Module4Page() {
             )}
           </div>
 
-          {/* Try a small version here */}
-          {(result.try_here || result.solve_here) && (
-            <div className="rounded-2xl p-5 border border-quantum-neon/30 bg-quantum-neon/5 flex flex-wrap items-center gap-4">
-              <Play className="w-6 h-6 text-quantum-neon flex-shrink-0" aria-hidden="true" />
-              <div className="flex-1 min-w-[220px]">
-                <p className="text-white font-bold text-sm">See it in QAIbridge</p>
-                <p className="text-gray-300 text-xs leading-relaxed">
-                  Run a small version of this problem on QAIbridge's simulator, with the quantum and the classical answer side by side.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {result.try_here && (
-                  <Link to={result.try_here.path} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-black"
-                    style={{ background: 'linear-gradient(90deg,#00ffcc,#00ccaa)' }}>
-                    {result.try_here.label} <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </Link>
-                )}
-                {result.solve_here && (
-                  <Link to={result.solve_here} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-white border border-quantum-600 hover:bg-quantum-700">
-                    Use my own small data
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Solve it here, with the problem's own data (FE-3) */}
+          <SolveHere key={solveFrom.key} plan={result.solve} problemText={solveFrom.text} dataLines={solveFrom.lines}
+            mode={mode} tryHere={result.try_here} onAIStatus={setAiStatus} />
 
           {/* What was read from the input */}
           <button

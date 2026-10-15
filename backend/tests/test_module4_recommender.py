@@ -98,10 +98,10 @@ def test_a_real_routing_problem_gets_an_honest_answer(client, auth):
     body = _advise(client, auth, ROUTING).json()
     assert body["approach"] == "Classical" and body["top_algorithm_id"] == "routing_heuristics"
     q = body["quantum"]
-    assert q["algorithm_id"] == "qaoa" and not q["proven"] and q["verdict"] == "Classical" and q["qubits_needed"] == 3600
-    assert "no proven speed-up" in body["today"]["reason"] and "3,600 qubits" in body["today"]["reason"]
-    assert any("60 stops × 60 positions" in line and "5 vehicles and the time windows" in line for line in body["limits"])
-    assert body["try_here"]["path"] == "/module2?type=optimization" and body["solve_here"] == "/solve?type=optimization"
+    assert q["algorithm_id"] == "qaoa" and not q["proven"] and q["verdict"] == "Classical" and q["qubits_needed"] == 3481
+    assert "no proven speed-up" in body["today"]["reason"] and "3,481 qubits" in body["today"]["reason"]
+    assert any("(59 × 59)" in line and "5 vehicles and the time windows" in line for line in body["limits"])
+    assert body["try_here"]["path"] == "/module2?type=optimization" and body["solve"]["kind"] == "tsp"
 
 
 def test_no_speed_up_is_claimed_for_heuristics(client, auth):
@@ -118,7 +118,7 @@ def test_no_speed_up_is_claimed_for_heuristics(client, auth):
     (CASES[9][0], "classical_chemistry", "Classical", 50),  # VQE: no proven speed-up
     (CASES[2][0], "optimisation_solver", "Classical", None),  # "5 million" is the budget, not 5 million items
     ("Find the exact shortest route through 5 cities in Punjab (travelling salesman), it must be the proven optimum.",
-     "dynamic_programming", "Classical", 25),
+     "dynamic_programming", "Classical", 16),
 ])
 def test_today_and_future(client, auth, text, today, future, qubits):
     body = _advise(client, auth, text).json()
@@ -205,6 +205,7 @@ def test_a_file_is_read_by_the_ai_too(client, auth, fake_ai):
                     files={"file": ("bakery.txt", io.BytesIO(BAKERY.encode()), "text/plain")})
     body = r.json()
     assert r.status_code == 200 and body["engine"] == "ai" and body["filename"] == "bakery.txt"
+    assert body["data_lines"] == [] and body["problem_text"] == BAKERY      # sentences describe the problem; they aren't data
 
 
 # ── The model itself (module4_recommender/model.py) ─────────────────────────────
@@ -239,3 +240,96 @@ def test_it_is_tested_on_problems_it_never_tuned_on(client):
     assert MODEL_TEST["labelled"]["facts"]["total"] == 48
     info = client.get("/api/module4/model-info").json()
     assert info["test"]["held_out"]["facts"]["pct"] == held["facts"]["pct"] and "speedup_priority" not in info["features"]
+
+
+# ── Solving it here (FE-3): the problem's own data, solved with the SFOD suite ─────
+
+from app.modules.module4_recommender import data_reader  # noqa: E402
+
+
+@pytest.mark.parametrize("kind,text,source,params", [
+    ("search", "Find 'Grace' in this list: Alice, Bob, Charlie, Grace and Henry.", "your problem",
+     {"items": ["Alice", "Bob", "Charlie", "Grace", "Henry"], "target": "Grace"}),
+    ("factoring", "Please factorise 91.", "your problem", {"N": 91}),
+    ("factoring", "Factor 1,000,003 please.", "your problem", {"N": 1000003}),
+    ("factoring", "I need to factorise a large RSA-2048 integer.", "example", {"N": 91}),
+    ("tsp", "Our van delivers to Lahore, Multan, Faisalabad and Sialkot. Shortest route?", "your problem",
+     {"cities": ["Lahore", "Multan", "Faisalabad", "Sialkot"]}),
+    ("tsp", "Find the shortest route visiting 500 cities.", "example", {"cities": data_reader.EXAMPLE_CITIES}),
+])
+def test_the_built_in_rules_read_the_data_or_say_it_is_an_example(kind, text, source, params):
+    out = data_reader.read(text, [], kind, "local", None)
+    assert out["source"] == source and out["spec"]["parameters"] == params
+    assert (source == "example") == any("small example" in n for n in out["notes"])
+
+
+def test_a_query_is_read_and_a_missing_one_is_asked_for():
+    rows = ["name: Ali · age: 34", "name: Sara · age: 45"]
+    older = data_reader.read("Which staff are older than 40?", rows, "database", "local", None)
+    assert older["spec"]["parameters"] == {"records": rows, "query": "age > 40"} and older["source"] == "your problem"
+    none = data_reader.read("Search our staff table.", rows, "database", "local", None)
+    assert none["spec"]["parameters"]["query"] == "" and any("Say what to look for" in n for n in none["notes"])
+    table = data_reader.read("Find Sara.", rows, "search", "local", None)      # a table is searched with a query
+    assert table["spec"]["problem_type"] == "database" and any("solved as a query" in n for n in table["notes"])
+
+
+def test_the_advice_says_how_it_will_be_solved(client, auth):
+    plan = _advise(client, auth, "Search 10 million unsorted customer records to find one customer ID", mode="local").json()["solve"]
+    assert plan["kind"] == "search" and plan["quantum"] == "Grover's Search Algorithm"
+    route = _advise(client, auth, CASES[0][0], mode="local").json()["solve"]
+    assert route["kind"] == "tsp" and route["quantum"] == "QAOA"
+    assert _advise(client, auth, CASES[9][0], mode="local").json()["solve"] is None     # chemistry: not an SFOD problem
+
+
+def test_the_ai_reads_the_data_and_a_file_is_the_data(client, auth, fake_ai):
+    fake_ai.reply = json.dumps({"problem_type": "database", "parameters": {"records": ["a", "b"], "query": "age > 40"},
+                                "explanation": "A staff query.", "confidence": 0.9, "example_data": False})
+    rows = ["name: Ali · age: 34", "name: Sara · age: 45", "name: Omar · age: 52"]
+    r = client.post("/api/module4/read-data", headers=auth,
+                    json={"problem_text": "Who is older than 40?", "data_lines": rows, "kind": "database", "mode": "auto"})
+    body = r.json()
+    assert r.status_code == 200 and body["source"] == "your problem" and body["spec"]["engine"] == "llm"
+    assert body["spec"]["parameters"] == {"records": rows, "query": "age > 40"}      # the AI saw a sample; the file is the data
+    assert "AI Advisor matched this to a database query problem" in fake_ai.calls[0]["user"]
+
+
+def test_an_ai_example_is_called_an_example(client, auth, fake_ai):
+    fake_ai.reply = json.dumps({"problem_type": "factoring", "parameters": {"N": 77}, "explanation": "An example.",
+                                "confidence": 0.8, "example_data": True})
+    body = client.post("/api/module4/read-data", headers=auth,
+                       json={"problem_text": "Break RSA-2048.", "kind": "factoring"}).json()
+    assert body["source"] == "example" and body["spec"]["parameters"] == {"N": 77}
+
+
+def test_solving_runs_both_sides_and_is_saved(client, auth):
+    spec = {"problem_type": "search", "parameters": {"items": ["Alice", "Bob", "Grace", "Henry"], "target": "Grace"}}
+    body = client.post("/api/module4/solve", headers=auth, json={"spec": spec}).json()
+    assert body["supported"] and body["verification"]["match"]
+    assert body["details"]["quantum"]["answer"]["value"] == "Grace" and body["details"]["classical"]["steps"] == 3
+    runs = client.get("/api/dashboard/history", headers=auth).json()["runs"]
+    assert runs[0]["kind"] == "advisor" and runs[0]["title"] == "AI Advisor — solved a search problem"
+
+
+def test_too_big_for_the_simulator_still_gets_the_classical_answer(client, auth):
+    body = client.post("/api/module4/solve", headers=auth,
+                       json={"spec": {"problem_type": "factoring", "parameters": {"N": 143}}}).json()
+    assert body["classical_only"] and "24 qubits" in body["reason"]
+    assert body["classical"]["result"]["factors"] == [11, 13]
+    bad = client.post("/api/module4/solve", headers=auth,
+                      json={"spec": {"problem_type": "tsp", "parameters": {"cities": ["Lahore", "Karachi", "Atlantis"]}}})
+    assert bad.status_code == 422 and "Atlantis" in bad.json()["detail"]
+
+
+def test_an_uploaded_table_comes_back_as_the_data(client, auth):
+    csv_bytes = b"name,dept,age\nAli,Research,34\nSara,Finance,45\n"
+    r = client.post("/api/module4/advise-file", headers=auth, data={"mode": "local"},
+                    files={"file": ("staff.csv", io.BytesIO(csv_bytes), "text/csv")})
+    assert r.status_code == 200 and r.json()["data_lines"] == ["name: Ali · dept: Research · age: 34",
+                                                             "name: Sara · dept: Finance · age: 45"]
+    assert r.json()["problem_text"] == ""        # nothing in the summary is taken as the user's query
+    big = client.post("/api/module4/advise-file", headers=auth, data={"mode": "local"},
+                      files={"file": ("big.txt", io.BytesIO(b"x" * (5 * 1024 * 1024 + 1)), "text/plain")})
+    assert big.status_code == 413
+    old = client.post("/api/module4/advise-file", headers=auth, data={"mode": "local"},
+                      files={"file": ("old.doc", io.BytesIO(b"x"), "application/msword")})
+    assert old.status_code == 400

@@ -59,7 +59,7 @@ def qubits_needed(qid: str, category: int, n: int, text: str) -> Optional[int]:
         return 2 * _bits(text, n) + 3
     if qid == "qaoa":
         if is_routing(category, text):
-            return n * n                                           # a route: one qubit per (stop, position)
+            return (n - 1) ** 2                                    # a route: one qubit per (stop, position), start fixed
         return n if n <= 10_000 else None                          # one per item; a bigger number is likely money, not items
     if qid == "vqe":
         return n
@@ -103,9 +103,6 @@ def _try_here(qid: str, category: int, text: str) -> Dict[str, str]:
     if qid == "grovers":
         return {"label": "Try Grover's search on a small list", "path": "/module2?type=search"}
     return {"label": "Explore small circuits in the Simulator", "path": "/simulator"}
-
-
-SOLVE_TYPES = {"grovers": "search", "amplitude_amp": "database", "shors": "factoring"}
 
 
 def assess(qid: str, name: str, features: Dict[str, Any], text: str) -> Dict[str, Any]:
@@ -169,7 +166,8 @@ def assess(qid: str, name: str, features: Dict[str, Any], text: str) -> Dict[str
             extra = [f"{vehicles} vehicles"] if vehicles > 1 else []
             if "time window" in t:
                 extra.append("the time windows")
-            limits.append(f"{name} would need about {q:,} qubits for one vehicle ({n} stops × {n} positions)"
+            limits.append(f"{name} would need about {q:,} qubits for one vehicle: one per (stop, position) pair with "
+                          f"the start fixed ({n - 1} × {n - 1})"
                           + (f", and more for {' and '.join(extra)}." if extra else "."))
         elif qid == "shors":
             limits.append(f"Shor's algorithm would need about {q:,} error-corrected qubits for a {bits}-bit number; "
@@ -195,7 +193,6 @@ def assess(qid: str, name: str, features: Dict[str, Any], text: str) -> Dict[str
     }[qid])
     limits.append(f"QAIbridge's simulator holds up to {SIMULATOR_QUBITS} qubits, so you can try a small version here.")
 
-    solve = "optimization" if routing else SOLVE_TYPES.get(qid)
     return {
         "today": today,
         "future": future,
@@ -205,5 +202,5 @@ def assess(qid: str, name: str, features: Dict[str, Any], text: str) -> Dict[str
         "proven": facts["proven"],
         "limits": limits,
         "try_here": _try_here(qid, category, t),
-        "solve_here": f"/solve?type={solve}" if solve else None,
+        "routing": routing,
     }

@@ -10,6 +10,7 @@ KIND_BENCHMARK = "benchmark"   # live benchmark suites on the dashboard
 KIND_SFOD = "sfod"             # a Module 2 classical-vs-quantum comparison
 KIND_SOLVE = "solve"           # a Solve-page quantum run on the user's own data
 KIND_TRANSFORM = "transform"   # a Module 5 classical→quantum transformation
+KIND_ADVISOR = "advisor"       # the AI Advisor solving the data in a user's problem
 
 
 class BenchmarkRun(Base):

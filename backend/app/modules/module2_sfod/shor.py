@@ -124,7 +124,7 @@ def run_shor(N: int, a: Optional[int] = None, shots: int = 1024, max_attempts: i
     if N > MAX_SHOR_N:
         q = qubits_needed(N)
         raise ValueError(
-            f"N = {N} needs {q['total']} qubits for exact simulation; this laptop-scale kernel runs Shor's "
+            f"N = {N} needs {q['total']} qubits for exact simulation; QAIbridge's simulator runs Shor's "
             f"algorithm for N ≤ {MAX_SHOR_N} (21 qubits). Try 15, 21, 33, 35, 51, 55, 77, 85, 91 or 119."
         )
     n_total = qubits_needed(N)["total"]

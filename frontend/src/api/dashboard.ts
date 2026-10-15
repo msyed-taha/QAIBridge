@@ -87,7 +87,7 @@ export type SavedSuites = { [K in SuiteKey]?: { title: string; points: SuitePoin
 
 export interface HistoryRun {
   id: number;
-  kind: 'benchmark' | 'sfod' | 'solve' | 'transform';
+  kind: 'benchmark' | 'sfod' | 'solve' | 'transform' | 'advisor';
   title: string;
   summary: RunSummary;
   duration_ms: number | null;

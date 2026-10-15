@@ -162,7 +162,7 @@ export function SideBySide({ result }: { result: ComparisonResult }) {
           <span className="ml-auto font-mono text-red-300 text-sm">{c.complexity}</span>
         </div>
         <p className="text-white font-bold text-sm mb-3">{c.algorithm}</p>
-        <Row label={`Steps (${c.steps_label})`} value={num(c.steps)} />
+        <Row label={`Steps: ${c.steps_label}`} value={num(c.steps)} />
         {result.algorithm === 'search' && result.input.n_marked > 0 && (
           <Row label="Average for this size, (N+1)/2" value={num(result.comparison.classical_expected)} />
         )}
@@ -181,7 +181,7 @@ export function SideBySide({ result }: { result: ComparisonResult }) {
           <span className="ml-auto font-mono text-quantum-neon text-sm">{q.complexity}</span>
         </div>
         <p className="text-white font-bold text-sm mb-3">{q.algorithm}</p>
-        <Row label={`Steps (${q.steps_label})`} value={num(q.steps)} accent />
+        <Row label={`Steps: ${q.steps_label}`} value={num(q.steps)} accent />
         {(result.algorithm === 'search' || result.algorithm === 'database') && (
           <>
             <Row label="Runs × (rounds + 1 check)"

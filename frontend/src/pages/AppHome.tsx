@@ -178,6 +178,7 @@ const RUN_SOURCES: Record<HistoryRun['kind'], { tool: string; to: (run: HistoryR
   sfod:      { tool: toolName('/module2'),   to: run => withType('/module2', run), checked: ['Quantum answer correct', 'Quantum answer wrong'] },
   solve:     { tool: 'Problem Solver',       to: run => withType('/solve', run) },
   transform: { tool: toolName('/module5'),   to: () => '/module5', checked: ['Matches your code', "Didn't match your code"] },
+  advisor:   { tool: toolName('/module4'),   to: () => '/module4', checked: ['Quantum matched classical', "Quantum didn't match"] },
   benchmark: { tool: toolName('/dashboard'), to: () => '/dashboard' },
 };
 

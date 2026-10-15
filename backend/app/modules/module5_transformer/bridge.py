@@ -510,6 +510,8 @@ def haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
 def parse_city_line(line: str) -> Tuple[str, Optional[Tuple[float, float]]]:
     """'Lahore' or 'Lahore, 31.52, 74.35' or 'Depot 12.5 40' → (name, (lat, lon) | None)."""
     import re
+    if "·" in line and ":" in line:          # a labelled row from a file: "city: Lahore · lat: 31.52 · lon: 74.35"
+        line = ", ".join(part.split(":", 1)[-1].strip() for part in line.split("·"))
     nums = re.findall(r"-?\d+(?:\.\d+)?", line)
     if len(nums) >= 2:
         name = re.sub(r"[,;\t]*\s*-?\d+(?:\.\d+)?", "", line).strip(" ,;\t") or line.strip()

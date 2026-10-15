@@ -24,6 +24,7 @@ const KINDS: Record<string, { label: string; badge: string }> = {
   sfod: { label: 'Quantum vs Classical', badge: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
   solve: { label: 'Problem Solver', badge: 'bg-orange-500/10 text-orange-300 border-orange-500/30' },
   transform: { label: 'Code to Quantum', badge: 'bg-purple-500/10 text-purple-300 border-purple-500/30' },
+  advisor: { label: 'AI Advisor', badge: 'bg-amber-500/10 text-amber-200 border-amber-500/30' },
 };
 const OPTION_LABELS: Record<string, string> = {
   search_max_qubits: 'Grover: most qubits', factoring_max_n: 'Shor: largest N', maxcut_max_nodes: 'Max-Cut: most nodes',

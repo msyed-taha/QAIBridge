@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal, get_db
 from ..models.benchmark import KIND_BENCHMARK, KIND_SOLVE
 from ..models.user import User
+from ..modules import file_text
 from ..modules.module8_dashboard import history
 from ..modules.module8_dashboard.benchmarker import (
     DEFAULT_OPTIONS, LIMITS, SUITES, headline, run_benchmark,
@@ -142,65 +143,13 @@ async def solve_user_problem(req: SolveRequest, user: Optional[User] = Depends(g
 
 # ── File extraction endpoint for Solve page ───────────────────────────────────
 
-ALLOWED_EXTENSIONS = {"pdf", "docx", "csv", "tsv", "txt", "md", "log", "json", "xml", "yaml", "yml"}
-MAX_FILE_BYTES = 5 * 1024 * 1024
-
-
-def _json_lines(obj: Any) -> List[str]:
-    """One line per element: a list of values or records, or the key: value pairs of an object."""
-    def flat(v: Any) -> str:
-        if isinstance(v, dict):
-            return " · ".join(f"{k}: {flat(x)}" for k, x in v.items())
-        if isinstance(v, list):
-            return ", ".join(flat(x) for x in v)
-        return str(v)
-    if isinstance(obj, list):
-        return [flat(v) for v in obj]
-    if isinstance(obj, dict):
-        return [f"{k}: {flat(v)}" for k, v in obj.items()]
-    return [str(obj)]
-
-
 @router.post("/extract-file")
 async def extract_file(file: UploadFile = FastAPIFile(...), user: User = Depends(get_current_user)):
     """
     Read an uploaded file as lines of text for the Solve page: one item, record or city per line.
-    Supports PDF, Word (.docx), CSV/TSV, JSON and plain-text formats, up to 5 MB.
+    Supports PDF, Word (.docx), CSV/TSV, JSON and plain-text formats, up to 5 MB (app/modules/file_text.py).
     """
-    import csv
-    import io
-    import json
-
-    fname = (file.filename or "").lower()
-    ext   = fname.rsplit(".", 1)[-1] if "." in fname else ""
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"QAIbridge can't read '.{ext}' files. "
-                                 f"Use one of: {', '.join(sorted(ALLOWED_EXTENSIONS))}.")
-    content = await file.read(MAX_FILE_BYTES + 1)
-    if len(content) > MAX_FILE_BYTES:
-        raise HTTPException(413, "This file is larger than 5 MB.")
-
-    try:
-        if ext == "pdf":
-            from pypdf import PdfReader
-            text = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(content)).pages)
-        elif ext == "docx":
-            from docx import Document
-            text = "\n".join(p.text for p in Document(io.BytesIO(content)).paragraphs if p.text.strip())
-        elif ext in ("csv", "tsv"):
-            rows = csv.reader(io.StringIO(content.decode("utf-8", errors="replace")),
-                              delimiter="," if ext == "csv" else "\t")
-            text = "\n".join(", ".join(c.strip() for c in row) for row in rows if any(c.strip() for c in row))
-        elif ext == "json":
-            text = "\n".join(_json_lines(json.loads(content.decode("utf-8", errors="replace"))))
-        else:
-            text = content.decode("utf-8", errors="replace")
-    except Exception:
-        raise HTTPException(400, f"QAIbridge couldn't read this .{ext} file. Check that it isn't damaged.")
-
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    if not lines:
-        raise HTTPException(400, "No readable text was found in this file. A scanned PDF has none, for example.")
+    ext, lines = await file_text.read_lines(file)
     return {"filename": file.filename, "extension": ext, "text": "\n".join(lines), "line_count": len(lines)}
 
 

@@ -1,5 +1,7 @@
 import apiClient from './client';
 import type { AIStatus } from './ai';
+import type { SolveResult } from './solve';
+import type { ProblemSpec, TransformResult } from './transformer';
 
 /** A method, with how well it fits (the model's confidence, for the quantum ranking). */
 export interface AlgoCard {
@@ -52,7 +54,8 @@ export interface Advice {
   /** The limits of today's hardware for this problem, in plain words. */
   limits: string[];
   try_here: { label: string; path: string } | null;
-  solve_here: string | null;
+  /** How "Solve it here" solves this problem with the SFOD suite (null: the suite doesn't cover it). */
+  solve: SolvePlan | null;
   model_confidence: number;
   /** The model's ranking of the quantum algorithms. */
   recommendations: AlgoCard[];
@@ -69,7 +72,28 @@ export interface Advice {
   source: 'text' | 'file';
   filename?: string;
   input_preview: string;
+  /** An uploaded file's text, as the reader saw it. */
+  problem_text?: string;
+  /** An uploaded file's lines, when they are data (a table or a list): the data to solve. */
+  data_lines?: string[];
 }
+
+export type SolveKind = 'search' | 'database' | 'factoring' | 'tsp' | 'qaoa';
+
+export interface SolvePlan { kind: SolveKind; label: string; classical: string; quantum: string }
+
+/** The data to solve, read from the problem: from it, or a small example when it gave none (always said). */
+export interface ReadData {
+  spec: ProblemSpec;
+  source: 'your problem' | 'example';
+  notes: string[];
+  ai_status: AIStatus;
+}
+
+/** Data too big for the simulator: the classical answer alone, and why. */
+export interface ClassicalOnly { classical_only: true; reason: string; classical: SolveResult }
+
+export type Solved = TransformResult | ClassicalOnly;
 
 /** The text wasn't a computing problem: a polite line saying what the Advisor does. */
 export interface OffTopic { off_topic: true; message: string; ai_status: AIStatus }
@@ -97,4 +121,8 @@ export const advisorApi = {
     form.append('mode', mode);
     return (await apiClient.post('/api/module4/advise-file', form, { timeout: TIMEOUT })).data;
   },
+  readData: async (problem_text: string, data_lines: string[], kind: SolveKind, mode: AdvisorMode): Promise<ReadData> =>
+    (await apiClient.post('/api/module4/read-data', { problem_text, data_lines, kind, mode }, { timeout: TIMEOUT })).data,
+  solve: async (spec: ProblemSpec, layers = 2): Promise<Solved> =>
+    (await apiClient.post('/api/module4/solve', { spec, layers }, { timeout: 180_000 })).data,
 };

@@ -10,9 +10,15 @@ in plain words. When the AI can't answer, or the user picks the built-in
 reader, keyword rules fill in the features instead. Either way the Random
 Forest makes the recommendation.
 
+Solving it (FE-3): the problem's own data is read from the description or the
+uploaded file (data_reader.py) and solved with the chosen algorithm from the
+SFOD suite, classical and quantum side by side, on QAIbridge's simulator.
+
 Routes (signed-in users; the AI has a daily allowance per user):
   POST /api/module4/advise        – Analyse free-text problem description
   POST /api/module4/advise-file   – Analyse uploaded file (PDF, DOCX, CSV, TXT…)
+  POST /api/module4/read-data     – Read the data to solve from the problem (editable)
+  POST /api/module4/solve         – Solve it: classical and quantum, side by side
   GET  /api/module4/algorithms    – List all supported algorithms
   GET  /api/module4/model-info    – Model accuracy, feature importances
 """
@@ -28,8 +34,14 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel, Field
 
 from ..ai import service as ai
+from ..models.benchmark import KIND_ADVISOR
 from ..models.user import User
-from ..modules.module4_recommender import ai_reader, model, reality
+from ..modules import file_text
+from ..modules.module1_kernel.limits import simulation_slot
+from ..modules.module4_recommender import ai_reader, data_reader, model, reality
+from ..modules.module5_transformer import pipeline
+from ..modules.module5_transformer.bridge import KNOWN_CITIES
+from ..modules.module8_dashboard import custom_solver, history
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/module4", tags=["AI Advisor"])
@@ -323,7 +335,8 @@ CATEGORY_KEYWORDS = {
     1: ['factor', 'factoring', 'factorization', 'prime', 'rsa', 'integer decompos'],
     2: ['optim', 'minimize', 'minimise', 'maximise', 'maximize', 'shortest path', 'route', 'tsp',
         'traveling salesman', 'travelling salesman', 'schedule', 'portfolio', 'allocat', 'budget', 'assign',
-        'shift', 'pack', 'container', 'cheapest', 'as few', 'as low as possible', 'most total'],
+        'shift', 'pack', 'container', 'cheapest', 'as few', 'as low as possible', 'most total',
+        'shortest trip', 'shortest tour', 'round trip', 'order of stops', 'delivery route'],
     3: ['database', 'query', 'record', 'sql', 'table', 'row', 'column', 'data entry', 'lookup table'],
     4: ['simulat', 'molecule', 'molecular', 'chemistry', 'hamiltonian', 'energy level',
         'protein', 'drug discovery', 'material', 'quantum system', 'eigenvalue', 'eigenvector', 'unitary',
@@ -448,7 +461,8 @@ def _extract_features_from_text(text: str) -> dict:
     explicit_category = None
 
     # TSP and routing problems are inherently optimization problems
-    if any(phrase in t for phrase in ['travelling salesman', 'traveling salesman', 'tsp', 'shortest route', 'shortest path', 'routing problem', 'vehicle routing']):
+    if any(phrase in t for phrase in ['travelling salesman', 'traveling salesman', 'tsp', 'shortest route', 'shortest path', 'routing problem', 'vehicle routing',
+                                      'shortest trip', 'shortest tour', 'round trip', 'order of stops', 'delivery route']):
         explicit_category = 2  # Optimization (TSP is fundamentally optimization, regardless of wording)
 
     # General optimization problems
@@ -526,6 +540,11 @@ def _extract_features_from_text(text: str) -> dict:
         found_sizes = [n for n in bare_numbers if n >= 100]
     if found_sizes:
         data_size = max(found_sizes)
+    elif best_cat in (2, 6):
+        # a route through named cities: its size is how many there are
+        named = [c for c in KNOWN_CITIES if re.search(rf"\b{re.escape(c)}\b", t)]
+        if len(named) >= 3:
+            data_size = len(named)
 
     return {
         "problem_category":    best_cat,
@@ -619,7 +638,7 @@ def _recommend(features: dict, text: str = "") -> dict:
         },
         "limits":             check["limits"],
         "try_here":           check["try_here"],
-        "solve_here":         check["solve_here"],
+        "solve":              _solve_plan(qid, check["routing"]),
         "model_confidence":   qconf,
         "recommendations":    [_card(a, i, c) for i, (a, c) in enumerate(ranked, 1)],
         "detected_features":  {
@@ -633,74 +652,42 @@ def _recommend(features: dict, text: str = "") -> dict:
         },
     }
 
+def _solve_plan(qid: str, routing: bool) -> Optional[dict]:
+    """How "Solve it here" solves this problem with the SFOD suite (None: the suite doesn't cover it)."""
+    kind = data_reader.solve_kind(qid, routing)
+    if kind is None:
+        return None
+    classical = {"search": "linear search", "database": "a sequential scan", "factoring": "trial division",
+                 "tsp": "exhaustive search", "qaoa": "exhaustive search"}[kind]
+    quantum = "QAOA" if kind == "tsp" else ALGO_MAP[qid]["name"]
+    return {"kind": kind, "label": data_reader.LABELS[kind], "classical": classical, "quantum": quantum}
+
+
 CATEGORY_LABELS = {
     0: "Search", 1: "Factoring", 2: "Optimisation", 3: "Database",
     4: "Simulation", 5: "Machine Learning", 6: "Graph", 7: "Cryptography",
 }
 
-# ── File text extraction ──────────────────────────────────────────────────────
+# ── File text for the reader ──────────────────────────────────────────────────
 
-async def _extract_text(file: UploadFile) -> str:
-    content = await file.read()
-    fname   = (file.filename or "").lower()
-    ext     = fname.rsplit(".", 1)[-1] if "." in fname else ""
+ADVISOR_FORMATS = file_text.FORMATS
 
-    # ── PDF ──────────────────────────────────────────────────────────────────
-    if ext == "pdf":
-        try:
-            from pypdf import PdfReader
-            reader = PdfReader(io.BytesIO(content))
-            pages  = [p.extract_text() or "" for p in reader.pages]
-            text   = "\n".join(pages).strip()
-            if not text:
-                raise HTTPException(400, "PDF appears to be scanned/image-only. Please provide a text-based PDF.")
-            return text
-        except ImportError:
-            raise HTTPException(500, "pypdf library not installed on this server.")
 
-    # ── DOCX ─────────────────────────────────────────────────────────────────
-    if ext in ("docx", "doc"):
-        try:
-            from docx import Document
-            doc   = Document(io.BytesIO(content))
-            lines = [p.text for p in doc.paragraphs if p.text.strip()]
-            return "\n".join(lines)
-        except ImportError:
-            raise HTTPException(500, "python-docx not installed on this server.")
+def _reader_text(ext: str, lines: List[str]) -> str:
+    """What the reader sees: a data file is described by its size and first rows; other files are read as text."""
+    if ext in ("csv", "tsv", "json"):
+        return (f"A data file with {len(lines):,} records. The first ones:\n" + "\n".join(lines[:5])
+                + f"\nThis is a structured database query or search problem over {len(lines):,} records.")
+    return "\n".join(lines)[:20_000]
 
-    # ── CSV ──────────────────────────────────────────────────────────────────
-    if ext == "csv":
-        try:
-            decoded = content.decode("utf-8", errors="replace")
-            reader  = csv.reader(io.StringIO(decoded))
-            rows    = list(reader)
-            n_rows  = len(rows) - 1  # exclude header
-            header  = rows[0] if rows else []
-            sample  = rows[1:6] if len(rows) > 1 else []
-            summary = (
-                f"CSV dataset with {n_rows} rows and {len(header)} columns. "
-                f"Columns: {', '.join(header[:20])}. "
-                f"Sample data: {str(sample[:3])}. "
-                f"This is a structured database query or search problem over {n_rows} records."
-            )
-            return summary
-        except Exception:
-            return content.decode("utf-8", errors="replace")
 
-    # ── JSON ─────────────────────────────────────────────────────────────────
-    if ext == "json":
-        try:
-            data = json.loads(content)
-            if isinstance(data, list):
-                return (f"JSON dataset with {len(data)} records. "
-                        f"Fields: {', '.join(data[0].keys()) if data else 'none'}. "
-                        f"This is a structured search or database problem.")
-            return json.dumps(data, indent=2)[:3000]
-        except Exception:
-            return content.decode("utf-8", errors="replace")[:3000]
+def _looks_like_data(ext: str, lines: List[str]) -> bool:
+    """A table, or a list of short lines, is data to solve; a page of sentences describes the problem."""
+    if ext in ("csv", "tsv", "json"):
+        return True
+    short = sum(1 for ln in lines if len(ln.split()) <= 12)
+    return len(lines) >= 3 and short >= 0.8 * len(lines)
 
-    # ── Plain text / markdown / code ─────────────────────────────────────────
-    return content.decode("utf-8", errors="replace")
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
@@ -768,18 +755,80 @@ def advise_text(req: AdviseTextRequest, user: User = Depends(get_current_user)):
 
 @router.post("/advise-file")
 async def advise_file(file: UploadFile = File(...), mode: Mode = Form("auto"), user: User = Depends(get_current_user)):
-    """Extract text from an uploaded file and analyse the problem."""
-    allowed = {"pdf", "docx", "doc", "csv", "txt", "md", "json", "tex", "rtf"}
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
-    if ext not in allowed:
-        raise HTTPException(400, f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(allowed))}")
-    extracted = await _extract_text(file)
-    if not extracted.strip():
-        raise HTTPException(400, "Could not extract any text from the uploaded file.")
+    """Read an uploaded file (up to 5 MB) and analyse the problem; its lines come back as the data to solve."""
+    ext, lines = await file_text.read_lines(file, ADVISOR_FORMATS)
+    extracted = _reader_text(ext, lines)
     result = _advise(extracted, mode, user)
     result["source"]        = "file"
     result["filename"]      = file.filename
     result["input_preview"] = extracted[:300]
+    data = _looks_like_data(ext, lines)
+    # a table's description above is QAIbridge's own words, not the user's: only the rows go on to be solved
+    result["problem_text"]  = "" if ext in ("csv", "tsv", "json") else extracted
+    result["data_lines"]    = lines[:data_reader.MAX_ITEMS] if data else []
+    return result
+
+
+# ── Solving it (FE-3) ─────────────────────────────────────────────────────────
+
+class ReadDataRequest(BaseModel):
+    problem_text: str = Field("", max_length=20_000)
+    data_lines:   List[str] = Field(default_factory=list, max_length=data_reader.MAX_ITEMS)
+    kind:         Literal["search", "database", "factoring", "tsp", "qaoa"]
+    mode:         Mode = "auto"
+
+
+@router.post("/read-data")
+def read_data(req: ReadDataRequest, user: User = Depends(get_current_user)):
+    """The data to solve, read from the problem (or a small example, said so), for the user to check and edit."""
+    if not req.problem_text.strip() and not req.data_lines:
+        raise HTTPException(422, "There is no problem to read the data from.")
+    out = data_reader.read(req.problem_text, req.data_lines, req.kind, req.mode, user.id)
+    out["ai_status"] = ai.status(user.id)
+    return out
+
+
+class SolveRequest(BaseModel):
+    spec:   Dict[str, Any]
+    layers: int = Field(2, ge=1, le=3)
+
+
+def _classical_only(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The classical answer alone, for data too big for the simulator (None for other problem types)."""
+    kind, p = spec.get("problem_type"), spec.get("parameters") or {}
+    if kind == "search":
+        return custom_solver.solve_search_classical([str(x) for x in p.get("items") or []], str(p.get("target") or "")).to_dict()
+    if kind == "database":
+        return custom_solver.solve_database_classical([str(x) for x in p.get("records") or []], str(p.get("query") or "")).to_dict()
+    if kind == "factoring":
+        return custom_solver.solve_factoring_classical(int(p["N"])).to_dict()
+    if kind == "tsp" and p.get("cities") and 3 <= len(p["cities"]) <= 12:
+        return custom_solver.solve_optimization_classical([str(c) for c in p["cities"]]).to_dict()
+    return None
+
+
+@router.post("/solve")
+def solve(req: SolveRequest, user: User = Depends(get_current_user)):
+    """
+    Solve the problem's data both ways with the SFOD suite. When the data is too big for the simulator,
+    the classical answer comes back alone, with the reason.
+    """
+    try:
+        with simulation_slot():
+            result = pipeline.execute(req.spec, layers=req.layers, shots=1024)
+    except MemoryError as e:
+        raise HTTPException(400, str(e))
+    except (ValueError, KeyError, TypeError, IndexError) as e:
+        reason = f"Missing {e} in the data." if isinstance(e, KeyError) else str(e)
+        try:
+            classical = _classical_only(req.spec)
+        except (ValueError, KeyError, TypeError, IndexError):
+            classical = None
+        if classical is None or classical.get("error"):
+            raise HTTPException(422, reason)
+        return {"classical_only": True, "reason": reason, "classical": classical}
+    title, summary = history.advisor_summary(req.spec, result)
+    history.record_run(user.id, KIND_ADVISOR, title, summary, duration_ms=result.get("total_ms"))
     return result
 
 

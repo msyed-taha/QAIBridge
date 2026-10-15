@@ -14,10 +14,14 @@ from sqlalchemy.orm import Session
 
 from ...database import SessionLocal
 from ...models.benchmark import (
-    KIND_BENCHMARK, KIND_SFOD, KIND_SOLVE, KIND_TRANSFORM, BenchmarkRun,
+    KIND_ADVISOR, KIND_BENCHMARK, KIND_SFOD, KIND_SOLVE, KIND_TRANSFORM, BenchmarkRun,
 )
 
 log = logging.getLogger(__name__)
+
+
+# The kinds of run whose quantum answer is checked against a classical one
+CHECKED_KINDS = (KIND_SFOD, KIND_SOLVE, KIND_TRANSFORM, KIND_ADVISOR)
 
 
 def to_dict(run: BenchmarkRun, with_payload: bool = False) -> Dict[str, Any]:
@@ -103,9 +107,9 @@ def overview(db: Session, user_id: int) -> Dict[str, Any]:
                                 ("shor_success_rate", max)):
                 if s.get(key) is not None:
                     kpi[key] = better(kpi.get(key, s[key]), s[key])
-        if r.kind in (KIND_SFOD, KIND_SOLVE, KIND_TRANSFORM) and s.get("qubits"):
+        if r.kind in CHECKED_KINDS and s.get("qubits"):
             kpi["kernel_max_qubits"] = max(kpi.get("kernel_max_qubits", 0), s["qubits"])
-    correct = [r for r in runs if r.kind in (KIND_SFOD, KIND_SOLVE, KIND_TRANSFORM) and "quantum_correct" in (r.summary or {})]
+    correct = [r for r in runs if r.kind in CHECKED_KINDS and "quantum_correct" in (r.summary or {})]
     if correct:
         kpi["quantum_correct_rate"] = round(sum(1 for r in correct if r.summary["quantum_correct"]) / len(correct), 3)
     last = max(runs, key=lambda r: r.id) if runs else None
@@ -149,3 +153,15 @@ def transform_summary(spec: Dict[str, Any], result: Dict[str, Any]) -> Tuple[str
         "algorithm": result.get("algorithm"),
     }
     return title, summary
+
+
+def advisor_summary(spec: Dict[str, Any], result: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    """An AI Advisor run: the user's own problem, solved both ways."""
+    kind = result.get("problem_type", spec.get("problem_type"))
+    d = result.get("details") or {}
+    q = d.get("quantum") or {}
+    qubits = (q.get("circuit") or {}).get("qubits") or (q.get("detail") or {}).get("qubits") or d.get("qubits")
+    return f"AI Advisor — solved a {kind} problem", {
+        "problem_type": kind, "algorithm": result.get("algorithm"), "engine": spec.get("engine"),
+        "quantum_correct": bool((result.get("verification") or {}).get("match")), "qubits": qubits,
+    }
