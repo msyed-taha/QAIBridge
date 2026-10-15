@@ -15,7 +15,7 @@ export const CLASS_COLORS = ['#fbbf24', '#38bdf8'] as const;
 
 const TEXT = { color: COLORS.text, family: 'Inter, sans-serif', size: 12 };
 const TICKS = { color: COLORS.muted, size: 12 };
-const LEGEND = { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom', font: { color: COLORS.text, size: 12 }, bgcolor: 'rgba(0,0,0,0)' };
+const LEGEND = { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom', font: { color: COLORS.text, size: 12 }, bgcolor: 'rgba(0,0,0,0)' } as const;
 const SURFACE = '#12122b';
 
 function rgba(hex: string, alpha: number) {
@@ -42,9 +42,9 @@ function pointTraces(data: Dataset) {
 
 const square = (title: boolean) => ({
   font: TEXT, showlegend: false, margin: { t: 8, r: 8, b: title ? 44 : 28, l: title ? 48 : 32 },
-  xaxis: { range: [-1.12, 1.12], tickvals: [-1, 0, 1], tickfont: TICKS, zeroline: false, constrain: 'domain',
+  xaxis: { range: [-1.12, 1.12], tickvals: [-1, 0, 1], tickfont: TICKS, zeroline: false, constrain: 'domain' as const,
     ...(title ? { title: { text: 'Feature 1' } } : {}) },
-  yaxis: { range: [-1.12, 1.12], tickvals: [-1, 0, 1], tickfont: TICKS, zeroline: false, scaleanchor: 'x', constrain: 'domain',
+  yaxis: { range: [-1.12, 1.12], tickvals: [-1, 0, 1], tickfont: TICKS, zeroline: false, scaleanchor: 'x' as const, constrain: 'domain' as const,
     ...(title ? { title: { text: 'Feature 2' } } : {}) },
 });
 

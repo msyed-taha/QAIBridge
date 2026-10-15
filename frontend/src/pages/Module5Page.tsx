@@ -14,7 +14,9 @@ import {
   transformerApi, type ClassicalRun, type EngineStatus, type Example, type ProblemSpec, type TransformResult,
 } from '../api/transformer';
 import { getApiErrorMessage } from '../api/client';
-import type { ComparisonResult, GroverQuantum, QaoaQuantum, ShorQuantum, SideResult } from '../api/sfod';
+import type { ComparisonResult } from '../api/sfod';
+import type { LogicDetails, QaoaProblemDetails } from '../api/transformer';
+import { RunWalkthrough } from '../components/module2/RunWalkthrough';
 
 const TYPE_LABEL: Record<string, string> = {
   search: 'Unstructured search', database: 'Database query', factoring: 'Integer factoring',
@@ -154,7 +156,8 @@ export function Module5Page() {
   const reached = result ? (result.supported ? 6 : 1) : spec ? 1 : 0;
   const details = result?.details;
   // search, database, factoring and city routes come back as a quantum-vs-classical comparison
-  const comparison = <Q extends SideResult>() => details as unknown as ComparisonResult<Q>;
+  const comparison = details && ['search', 'database', 'factoring', 'optimization'].includes(String(details.algorithm))
+    ? details as unknown as ComparisonResult : null;
 
   return (
     <div className="min-h-screen px-4 py-10 max-w-6xl mx-auto">
@@ -339,12 +342,18 @@ export function Module5Page() {
             </div>
           </div>
 
-          {details && ['search', 'database'].includes(result.problem_type) && (<><SideBySide result={comparison()} /><GroverViews result={comparison<GroverQuantum>()} /></>)}
-          {details && result.problem_type === 'factoring' && (<><SideBySide result={comparison()} /><ShorViews result={comparison<ShorQuantum>()} /></>)}
-          {details && result.problem_type === 'tsp' && details.algorithm === 'optimization' && (<><SideBySide result={comparison()} /><TspViews result={comparison<QaoaQuantum>()} /></>)}
-          {details && ['knapsack', 'maxcut', 'partition', 'portfolio'].includes(result.problem_type) && <QaoaProblemView kind={result.problem_type} details={details} />}
-          {details && result.problem_type === 'tsp' && details.algorithm !== 'optimization' && <QaoaProblemView kind="tsp" details={details} />}
-          {details && result.problem_type === 'boolean' && <LogicView details={details} />}
+          {comparison && (
+            <>
+              <SideBySide result={comparison} />
+              <RunWalkthrough result={comparison} />
+              {(comparison.algorithm === 'search' || comparison.algorithm === 'database') && <GroverViews result={comparison} />}
+              {comparison.algorithm === 'factoring' && <ShorViews result={comparison} />}
+              {comparison.algorithm === 'optimization' && <TspViews result={comparison} />}
+            </>
+          )}
+          {details && ['knapsack', 'maxcut', 'partition', 'portfolio'].includes(result.problem_type) && <QaoaProblemView kind={result.problem_type} details={details as unknown as QaoaProblemDetails} />}
+          {details && result.problem_type === 'tsp' && details.algorithm !== 'optimization' && <QaoaProblemView kind="tsp" details={details as unknown as QaoaProblemDetails} />}
+          {details && result.problem_type === 'boolean' && <LogicView details={details as unknown as LogicDetails} />}
 
           {result.qiskit && (
             <CodeBlock code={result.qiskit} title="6 · Export — runnable Qiskit code"

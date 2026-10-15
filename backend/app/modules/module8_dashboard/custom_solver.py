@@ -90,7 +90,7 @@ def solve_search_classical(dataset: List[str], target: str) -> SolveResult:
             f"{'found' if idx is not None else 'ruled out'}. Unsorted data offers no shortcut: "
             f"on average N/2 = {n / 2:g} comparisons, {n} in the worst case."
         ),
-        success=idx is not None,
+        success=True,
     )
 
 
@@ -103,6 +103,7 @@ def solve_search_quantum(dataset: List[str], target: str) -> SolveResult:
         return _failed("search", "quantum", "Grover's Algorithm", "O(√N)", len(items), str(e))
     q = cmp["quantum"]
     ans = q["answer"]
+    runs = q["runs"]
     n = len(items)
     found = ans["index"] is not None
     hist = [{"label": items[h["index"]] if h["index"] < n else f"(padding {h['index']})",
@@ -114,19 +115,17 @@ def solve_search_quantum(dataset: List[str], target: str) -> SolveResult:
             "grover_iterations": q["iterations"], "success_probability": q["success_probability"],
             "qubits": q["n_qubits"], "gates": q["circuit"]["gates"], "depth": q["circuit"]["depth"],
             "shots": q["shots"], "measured_success_rate": q["measured_success_rate"],
-            "histogram": hist, "curve": q["curve"],
+            "histogram": hist, "curve": q["curve"], "runs": runs,
         },
-        steps=q["iterations"], steps_label="oracle queries", elapsed_ms=q["simulation_ms"],
-        complexity="O(√N)", theoretical_steps=max(1, optimal_iterations(2 ** q["n_qubits"], 1)), input_size=n,
+        steps=q["steps"], steps_label="oracle queries", elapsed_ms=q["simulation_ms"],
+        complexity="O(√N)", theoretical_steps=max(1, optimal_iterations(2 ** q["n_qubits"], 1)) + 1, input_size=n,
         explanation=(
-            f"Encoded {n} items into {q['n_qubits']} qubits ({2 ** q['n_qubits']} basis states) and put them in "
-            f"equal superposition. {q['iterations']} Grover iteration(s) (oracle + diffuser) raised the target's "
-            f"probability from {1 / 2 ** q['n_qubits']:.2%} to {q['success_probability']:.1%}; "
-            f"{q['measured_success_rate']:.0%} of {q['shots']} simulated measurements returned it. "
-            + ("A final oracle check verified the answer." if found else
-               "The measured item failed the final oracle check, so the target is reported as not present.")
+            f"Encoded {n} items into {q['n_qubits']} qubits ({2 ** q['n_qubits']} basis states) in equal superposition. "
+            + (f"{q['iterations']} Grover round(s) (oracle + diffuser) raised the target's chance from "
+               f"{1 / 2 ** q['n_qubits']:.2%} to {q['success_probability']:.1%}. " if q["n_marked"] else "")
+            + cmp["comparison"]["notes"][1]
         ),
-        success=found,
+        success=bool(q["correct"]),
     )
 
 
@@ -148,8 +147,11 @@ def solve_factoring_classical(number: int) -> SolveResult:
         input_size=number,
         explanation=(
             f"{r['algorithm']} factored {number:,} = {' × '.join(map(str, factors))} after {steps:,} steps. "
-            f"The worst case (a prime or a product of two large primes) needs ~√N = {math.isqrt(number):,} "
-            "trial divisions — infeasible for 600-digit RSA moduli."
+            + (f"The worst case (a prime, or two primes of similar size) tries 2 and every odd number up to "
+               f"√N = {math.isqrt(number):,}: about {math.isqrt(number) // 2 + 1:,} divisions. That cost doubles "
+               "with every 2 bits of N, which is why it is hopeless for 600-digit RSA moduli."
+               if "divisions" in r else
+               "Pollard's rho needs about N^¼ steps: far fewer, but still hopeless for 600-digit RSA moduli.")
         ),
         success=True,
     )
@@ -172,7 +174,7 @@ def solve_factoring_quantum(number: int) -> SolveResult:
         problem_type="factoring", approach="quantum", algorithm="Shor's Algorithm (QFT)",
         result={
             "number": number, "factors": factors, "factored_form": " × ".join(map(str, factors)),
-            "is_prime": is_prime, "qubits_needed": qn["total"], "status": q["status"],
+            "is_prime": is_prime, "qubits_needed": qn["total"], "status": q["status"], "from_period": q["from_period"],
             "a": q.get("a"), "period": q.get("period"),
             "qubits": detail.get("qubits"), "gates": detail.get("gates"), "depth": detail.get("depth"),
             "measurements": detail.get("measurements", [])[:8],
@@ -289,20 +291,22 @@ def solve_database_quantum(records: List[str], query: str) -> SolveResult:
         return _failed("database", "quantum", "Amplitude Amplification", "O(√(N/M))", len(recs), str(e))
     q = cmp["quantum"]
     n = len(recs)
+    m_true = cmp["input"]["n_matches"]
     matches = [{"index": m["index"], "value": m["record"], "count": m["count"]} for m in q["retrieved"]]
     return SolveResult(
         problem_type="database", approach="quantum", algorithm="Amplitude Amplification",
         result={"query": query, "query_meaning": cmp["input"]["query_meaning"], "total_records": n,
-                "matches_found": len(matches), "matches": matches, "true_matches": cmp["input"]["n_matches"],
-                "quantum_queries": q["iterations"], "success_probability": q["success_probability"],
-                "qubits": q["n_qubits"], "shots": q["shots"]},
-        steps=q["iterations"], steps_label="oracle queries", elapsed_ms=q["simulation_ms"],
+                "matches_found": q["answer"]["matches_seen"], "matches": matches, "true_matches": m_true,
+                "first": q["answer"]["first"], "first_index": q["answer"]["index"],
+                "runs": q["runs"], "collect_all": q["collect_all"],
+                "success_probability": q["success_probability"], "qubits": q["n_qubits"], "shots": q["shots"]},
+        steps=q["steps"], steps_label="oracle queries (to first match)", elapsed_ms=q["simulation_ms"],
         complexity="O(√(N/M))", theoretical_steps=max(1, math.ceil(math.sqrt(n))), input_size=n,
         explanation=(
-            f"Loaded {n} records into {q['n_qubits']} qubits. The oracle marks the "
-            f"{cmp['input']['n_matches']} matching record(s); {q['iterations']} amplification round(s) raised the "
-            f"chance that a measurement returns a match to {q['success_probability']:.1%}. Across {q['shots']} "
-            f"simulated measurements, {len(matches)} distinct matching record(s) were retrieved."
+            f"Loaded {n} records into {q['n_qubits']} qubits. "
+            + (f"The oracle marks the {m_true} matching record(s); {q['iterations']} amplification round(s) raised the "
+               f"chance that a measurement returns a match to {q['success_probability']:.1%}. " if m_true else "")
+            + " ".join(cmp["comparison"]["notes"][:1] + cmp["comparison"]["notes"][2:3])
         ),
-        success=cmp["input"]["n_matches"] == 0 or bool(matches),
+        success=bool(q["correct"]),
     )

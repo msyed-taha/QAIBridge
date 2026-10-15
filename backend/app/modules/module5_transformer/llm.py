@@ -39,8 +39,8 @@ parameters by problem_type (use the concrete data found in the code; keep lists 
   search:    {"items": ["..."], "target": "..."}                          (unsorted lookup of one value)
   database:  {"records": ["one text line per record"], "query": "keyword | field = text | field > number"}
   factoring: {"N": integer}                                               (integer factorisation / primality)
-  tsp:       {"cities": ["Name, latitude, longitude" or known city names]} or {"distance_matrix": [[...]]}
-             (at most 5 cities)
+  tsp:       {"cities": ["Name, latitude, longitude", ...]} or {"distance_matrix": [[...]]}
+             (at most 5 cities; give every city its real latitude and longitude)
   knapsack:  {"names": [...], "weights": [integers], "values": [numbers], "capacity": integer}
   maxcut:    {"n_nodes": integer, "edges": [[i, j, weight], ...]}         (split a graph into two groups)
   partition: {"numbers": [...]}                                           (two groups with equal sums)

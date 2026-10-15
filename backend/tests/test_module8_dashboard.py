@@ -133,3 +133,22 @@ def test_module2_runs_are_recorded_for_signed_in_users(client):
         assert len(runs) == 1 and runs[0]["summary"]["quantum_correct"] is True
     finally:
         _cleanup(uid)
+
+
+def test_file_upload_needs_sign_in_and_reads_lines(client):
+    files = {"file": ("people.json", b'[{"name": "Ali", "age": 34}, {"name": "Sara", "age": 41}]', "application/json")}
+    assert client.post("/api/dashboard/extract-file", files=files).status_code in (401, 403)
+    uid, email, pw = _mk_user()
+    try:
+        h, _ = _headers(client, email, pw)
+        r = client.post("/api/dashboard/extract-file", files=files, headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["text"].splitlines() == ["name: Ali · age: 34", "name: Sara · age: 41"]
+        csv_file = {"file": ("cities.csv", b"Lahore\n\nKarachi\n", "text/csv")}
+        assert client.post("/api/dashboard/extract-file", files=csv_file, headers=h).json()["line_count"] == 2
+        big = {"file": ("big.txt", b"x" * (5 * 1024 * 1024 + 1), "text/plain")}
+        assert client.post("/api/dashboard/extract-file", files=big, headers=h).status_code == 413
+        old_word = {"file": ("old.doc", b"binary", "application/msword")}
+        assert client.post("/api/dashboard/extract-file", files=old_word, headers=h).status_code == 400
+    finally:
+        _cleanup(uid)

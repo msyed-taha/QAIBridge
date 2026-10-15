@@ -522,19 +522,21 @@ def distance_matrix_from_cities(lines: Sequence[str]) -> Dict[str, Any]:
     """
     Build a real distance matrix from city names and/or coordinates.
     Known city names use their real latitude/longitude (great-circle km);
-    unknown names without coordinates get deterministic stand-in positions.
+    any other place needs its coordinates, since a made-up position would
+    give made-up distances.
     """
     names, coords, sources = [], [], []
     for line in lines:
         name, xy = parse_city_line(line)
-        names.append(name)
         if xy is None:
-            seed = sum(ord(c) for c in name.lower())
-            local = np.random.default_rng(seed)
-            xy = (float(local.uniform(24, 36)), float(local.uniform(62, 76)))
-            sources.append("estimated")
-        else:
-            sources.append("given" if any(ch.isdigit() for ch in line) else "known")
+            raise ValueError(f"'{name}' isn't a city QAIbridge knows. Add its latitude and longitude, "
+                             f"like '{name}, 33.68, 73.05', or use a known city such as Lahore or Karachi.")
+        lat, lon = xy
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError(f"'{name}' has an impossible position ({lat}, {lon}): latitude must be "
+                             "between −90 and 90 and longitude between −180 and 180.")
+        names.append(name)
+        sources.append("given" if any(ch.isdigit() for ch in line) else "known")
         coords.append(xy)
     n = len(names)
     d = np.zeros((n, n))

@@ -5,7 +5,6 @@ Routes:
                                  (on the Module 1 kernel) and compare them
   GET  /api/module2/info       - Static metadata about all 4 algorithms
   GET  /api/module2/presets    - Ready-made inputs for the UI (cities, queries, N values)
-  POST /api/module2/tutorial   - Get step-by-step walkthrough tutorial
 """
 from __future__ import annotations
 
@@ -27,7 +26,6 @@ from ..modules.module2_sfod.suite import (
 )
 from ..modules.module2_sfod.grover import MAX_GROVER_QUBITS
 from ..modules.module2_sfod.shor import MAX_SHOR_N
-from ..modules.module2_sfod.tutorial import generate_tutorial, TutorialSession
 from ..modules.module5_transformer.bridge import KNOWN_CITIES
 
 router = APIRouter(prefix="/api/module2", tags=["Module 2 - SFOD Comparison Suite"])
@@ -56,11 +54,6 @@ class RunRequest(BaseModel):
     shots:        int = Field(1024, ge=16, le=8192)
     seed:         Optional[int] = None
     input_size:   Optional[int] = Field(None, ge=2, description="Legacy single-number input")
-
-
-class TutorialRequest(BaseModel):
-    algorithm:  AlgoType
-    input_size: int = Field(..., ge=4, le=10000)
 
 
 def run_comparison_request(req: RunRequest) -> dict:
@@ -108,12 +101,6 @@ def run_comparison(req: RunRequest, user: Optional[User] = Depends(get_optional_
         result["run_id"] = history.record_run(user.id, KIND_SFOD, title, summary,
                                               duration_ms=result["quantum"].get("time_ms"))
     return result
-
-
-@router.post("/tutorial", response_model=TutorialSession)
-def get_tutorial(req: TutorialRequest):
-    """Get step-by-step walkthrough tutorial for an algorithm."""
-    return generate_tutorial(req.algorithm, req.input_size)
 
 
 @router.get("/presets")

@@ -13,7 +13,7 @@ export const METHOD_ORDER: RaceMethod[] = ['random', 'rescued', 'near_zero', 'ne
 
 const TEXT = { color: COLORS.text, family: 'Inter, sans-serif', size: 12 };
 const TICKS = { color: COLORS.muted, size: 12 };
-const LEGEND = { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom', font: { color: COLORS.text, size: 12 }, bgcolor: 'rgba(0,0,0,0)' };
+const LEGEND = { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom', font: { color: COLORS.text, size: 12 }, bgcolor: 'rgba(0,0,0,0)' } as const;
 
 function rgba(hex: string, alpha: number) {
   const n = parseInt(hex.slice(1), 16);

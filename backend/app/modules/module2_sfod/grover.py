@@ -26,6 +26,7 @@ import numpy as np
 from ..module1_kernel import QuantumCircuit, QuantumStateVector, check_memory
 
 MAX_GROVER_QUBITS = 16          # 65,536 items
+CONFIDENCE = 0.99               # how sure "not there" must be before the search gives up
 
 
 def optimal_iterations(n_items: int, n_marked: int) -> int:
@@ -33,6 +34,13 @@ def optimal_iterations(n_items: int, n_marked: int) -> int:
         return 0
     theta = math.asin(math.sqrt(n_marked / n_items))
     return max(0, int(math.floor(math.pi / (4 * theta))))
+
+
+def runs_for_confidence(p: float, confidence: float = CONFIDENCE) -> int:
+    """Runs needed for something found with chance p per run to come up at least once, with this confidence."""
+    if p >= confidence:
+        return 1
+    return math.ceil(math.log(1 - confidence) / math.log(1 - p))
 
 
 def build_grover_circuit(n_qubits: int, marked: Sequence[int], iterations: int) -> QuantumCircuit:
@@ -106,6 +114,15 @@ def run_grover(n_qubits: int, marked: Sequence[int], shots: int = 1024,
     top = [{"index": i, "probability": round(p, 6), "marked": i in marked_set}
            for i, p in sv.top_states(min(16, N))]
 
+    # Each shot is one run of the circuit, in the order they were measured: the first run whose item
+    # passes the oracle check, and the run by which every marked item had come up at least once.
+    is_hit = np.isin(samples, marked_arr) if M else np.zeros(len(samples), dtype=bool)
+    first_hit_shot = int(np.argmax(is_hit)) + 1 if is_hit.any() else None
+    first_seen = {int(u): int(i) for u, i in zip(*np.unique(samples, return_index=True))}
+    all_found_shot = (max(first_seen[m] for m in marked) + 1
+                      if M and all(m in first_seen for m in marked) else None)
+    hit_counts = [{"index": int(uniq[i]), "count": int(cnt[i])} for i in order if int(uniq[i]) in marked_set]
+
     stats = circ.stats()
     return {
         "n_qubits": n_qubits,
@@ -127,6 +144,11 @@ def run_grover(n_qubits: int, marked: Sequence[int], shots: int = 1024,
         "measured_hits": hits,
         "measured_success_rate": round(hits / shots, 6) if shots else 0.0,
         "most_frequent": histogram[0]["index"] if histogram else None,
+        "first_hit_shot": first_hit_shot,
+        "first_hit_index": int(samples[first_hit_shot - 1]) if first_hit_shot else None,
+        "all_found_shot": all_found_shot,
+        "distinct_hits": len(hit_counts),
+        "hit_counts": hit_counts[:256],          # the marked items measured, most often first
         "circuit": {
             "qubits": n_qubits,
             "gates": stats["gates"],

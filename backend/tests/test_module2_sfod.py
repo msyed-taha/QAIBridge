@@ -138,3 +138,56 @@ def test_solve_endpoint_quantum_runs_circuits(client):
         "problem_type": "optimization", "approach": "quantum",
         "cities": ["Islamabad", "Lahore", "Karachi", "Peshawar", "Quetta", "Multan"]}).json()["result"]
     assert not too_big["success"] and "25 qubits" in too_big["error"]
+
+
+def test_search_counts_every_run_and_the_check():
+    s = compare_search(n_qubits=6, target_index=42, seed=1)
+    q, runs = s["quantum"], s["quantum"]["runs"]
+    assert runs["found"] and q["answer"]["index"] == 42
+    assert runs["queries_per_run"] == q["iterations"] + 1
+    assert q["steps"] == runs["runs"] * runs["queries_per_run"] == s["comparison"]["quantum_steps"]
+
+
+def test_search_for_a_missing_item_still_costs_queries():
+    s = compare_search(items=list("ABCDEFGH"), target="Z", seed=1)
+    q, runs = s["quantum"], s["quantum"]["runs"]
+    assert q["answer"]["index"] is None and q["correct"] and not runs["found"]
+    assert q["iterations"] == 2                                  # planned for one match among 8
+    assert (1 - runs["p_if_there"]) ** runs["runs"] <= 1 - runs["confidence"]
+    assert q["steps"] == runs["runs"] * 3 > 0
+    assert s["classical"]["steps"] == 8
+
+
+def test_database_finds_one_match_and_counts_listing_them_all():
+    db = compare_database(n_records=256, query="Research", seed=1)
+    q, m = db["quantum"], db["input"]["n_matches"]
+    assert q["correct"] and q["answer"]["index"] in db["classical"]["matches"]
+    assert q["steps"] == q["runs"]["runs"] * (q["iterations"] + 1)
+    assert q["collect_all"]["queries"] == q["collect_all"]["runs"] * (q["iterations"] + 1)
+    assert q["answer"]["matches_seen"] == m
+    many = compare_database(n_records=256, query="age > 30", seed=1)["quantum"]
+    assert many["answer"]["matches_seen"] > 32                 # counted over every shot, not just the top of the histogram
+    none = compare_database(n_records=64, query="nobody here", seed=1)
+    assert none["quantum"]["correct"] and none["quantum"]["steps"] > 0 and none["classical"]["steps"] == 64
+
+
+def test_factoring_says_when_no_quantum_step_ran():
+    assert compare_factoring(91, seed=1)["quantum"]["from_period"]
+    for n in (97, 22, 49):
+        assert not compare_factoring(n, seed=1)["quantum"]["from_period"]
+    lucky = compare_factoring(91, a=7)["quantum"]
+    assert lucky["answer"]["factors"] == [7, 13] and not lucky["from_period"]
+
+
+def test_unknown_cities_are_refused_not_invented(client):
+    with pytest.raises(ValueError, match="Atlantis"):
+        compare_optimization(["Islamabad", "Lahore", "Atlantis"], p=1, seed=1)
+    with pytest.raises(ValueError, match="impossible"):
+        compare_optimization(["Islamabad", "Lahore", "Depot, 120, 73"], p=1, seed=1)
+    given = compare_optimization(["Islamabad", "Lahore", "Depot, 33.7, 73.1"], p=1, seed=1)
+    assert given["input"]["sources"] == ["known", "known", "given"]
+    r = client.post("/api/module2/run", json={"algorithm": "optimization", "cities": ["Lahore", "Karachi", "Atlantis"]})
+    assert r.status_code == 422 and "Atlantis" in r.json()["detail"]
+    r = client.post("/api/dashboard/solve", json={"problem_type": "optimization", "approach": "classical",
+                                                  "cities": ["Lahore", "Karachi", "Atlantis"]})
+    assert r.status_code == 400 and "Atlantis" in r.json()["detail"]

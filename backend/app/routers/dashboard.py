@@ -134,100 +134,74 @@ async def solve_user_problem(req: SolveRequest, user: Optional[User] = Depends(g
 
     except HTTPException:
         raise
+    except ValueError as e:          # input the solver can't use (an unknown city, an empty list…)
+        raise HTTPException(status_code=400, detail=str(e))
     except MemoryError as e:
         raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── File extraction endpoint for Solve page ───────────────────────────────────
 
-ALLOWED_EXTENSIONS = {
-    "pdf", "docx", "doc", "csv", "txt", "md", "json",
-    "tex", "rtf", "tsv", "log", "xml", "yaml", "yml",
-}
+ALLOWED_EXTENSIONS = {"pdf", "docx", "csv", "tsv", "txt", "md", "log", "json", "xml", "yaml", "yml"}
+MAX_FILE_BYTES = 5 * 1024 * 1024
+
+
+def _json_lines(obj: Any) -> List[str]:
+    """One line per element: a list of values or records, or the key: value pairs of an object."""
+    def flat(v: Any) -> str:
+        if isinstance(v, dict):
+            return " · ".join(f"{k}: {flat(x)}" for k, x in v.items())
+        if isinstance(v, list):
+            return ", ".join(flat(x) for x in v)
+        return str(v)
+    if isinstance(obj, list):
+        return [flat(v) for v in obj]
+    if isinstance(obj, dict):
+        return [f"{k}: {flat(v)}" for k, v in obj.items()]
+    return [str(obj)]
+
 
 @router.post("/extract-file")
-async def extract_file(file: UploadFile = FastAPIFile(...)):
+async def extract_file(file: UploadFile = FastAPIFile(...), user: User = Depends(get_current_user)):
     """
-    Extract plain text from an uploaded file.
-    Supports: PDF, DOCX, CSV, TXT, JSON, MD, and more.
-    Returns the extracted text so the frontend can populate input fields.
+    Read an uploaded file as lines of text for the Solve page: one item, record or city per line.
+    Supports PDF, Word (.docx), CSV/TSV, JSON and plain-text formats, up to 5 MB.
     """
+    import csv
+    import io
+    import json
+
     fname = (file.filename or "").lower()
     ext   = fname.rsplit(".", 1)[-1] if "." in fname else ""
-
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            400,
-            f"Unsupported file type '.{ext}'. "
-            f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-        )
-
-    content = await file.read()
-    text    = ""
+        raise HTTPException(400, f"QAIbridge can't read '.{ext}' files. "
+                                 f"Use one of: {', '.join(sorted(ALLOWED_EXTENSIONS))}.")
+    content = await file.read(MAX_FILE_BYTES + 1)
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(413, "This file is larger than 5 MB.")
 
     try:
         if ext == "pdf":
-            try:
-                from pypdf import PdfReader
-                import io
-                reader = PdfReader(io.BytesIO(content))
-                text   = "\n".join(p.extract_text() or "" for p in reader.pages)
-            except ImportError:
-                raise HTTPException(503, "pypdf not installed. Run: pip install pypdf")
-
-        elif ext in ("docx", "doc"):
-            try:
-                from docx import Document
-                import io
-                doc  = Document(io.BytesIO(content))
-                text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-            except ImportError:
-                raise HTTPException(503, "python-docx not installed. Run: pip install python-docx")
-
-        elif ext == "csv":
-            import csv, io
-            reader = csv.reader(io.StringIO(content.decode("utf-8", errors="replace")))
-            rows   = [", ".join(row) for row in reader if any(c.strip() for c in row)]
-            text   = "\n".join(rows)
-
-        elif ext == "tsv":
-            import csv, io
-            reader = csv.reader(
-                io.StringIO(content.decode("utf-8", errors="replace")), delimiter="\t"
-            )
-            rows = ["\t".join(row) for row in reader if any(c.strip() for c in row)]
-            text = "\n".join(rows)
-
+            from pypdf import PdfReader
+            text = "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(content)).pages)
+        elif ext == "docx":
+            from docx import Document
+            text = "\n".join(p.text for p in Document(io.BytesIO(content)).paragraphs if p.text.strip())
+        elif ext in ("csv", "tsv"):
+            rows = csv.reader(io.StringIO(content.decode("utf-8", errors="replace")),
+                              delimiter="," if ext == "csv" else "\t")
+            text = "\n".join(", ".join(c.strip() for c in row) for row in rows if any(c.strip() for c in row))
         elif ext == "json":
-            import json
-            obj  = json.loads(content.decode("utf-8", errors="replace"))
-            text = json.dumps(obj, indent=2)
-
-        elif ext in ("xml", "yaml", "yml"):
-            text = content.decode("utf-8", errors="replace")
-
+            text = "\n".join(_json_lines(json.loads(content.decode("utf-8", errors="replace"))))
         else:
-            # Plain text formats: txt, md, tex, rtf, log, etc.
             text = content.decode("utf-8", errors="replace")
+    except Exception:
+        raise HTTPException(400, f"QAIbridge couldn't read this .{ext} file. Check that it isn't damaged.")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Failed to extract text: {e}")
-
-    text = text.strip()
-    if not text:
-        raise HTTPException(400, "No readable text found in the uploaded file.")
-
-    return {
-        "filename":   file.filename,
-        "extension":  ext,
-        "text":       text,
-        "char_count": len(text),
-        "line_count": len(text.splitlines()),
-    }
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        raise HTTPException(400, "No readable text was found in this file. A scanned PDF has none, for example.")
+    return {"filename": file.filename, "extension": ext, "text": "\n".join(lines), "line_count": len(lines)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

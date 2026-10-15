@@ -27,7 +27,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from . import classical
-from .grover import MAX_GROVER_QUBITS, optimal_iterations, run_grover
+from .grover import CONFIDENCE, MAX_GROVER_QUBITS, optimal_iterations, run_grover, runs_for_confidence
 from .qaoa import MAX_QAOA_QUBITS, run_qaoa, tsp_feasible_mask
 from .shor import MAX_SHOR_N, crypto_resource_table, qubits_needed, run_shor
 from ..module5_transformer.bridge import distance_matrix_from_cities, tsp_bridge
@@ -101,6 +101,44 @@ print(sorted(counts.items(), key=lambda kv: -kv[1])[:5])
 '''
 
 
+def grover_runs(q: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    What finding a match really cost. Each run is k Grover rounds (one oracle query each), a measurement,
+    then one more oracle query to check the measured item; runs repeat until one passes. With nothing
+    marked no run can pass, so the search stops once a match, had there been one, would have come up
+    with CONFIDENCE.
+    """
+    k = q["iterations"]
+    if q["n_marked"]:
+        runs = q["first_hit_shot"] or q["shots"]
+        out: Dict[str, Any] = {"runs": runs, "found": q["first_hit_shot"] is not None}
+    else:
+        p_if_there = math.sin((2 * k + 1) * math.asin(math.sqrt(1 / q["n_items"]))) ** 2
+        runs = runs_for_confidence(p_if_there)
+        out = {"runs": runs, "found": False, "confidence": CONFIDENCE, "p_if_there": round(p_if_there, 6)}
+    return {**out, "rounds": k, "queries_per_run": k + 1, "queries": runs * (k + 1)}
+
+
+def plural(n: int, word: str, many: Optional[str] = None) -> str:
+    return f"{n:,} {word if n == 1 else many or word + 's'}"
+
+
+def _runs_note(r: Dict[str, Any]) -> str:
+    each = (f"{plural(r['rounds'], 'Grover round')} (one oracle query each), a measurement, then 1 query to check "
+            "the measured item" if r["rounds"] else "a measurement, then 1 oracle query to check the measured item")
+    queries = plural(r["queries"], "oracle query", "oracle queries")
+    if r["found"]:
+        return (f"Each run is {each}. The first run whose item passed the check was run {r['runs']:,}: "
+                f"{r['runs']:,} × {r['queries_per_run']} = {queries} in all.")
+    if "confidence" in r:
+        return (f"Nothing matches, but the algorithm can't know that in advance: it plans its rounds for one match. "
+                f"Each run is {each}. After {plural(r['runs'], 'run')} ({queries}) no measured item passed the "
+                f"check. A match would have come up with "
+                f"{'over 99.9%' if r['p_if_there'] >= 0.9995 else format(r['p_if_there'], '.1%')} chance per run, so it is reported "
+                f"as not there with at least {r['confidence']:.0%} confidence.")
+    return f"No measured item passed the check in {plural(r['runs'], 'run')}."
+
+
 def search_scaling(max_exp: int = 40) -> List[Dict[str, float]]:
     rows = []
     for e in range(2, max_exp + 1, 2):
@@ -148,28 +186,26 @@ def compare_search(n_qubits: Optional[int] = None, target_index: Optional[int] =
         marked = [int(target_index)]
 
     cl = classical.linear_search(labels, is_target)
-    q = run_grover(n_qubits, marked, shots=shots, seed=seed)
     N = 2 ** n_qubits
+    # With nothing to find, the rounds are still planned for one match: the algorithm can't know in advance.
+    q = run_grover(n_qubits, marked, shots=shots, iterations=None if marked else optimal_iterations(N, 1), seed=seed)
     k = q["iterations"]
-    # Grover ends with one verification query: the measured item is checked by the oracle.
-    measured_idx = q["most_frequent"]
-    verified = measured_idx is not None and measured_idx in set(marked)
-    answer_idx = measured_idx if verified else None
-    q_correct = verified if marked else answer_idx is None
+    runs = grover_runs(q)
+    answer_idx = q["first_hit_index"]
+    q_correct = runs["found"] if marked else answer_idx is None
     cl_correct = (cl["found_index"] in set(marked)) if marked else cl["found_index"] is None
 
     expected_classical = (n_real + 1) / 2 if marked else n_real
     notes = [
         "Queries are the fair metric: each classical comparison and each quantum oracle call asks the same "
         "question ('is this the item?'). Simulation time is the cost of emulating the quantum computer on a CPU.",
+        _runs_note(runs),
     ]
     if n_real < N:
         notes.append(f"{n_real} items were padded to 2^{n_qubits} = {N} basis states; padding slots are never marked.")
-    if not marked:
-        notes.append("The target is not in the dataset, so there is nothing for the oracle to mark — Grover's "
-                     "algorithm leaves the uniform superposition unchanged and a measurement returns a random item.")
-    elif len(marked) > 1:
-        notes.append(f"The target occurs {len(marked)} times; Grover marks every occurrence (M = {len(marked)}).")
+    if len(marked) > 1:
+        notes.append(f"The target occurs {len(marked)} times. The oracle marks every copy, and the rounds are planned "
+                     f"for {len(marked)} matches (the textbook algorithm is told how many items match).")
 
     return _clean({
         "algorithm": "search",
@@ -184,16 +220,15 @@ def compare_search(n_qubits: Optional[int] = None, target_index: Optional[int] =
         "quantum": {
             **q, "algorithm": "Grover's Algorithm", "complexity": "O(√N)",
             "answer": {"index": answer_idx,
-                       "value": labels[answer_idx] if answer_idx is not None and answer_idx < n_real else None,
-                       "measured_index": measured_idx, "verified": verified},
-            "steps": k, "steps_label": "oracle queries", "correct": q_correct,
+                       "value": labels[answer_idx] if answer_idx is not None and answer_idx < n_real else None},
+            "runs": runs, "steps": runs["queries"], "steps_label": "oracle queries", "correct": q_correct,
             "time_ms": q["simulation_ms"],
         },
         "comparison": {
-            "classical_steps": cl["comparisons"], "quantum_steps": k,
+            "classical_steps": cl["comparisons"], "quantum_steps": runs["queries"],
             "classical_expected": expected_classical, "classical_worst": n_real,
-            "query_speedup_expected": _ratio(expected_classical, max(k, 1)),
-            "query_speedup_worst": _ratio(n_real, max(k, 1)),
+            "query_speedup_expected": _ratio(expected_classical, runs["queries"]),
+            "query_speedup_worst": _ratio(n_real, runs["queries"]),
             "scaling": search_scaling(),
             "notes": notes,
         },
@@ -279,30 +314,35 @@ def compare_database(records: Optional[Sequence[str]] = None, query: str = "Rese
     first = classical.linear_search(records, matcher)
     marked = cl["matches"]
     M = len(marked)
-    q = run_grover(n_qubits, marked, shots=shots, seed=seed)
     N = 2 ** n_qubits
+    q = run_grover(n_qubits, marked, shots=shots, iterations=None if M else optimal_iterations(N, 1), seed=seed)
     k = q["iterations"]
+    runs = grover_runs(q)
 
-    retrieved = {}
-    for h in q["histogram"]:
-        if h["marked"] and h["index"] < n_real:
-            retrieved[h["index"]] = retrieved.get(h["index"], 0) + h["count"]
-    retrieved_list = [{"index": i, "record": records[i], "count": c}
-                      for i, c in sorted(retrieved.items(), key=lambda kv: -kv[1])]
+    retrieved_list = [{"index": h["index"], "record": records[h["index"]], "count": h["count"]}
+                      for h in q["hit_counts"]]
+    answer_idx = q["first_hit_index"]
+    # Listing every match by repeating the same circuit until each one has come up
+    all_runs = q["all_found_shot"]
+    collect_all = {"runs": all_runs, "queries": all_runs * (k + 1)} if all_runs else None
 
     expected_first = (n_real + 1) / (M + 1) if M else n_real
-    notes = [
-        "One amplitude-amplification run returns ONE matching record with probability ≈ "
-        f"{q['success_probability']:.1%}. Finding a match costs ≈ π/4·√(N/M) oracle queries versus "
-        "≈ N/(M+1) reads for a classical scan that stops at the first hit.",
-        "Retrieving all M matches needs repeated runs (≈ √(N·M) queries in total) — still fewer than the "
-        "N reads of a full classical scan when M ≪ N.",
-    ]
-    if M == 0:
-        notes.append("No record matches, so the oracle marks nothing and amplification has no effect.")
-    elif M >= N / 2:
-        notes.append("More than half of the records match — amplification is unnecessary (0 iterations); "
-                     "a single random measurement already succeeds with probability ≥ 50%.")
+    notes = [_runs_note(runs)]
+    if M:
+        notes.append(f"A classical scan read {plural(first['comparisons'], 'record')} to its first match "
+                     f"(on average (N+1)/(M+1) ≈ {expected_first:.1f}).")
+        if collect_all:
+            cheaper = ("fewer than" if collect_all["queries"] < n_real else
+                       "more than" if collect_all["queries"] > n_real else "the same as")
+            notes.append(f"Listing all {M} matches by repeating the same circuit took {plural(all_runs, 'run')} = "
+                         f"{collect_all['queries']:,} queries: {cheaper} the {n_real:,} reads of a full scan."
+                         + (" Amplitude amplification pays off for finding a match among many records, "
+                            "not for listing a large share of them." if collect_all["queries"] >= n_real else ""))
+        else:
+            notes.append(f"{q['distinct_hits']} of the {M} matches came up in {q['shots']:,} runs.")
+    if M >= N / 2:
+        notes.append("Half or more of the states match, so no rounds are needed: "
+                     "a single measurement already finds a match with probability ≥ 50%.")
     if n_real < N:
         notes.append(f"{n_real} records were padded to 2^{n_qubits} = {N} basis states.")
 
@@ -313,7 +353,7 @@ def compare_database(records: Optional[Sequence[str]] = None, query: str = "Rese
                   "query_meaning": described, "n_matches": M, "sample_records": records[:12]},
         "classical": {
             **cl, "matching_records": [{"index": i, "record": records[i]} for i in marked[:50]],
-            "answer": {"matches": M, "first": records[marked[0]] if M else None},
+            "answer": {"matches": M, "first": records[marked[0]] if M else None, "index": marked[0] if M else None},
             "first_match_reads": first["comparisons"],
             "steps": first["comparisons"] if M else n_real,
             "steps_label": "record reads (to first match)", "correct": True,
@@ -321,16 +361,18 @@ def compare_database(records: Optional[Sequence[str]] = None, query: str = "Rese
         "quantum": {
             **q, "algorithm": "Amplitude Amplification", "complexity": "O(√(N/M))",
             "retrieved": retrieved_list[:64],
-            "answer": {"matches_seen": len(retrieved_list),
-                       "first": retrieved_list[0]["record"] if retrieved_list else None},
-            "steps": k, "steps_label": "oracle queries", "correct": bool(retrieved_list) or M == 0,
+            "answer": {"first": records[answer_idx] if answer_idx is not None else None, "index": answer_idx,
+                       "matches_seen": q["distinct_hits"]},
+            "runs": runs, "collect_all": collect_all,
+            "steps": runs["queries"], "steps_label": "oracle queries (to first match)",
+            "correct": runs["found"] if M else answer_idx is None,
             "time_ms": q["simulation_ms"],
         },
         "comparison": {
-            "classical_steps": first["comparisons"] if M else n_real, "quantum_steps": k,
+            "classical_steps": first["comparisons"] if M else n_real, "quantum_steps": runs["queries"],
             "classical_expected": round(expected_first, 2),
             "full_scan_reads": n_real,
-            "query_speedup_expected": _ratio(expected_first, max(k, 1)),
+            "query_speedup_expected": _ratio(expected_first, runs["queries"]),
             "notes": notes,
         },
         "qiskit": grover_qiskit_code(n_qubits, marked, k),
@@ -358,9 +400,11 @@ def compare_factoring(N: int, a: Optional[int] = None, shots: int = 1024,
     q_correct = bool(q_factors) and math.prod(q_factors) == N
     runs = sum(1 for att in q.get("attempts", []) if "peaks" in att)
     notes = [
-        "Shor's speed-up is asymptotic: for tiny N trial division is instant. The cryptography chart shows why the "
-        "algorithm matters — the chart shows that at RSA sizes the classical cost explodes while the quantum cost grows polynomially.",
-        f"Exact simulation needs 3·n qubits (n = bit length); this kernel handles N ≤ {MAX_SHOR_N} (21 qubits).",
+        "Shor's speed-up is asymptotic: for numbers this small, trial division is instant. The cryptography chart "
+        "shows why the algorithm matters: at RSA key sizes the best classical method's cost explodes, while "
+        "Shor's grows only polynomially.",
+        f"This exact simulation uses 3·n qubits (n = bits of N), so it runs Shor's algorithm for N ≤ {MAX_SHOR_N} "
+        "(21 qubits). The modular multiplications are applied as exact permutations of the work register.",
     ]
     if q["status"] in ("trivial", "prime", "prime_power"):
         notes.insert(0, q["message"])
@@ -378,6 +422,8 @@ def compare_factoring(N: int, a: Optional[int] = None, shots: int = 1024,
         "quantum": {
             "algorithm": "Shor's Algorithm", "complexity": "O((log N)³)",
             "status": q["status"], "message": q.get("message"), "a": q.get("a"), "period": q.get("period"),
+            # True when the factors came from a period the circuit measured, not a classical pre-check or a lucky gcd
+            "from_period": success_attempt is not None,
             "answer": {"factors": q_factors},
             "attempts": [
                 {k: v for k, v in att.items() if k not in ("peaks", "measurements", "post_processing", "ops")}
@@ -439,6 +485,8 @@ def compare_optimization(cities: Optional[Sequence[str]] = None, p: int = 2, sho
         f"(P = {q['p_optimal']:.2%} vs {q['random_p_optimal']:.3%}).",
         "QAOA is a heuristic: its value is concentrating probability on good answers with shallow circuits. "
         "Exhaustive search is exact but grows as (N−1)! — hopeless beyond ~15 cities.",
+        f"The optimiser ran the circuit {q['circuit_evaluations']} times, each time reading the exact probabilities "
+        "from the simulated state. Real hardware would estimate each one from many shots, so it would need more runs.",
     ]
 
     return _clean({

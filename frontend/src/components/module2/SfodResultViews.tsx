@@ -1,25 +1,28 @@
 import Plot from 'react-plotly.js';
 import { CheckCircle2, Cpu, Info, XCircle, Zap } from 'lucide-react';
 import type {
-  ComparisonResult, GroverQuantum, QaoaQuantum, ShorQuantum, SideResult,
+  ComparisonResult, DatabaseResult, FactoringResult, GroverQuantum, OptimizationResult, QaoaQuantum, SearchResult,
+  ShorDetail,
 } from '../../api/sfod';
 import { COLORS, PLOT_CONFIG, darkLayout } from '../shared/plotTheme';
 
 // ── small helpers ────────────────────────────────────────────────────────────
 
-const pct = (x: number | null | undefined, d = 1) => (x == null ? '—' : `${(x * 100).toFixed(d)}%`);
-const num = (x: number | null | undefined) => (x == null ? '—' : x.toLocaleString());
+export const pct = (x: number | null | undefined, d = 1) => (x == null ? '—' : `${(x * 100).toFixed(d)}%`);
+export const num = (x: number | null | undefined) => (x == null ? '—' : x.toLocaleString());
 const ms = (x: number | null | undefined) =>
   x == null ? '—' : x < 1 ? `${x.toFixed(3)} ms` : x < 1000 ? `${x.toFixed(1)} ms` : `${(x / 1000).toFixed(2)} s`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+const times = (x: number) => `${x >= 10 ? x.toFixed(0) : x.toFixed(1)}×`;
 
 function Badge({ ok, yes = 'Correct', no = 'Incorrect' }: { ok: boolean; yes?: string; no?: string }) {
   return ok ? (
     <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
-      <CheckCircle2 className="w-3 h-3" /> {yes}
+      <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> {yes}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-300 bg-red-500/10 border border-red-500/30 rounded-full px-2 py-0.5">
-      <XCircle className="w-3 h-3" /> {no}
+      <XCircle className="w-3 h-3" aria-hidden="true" /> {no}
     </span>
   );
 }
@@ -47,58 +50,88 @@ function Row({ label, value, accent }: { label: string; value: React.ReactNode; 
   );
 }
 
-// ── Answer formatting per algorithm ──────────────────────────────────────────
+// ── Answers in plain words ───────────────────────────────────────────────────
 
-function answerText(result: ComparisonResult, side: 'classical' | 'quantum'): string {
-  const s = result[side] as SideResult & Record<string, any>;
-  const a = s.answer ?? {};
+function itemText(index: number | null, value: string | null) {
+  if (index == null) return 'Not in the list';
+  return `Item #${index}${value != null && value !== String(index) ? ` ("${value}")` : ''}`;
+}
+
+function factorsText(N: number, f: number[] | null) {
+  if (!f || !f.length) return 'No factors found';
+  return f.length === 1 ? `${N} is prime` : `${N} = ${f.join(' × ')}`;
+}
+
+function routeText(tour: string[] | null, km: number | null) {
+  return tour && km != null ? `${tour.join(' → ')} (${Math.round(km).toLocaleString()} km)` : 'No valid route measured';
+}
+
+export function answerText(result: ComparisonResult, side: 'classical' | 'quantum'): string {
   switch (result.algorithm) {
-    case 'search':
-      return a.index == null ? 'Not found' : `Item #${a.index}${a.value != null && a.value !== String(a.index) ? ` ("${a.value}")` : ''}`;
+    case 'search': {
+      const a = result[side].answer;
+      return itemText(a.index, a.value);
+    }
     case 'database':
+      if (side === 'classical') {
+        const a = result.classical.answer;
+        return a.index == null ? 'No matching record' : `${plural(a.matches, 'matching record')} (first: #${a.index})`;
+      }
+      return result.quantum.answer.index == null ? 'No matching record' : `A matching record (#${result.quantum.answer.index})`;
+    case 'factoring':
+      return factorsText(result.input.N, result[side].answer.factors);
+    case 'optimization':
       return side === 'classical'
-        ? `${a.matches} matching record(s)`
-        : `${a.matches_seen} distinct match(es) retrieved`;
-    case 'factoring': {
-      const f = a.factors as number[] | null;
-      return f && f.length ? `${result.input.N} = ${f.join(' × ')}` : 'No factors found';
-    }
-    case 'optimization': {
-      const t = a.tour as string[] | null;
-      return t ? `${t.join(' → ')} (${Math.round(Number(a.length_km)).toLocaleString()} km)` : 'No valid tour sampled';
-    }
+        ? routeText(result.classical.answer.tour, result.classical.answer.length_km)
+        : routeText(result.quantum.answer.tour, result.quantum.answer.length_km);
   }
 }
 
 // ── Verdict + side-by-side ───────────────────────────────────────────────────
 
-export function VerdictBanner({ result }: { result: ComparisonResult<any> }) {
+function verdict(result: ComparisonResult): string {
+  switch (result.algorithm) {
+    case 'search':
+    case 'database': {
+      const { classical: c, quantum: q, comparison } = result;
+      const what = result.algorithm === 'search' ? 'comparisons' : 'record reads';
+      if (!result.quantum.n_marked) {
+        const thing = result.algorithm === 'search' ? `"${result.input.target}" isn't in the list` : `No record matches "${result.input.query}"`;
+        return `${thing}. Classical: ${plural(c.steps, what.slice(0, -1), what)} to be sure. Quantum: `
+          + `${plural(q.steps, 'oracle query', 'oracle queries')}, ${pct(q.runs.confidence, 0)} sure.`;
+      }
+      if (!q.runs.found) return `No measured item passed the check in ${plural(q.runs.runs, 'run')}.`;
+      const avg = comparison.classical_expected;
+      const head = `Quantum found ${result.algorithm === 'search' ? 'it' : 'a match'} with ${plural(q.steps, 'oracle query', 'oracle queries')}; `
+        + `classical needed ${plural(c.steps, what.slice(0, -1), what)} (${avg.toLocaleString(undefined, { maximumFractionDigits: 1 })} on average)`;
+      return avg > q.steps ? `${head}: ${times(avg / q.steps)} fewer than the classical average.` : `${head}. At this small size classical wins; the gap opens as N grows.`;
+    }
+    case 'factoring': {
+      const q = result.quantum;
+      return q.from_period
+        ? `Shor's algorithm factored ${factorsText(result.input.N, q.answer.factors)} from a period it measured (a = ${q.a}, r = ${q.period}).`
+        : q.message;
+    }
+    case 'optimization': {
+      const q = result.quantum;
+      const best = q.answer.length_km;
+      if (best == null) return `None of QAOA's ${q.shots.toLocaleString()} measurements was a valid route.`;
+      return q.correct
+        ? `QAOA's best measured route is the shortest one. QAOA made it ${times(q.amplification ?? 0)} more likely than a random guess.`
+        : `QAOA's best measured route is ${((best / result.classical.answer.length_km - 1) * 100).toFixed(1)}% longer than the shortest.`;
+    }
+  }
+}
+
+export function VerdictBanner({ result }: { result: ComparisonResult }) {
   const c = result.classical;
   const q = result.quantum;
-  const fewer = c.steps > 0 && q.steps > 0 && q.steps < c.steps;
-  let headline: string;
-  if (result.algorithm === 'search' || result.algorithm === 'database') {
-    headline = q.steps === 0
-      ? 'No amplification needed for this input'
-      : fewer
-        ? `Quantum needed ${num(q.steps)} oracle queries vs ${num(c.steps)} classical ${c.steps_label} — ${(c.steps / q.steps).toFixed(1)}× fewer`
-        : `At this tiny size classical needed ${num(c.steps)} ${c.steps_label} vs ${num(q.steps)} oracle queries — the gap opens as N grows`;
-  } else if (result.algorithm === 'factoring') {
-    headline = q.correct
-      ? `Shor's algorithm factored ${result.input.N} from a quantum-measured period`
-      : (q as ShorQuantum).message;
-  } else {
-    const qa = q as QaoaQuantum;
-    headline = q.correct
-      ? `QAOA's best measured route is the true optimum — ${(qa.amplification ?? 0).toFixed(1)}× more likely than a random guess`
-      : `QAOA's best measured route is within ${(((Number(q.answer.length_km) / Number(c.answer.length_km)) - 1) * 100).toFixed(1)}% of optimal`;
-  }
   return (
     <div className="rounded-2xl border border-quantum-neon/30 p-5 mb-5"
       style={{ background: 'linear-gradient(135deg, rgba(0,255,204,0.06), rgba(204,68,255,0.06))' }}>
-      <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Result</p>
-      <p className="text-white font-bold text-base leading-snug">{headline}</p>
-      <div className="flex flex-wrap gap-2 mt-3">
+      <h2 className="text-xs uppercase tracking-widest text-gray-400 mb-1">Result</h2>
+      <p className="text-white font-bold text-base leading-snug">{verdict(result)}</p>
+      <div className="flex flex-wrap items-center gap-2 mt-3">
         <span className="text-xs text-gray-400">Classical answer: <span className="text-gray-200">{answerText(result, 'classical')}</span></span>
         <Badge ok={c.correct} />
         <span className="text-xs text-gray-400 sm:ml-4">Quantum answer: <span className="text-gray-200">{answerText(result, 'quantum')}</span></span>
@@ -108,40 +141,60 @@ export function VerdictBanner({ result }: { result: ComparisonResult<any> }) {
   );
 }
 
-export function SideBySide({ result }: { result: ComparisonResult<any> }) {
+function circuitOf(result: ComparisonResult) {
+  if (result.algorithm === 'factoring') {
+    const d = result.quantum.detail;
+    return d?.qubits != null ? { qubits: d.qubits, gates: d.gates ?? null, depth: d.depth ?? null } : null;
+  }
+  return result.quantum.circuit;
+}
+
+export function SideBySide({ result }: { result: ComparisonResult }) {
   const c = result.classical;
-  const q = result.quantum as SideResult & Record<string, any>;
-  const qCirc = q.circuit ?? (q.detail ? { qubits: q.detail.qubits, gates: q.detail.gates, depth: q.detail.depth } : null);
+  const q = result.quantum;
+  const circ = circuitOf(result);
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
       <div className="rounded-2xl p-5 border bg-red-950/10 border-red-900/40">
         <div className="flex items-center gap-2 mb-2">
-          <Cpu className="w-4 h-4 text-red-400" />
+          <Cpu className="w-4 h-4 text-red-400" aria-hidden="true" />
           <span className="text-xs font-semibold uppercase tracking-widest text-red-400">Classical</span>
           <span className="ml-auto font-mono text-red-300 text-sm">{c.complexity}</span>
         </div>
         <p className="text-white font-bold text-sm mb-3">{c.algorithm}</p>
         <Row label={`Steps (${c.steps_label})`} value={num(c.steps)} />
-        {result.algorithm === 'search' && <Row label="Expected on average (N/2)" value={num(result.comparison.classical_expected)} />}
-        {result.algorithm === 'database' && <Row label="Full scan (all matches)" value={`${num(result.comparison.full_scan_reads)} reads`} />}
-        {result.algorithm === 'optimization' && c.greedy && (
-          <Row label="Greedy heuristic" value={`${Math.round(Number(c.greedy.length)).toLocaleString()} km (${result.comparison.greedy_gap_pct}% longer)`} />
+        {result.algorithm === 'search' && result.input.n_marked > 0 && (
+          <Row label="Average for this size, (N+1)/2" value={num(result.comparison.classical_expected)} />
         )}
-        <Row label="Wall-clock time (CPU)" value={ms(c.time_ms)} />
+        {result.algorithm === 'database' && <Row label="Full scan (lists every match)" value={`${num(result.comparison.full_scan_reads)} reads`} />}
+        {result.algorithm === 'optimization' && (
+          <Row label="Greedy nearest-city rule"
+            value={`${Math.round(result.classical.greedy.length).toLocaleString()} km (${result.comparison.greedy_gap_pct}% longer)`} />
+        )}
+        <Row label="Time on the CPU" value={ms(c.time_ms)} />
         <Row label="Answer" value={answerText(result, 'classical')} />
       </div>
       <div className="rounded-2xl p-5 border bg-teal-950/10 border-teal-800/50">
         <div className="flex items-center gap-2 mb-2">
-          <Zap className="w-4 h-4 text-quantum-neon" />
+          <Zap className="w-4 h-4 text-quantum-neon" aria-hidden="true" />
           <span className="text-xs font-semibold uppercase tracking-widest text-quantum-neon">Quantum (simulated)</span>
           <span className="ml-auto font-mono text-quantum-neon text-sm">{q.complexity}</span>
         </div>
         <p className="text-white font-bold text-sm mb-3">{q.algorithm}</p>
         <Row label={`Steps (${q.steps_label})`} value={num(q.steps)} accent />
-        {'success_probability' in q && <Row label="Success probability (state vector)" value={pct(q.success_probability as number)} accent />}
-        {'p_optimal' in q && <Row label="P(optimal tour) vs random guess" value={`${pct(q.p_optimal as number, 2)} vs ${pct(q.random_p_optimal as number, 3)}`} accent />}
-        {qCirc && <Row label="Qubits · gates · depth" value={`${qCirc.qubits} · ${num(qCirc.gates)} · ${num(qCirc.depth)}`} />}
-        <Row label="Simulation time (CPU emulating the QPU)" value={ms(q.time_ms)} />
+        {(result.algorithm === 'search' || result.algorithm === 'database') && (
+          <>
+            <Row label="Runs × (rounds + 1 check)"
+              value={`${num(result.quantum.runs.runs)} × (${result.quantum.runs.rounds} + 1)`} />
+            <Row label="Chance of a match per run" value={pct(result.quantum.success_probability)} accent />
+          </>
+        )}
+        {result.algorithm === 'optimization' && (
+          <Row label="Chance of the shortest route vs a random guess"
+            value={`${pct(result.quantum.p_optimal, 2)} vs ${pct(result.quantum.random_p_optimal, 3)}`} accent />
+        )}
+        {circ && <Row label="Qubits · gates · depth" value={`${circ.qubits} · ${num(circ.gates)} · ${num(circ.depth)}`} />}
+        <Row label="Time to simulate it on the CPU" value={ms(q.time_ms)} />
         <Row label="Answer" value={answerText(result, 'quantum')} />
       </div>
     </div>
@@ -149,15 +202,15 @@ export function SideBySide({ result }: { result: ComparisonResult<any> }) {
 }
 
 export function NotesPanel({ notes }: { notes: string[] }) {
-  if (!notes?.length) return null;
+  if (!notes.length) return null;
   return (
     <div className="bg-quantum-800/60 border border-quantum-700 rounded-2xl p-5 mb-5">
       <div className="flex items-center gap-2 mb-2">
-        <Info className="w-4 h-4 text-blue-300" />
+        <Info className="w-4 h-4 text-blue-300" aria-hidden="true" />
         <h3 className="text-white font-bold text-sm">How to read this</h3>
       </div>
-      <ul className="space-y-1.5">
-        {notes.map((n, i) => <li key={i} className="text-gray-400 text-xs leading-relaxed">• {n}</li>)}
+      <ul className="space-y-1.5 list-disc pl-5">
+        {notes.map((n, i) => <li key={i} className="text-gray-300 text-sm leading-relaxed">{n}</li>)}
       </ul>
     </div>
   );
@@ -165,38 +218,45 @@ export function NotesPanel({ notes }: { notes: string[] }) {
 
 // ── Grover / amplitude amplification ─────────────────────────────────────────
 
-export function AmplificationChart({ q }: { q: GroverQuantum }) {
+/** How far the simulator's per-round chance is from sin²((2k+1)θ), in words. */
+export function theoryGap(q: GroverQuantum) {
+  const gap = Math.max(0, ...q.curve.map(p => Math.abs(p.success_probability - p.theory)));
+  return gap < 5e-7 ? 'matches the theory curve to 6 decimal places' : `is within ${gap.toExponential(1)} of the theory curve`;
+}
+
+export function AmplificationChart({ q, height = 260 }: { q: GroverQuantum; height?: number }) {
   const x = q.curve.map(p => p.iteration);
   return (
     <Plot
       data={[
-        { type: 'scatter', mode: 'lines', name: 'Theory sin²((2k+1)θ)', x, y: q.curve.map(p => p.theory),
-          line: { color: COLORS.purple, width: 2, dash: 'dot' } },
-        { type: 'scatter', mode: 'lines+markers', name: 'Measured on the kernel', x, y: q.curve.map(p => p.success_probability),
-          line: { color: COLORS.neon, width: 2 }, marker: { size: 6 } },
+        { type: 'scatter', mode: 'lines', name: 'Theory: sin²((2k+1)θ)', x, y: q.curve.map(p => p.theory),
+          line: { color: COLORS.purple, width: 2, dash: 'dot' }, hovertemplate: 'round %{x}: %{y:.4f}<extra>theory</extra>' },
+        { type: 'scatter', mode: 'lines+markers', name: 'Measured on the simulator', x, y: q.curve.map(p => p.success_probability),
+          line: { color: COLORS.neon, width: 2 }, marker: { size: 8 }, hovertemplate: 'round %{x}: %{y:.4f}<extra>simulator</extra>' },
       ]}
       layout={darkLayout({
-        xaxis: { title: { text: 'Grover iteration k' }, ...(x.length <= 12 ? { dtick: 1 } : {}) },
-        yaxis: { title: { text: 'P(measure a marked item)' }, range: [0, 1.05] },
+        xaxis: { title: { text: 'Grover round k' }, ...(x.length <= 12 ? { dtick: 1 } : {}) },
+        yaxis: { title: { text: 'Chance of a match' }, range: [0, 1.05] },
       })}
       config={PLOT_CONFIG}
-      style={{ width: '100%', height: 260 }}
+      style={{ width: '100%', height }}
     />
   );
 }
 
-export function HistogramChart({ q, label }: { q: GroverQuantum; label: (i: number) => string }) {
+function HistogramChart({ q, label }: { q: GroverQuantum; label: (i: number) => string }) {
   const bars = q.histogram.slice(0, 16);
   return (
     <Plot
       data={[{
         type: 'bar', x: bars.map(b => label(b.index)), y: bars.map(b => b.count),
-        marker: { color: bars.map(b => (b.marked ? COLORS.neon : '#3b3b7a')) },
-        hovertemplate: '%{x}: %{y} shots<extra></extra>',
+        marker: { color: bars.map(b => (b.marked ? COLORS.neon : '#4b4b8a')) },
+        customdata: bars.map(b => (b.marked ? 'a match' : 'not a match')),
+        hovertemplate: '%{x}: %{y} shots (%{customdata})<extra></extra>',
       }]}
       layout={darkLayout({
-        xaxis: { title: { text: 'Measured outcome' }, type: 'category', tickangle: -35 },
-        yaxis: { title: { text: `Count (of ${q.shots} shots)` } },
+        xaxis: { title: { text: 'Measured item' }, type: 'category', tickangle: -35 },
+        yaxis: { title: { text: `Count (of ${q.shots.toLocaleString()} shots)` } },
         margin: { t: 10, r: 10, b: 80, l: 56 },
         showlegend: false,
       })}
@@ -206,7 +266,7 @@ export function HistogramChart({ q, label }: { q: GroverQuantum; label: (i: numb
   );
 }
 
-export function ScalingChart({ rows }: { rows: { n_items: number; classical_expected: number; quantum: number }[] }) {
+function ScalingChart({ rows }: { rows: SearchResult['comparison']['scaling'] }) {
   return (
     <Plot
       data={[
@@ -216,8 +276,8 @@ export function ScalingChart({ rows }: { rows: { n_items: number; classical_expe
           y: rows.map(r => r.quantum), line: { color: COLORS.neon, width: 2 } },
       ]}
       layout={darkLayout({
-        xaxis: { title: { text: 'Items N (log scale)' }, type: 'log' },
-        yaxis: { title: { text: 'Queries (log scale)' }, type: 'log' },
+        xaxis: { title: { text: 'Items N (log scale)' }, type: 'log', dtick: 3 },
+        yaxis: { title: { text: 'Queries (log scale)' }, type: 'log', dtick: 3 },
       })}
       config={PLOT_CONFIG}
       style={{ width: '100%', height: 260 }}
@@ -225,41 +285,50 @@ export function ScalingChart({ rows }: { rows: { n_items: number; classical_expe
   );
 }
 
-export function GroverViews({ result }: { result: ComparisonResult<GroverQuantum> }) {
+export function GroverViews({ result }: { result: SearchResult | DatabaseResult }) {
   const q = result.quantum;
   const label = (i: number) => (result.algorithm === 'database' ? `#${i}` : `${i}`);
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        <Card title="Amplitude amplification — probability of the answer" icon={<Zap className="w-4 h-4 text-quantum-neon" />}>
-          <AmplificationChart q={q} />
-          <p className="text-gray-400 text-xs mt-1">
-            Starts at 1/N = {pct(q.uniform_probability, 3)} (uniform superposition) and rises to {pct(q.success_probability)} after
-            {' '}{q.iterations} iteration(s). The kernel's values sit exactly on the theoretical curve.
-          </p>
+        <Card title="Amplitude amplification: the chance of a match, round by round" icon={<Zap className="w-4 h-4 text-quantum-neon" aria-hidden="true" />}>
+          {q.n_marked ? (
+            <>
+              <AmplificationChart q={q} />
+              <p className="text-gray-300 text-xs mt-1 leading-relaxed">
+                It starts at {q.n_marked}/N = {pct(q.n_marked * q.uniform_probability, 3)} (equal superposition) and reaches{' '}
+                {pct(q.success_probability)} after {plural(q.iterations, 'round')}. The simulator {theoryGap(q)}.
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Nothing matches, so the oracle has nothing to mark and the rounds change nothing: every one of the {q.n_items.toLocaleString()}{' '}
+              states keeps the same {pct(q.uniform_probability, 3)} chance.
+            </p>
+          )}
         </Card>
-        <Card title={`Measurement histogram (${q.shots} simulated shots)`} icon={<Zap className="w-4 h-4 text-quantum-neon" />}>
+        <Card title={`What ${q.shots.toLocaleString()} measurements gave`} icon={<Zap className="w-4 h-4 text-quantum-neon" aria-hidden="true" />}>
           <HistogramChart q={q} label={label} />
-          <p className="text-gray-400 text-xs mt-1">
-            Green bars are marked items. {pct(q.measured_success_rate)} of the shots returned a correct answer.
+          <p className="text-gray-300 text-xs mt-1">
+            Bright bars are matches. {pct(q.measured_success_rate)} of the measurements were a match. The 16 most frequent outcomes are shown.
           </p>
         </Card>
       </div>
-      {result.algorithm === 'search' && result.comparison.scaling && (
-        <Card title="Why it matters at scale — queries needed vs dataset size" className="mb-5">
+      {result.algorithm === 'search' && (
+        <Card title="Why it matters at scale: queries needed as the list grows" className="mb-5">
           <ScalingChart rows={result.comparison.scaling} />
-          <p className="text-gray-400 text-xs mt-1">
-            For a billion items a classical scan needs ~500 million comparisons on average; Grover needs ~24,800 oracle queries.
+          <p className="text-gray-300 text-xs mt-1">
+            For a billion items a classical search needs about 500 million comparisons on average; Grover's needs about 24,800 oracle queries.
           </p>
         </Card>
       )}
-      {result.algorithm === 'database' && (
+      {result.algorithm === 'database' && result.input.n_matches > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-          <Card title={`Records retrieved by amplitude amplification (${q.retrieved?.length ?? 0} distinct)`}>
-            <RecordList rows={(q.retrieved ?? []).map(r => ({ index: r.index, text: r.record, extra: `${r.count}×` }))} />
+          <Card title={`Matches measured in ${q.shots.toLocaleString()} runs (${result.quantum.answer.matches_seen} of ${result.input.n_matches})`}>
+            <RecordList rows={result.quantum.retrieved.map(r => ({ index: r.index, text: r.record, extra: `${r.count}×` }))} />
           </Card>
-          <Card title={`All matching records — classical full scan (${result.input.n_matches})`}>
-            <RecordList rows={(result.classical.matching_records ?? []).map((r: any) => ({ index: r.index, text: r.record }))} />
+          <Card title={`Every match, from the classical full scan (${result.input.n_matches})`}>
+            <RecordList rows={result.classical.matching_records.map(r => ({ index: r.index, text: r.record }))} />
           </Card>
         </div>
       )}
@@ -270,58 +339,66 @@ export function GroverViews({ result }: { result: ComparisonResult<GroverQuantum
 function RecordList({ rows }: { rows: { index: number; text: string; extra?: string }[] }) {
   if (!rows.length) return <p className="text-gray-400 text-xs">No records.</p>;
   return (
-    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+    <ul className="space-y-1 max-h-56 overflow-y-auto pr-1">
       {rows.map(r => (
-        <div key={r.index} className="flex items-center gap-2 bg-quantum-900/60 rounded-lg px-2.5 py-1.5">
-          <span className="text-gray-400 font-mono text-xs w-10 flex-shrink-0">#{r.index}</span>
-          <span className="text-gray-300 text-xs flex-1 truncate">{r.text}</span>
+        <li key={r.index} className="flex items-center gap-2 bg-quantum-900/60 rounded-lg px-2.5 py-1.5">
+          <span className="text-gray-400 font-mono text-xs w-12 flex-shrink-0">#{r.index}</span>
+          <span className="text-gray-300 text-xs flex-1 truncate" title={r.text}>{r.text}</span>
           {r.extra && <span className="text-quantum-neon font-mono text-xs">{r.extra}</span>}
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
 // ── Shor ─────────────────────────────────────────────────────────────────────
 
-export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> }) {
+export function ShorPeaksChart({ d, height = 260 }: { d: ShorDetail; height?: number }) {
+  const size = 2 ** (d.counting_qubits ?? 0);
+  return (
+    <Plot
+      data={[{
+        type: 'bar', x: d.peaks.map(p => p.y), y: d.peaks.map(p => p.probability),
+        marker: { color: COLORS.neon }, hovertemplate: 'y = %{x}<br>chance %{y:.4f}<extra></extra>',
+      }]}
+      layout={darkLayout({
+        xaxis: { title: { text: `Measured value y (0 to ${size - 1})` }, range: [-0.5, size] },
+        yaxis: { title: { text: 'Chance' } },
+        showlegend: false,
+        bargap: 0.1,
+      })}
+      config={PLOT_CONFIG}
+      style={{ width: '100%', height }}
+    />
+  );
+}
+
+export function ShorViews({ result }: { result: FactoringResult }) {
   const q = result.quantum;
   const d = q.detail;
-  const table = result.comparison.crypto_table as { bits: number; logical_qubits: number; quantum_gates: number; classical_gnfs_ops: number }[];
+  const table = result.comparison.crypto_table;
+  const last = table[table.length - 1];
   return (
     <>
       {d && d.peaks && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
-          <Card title={`Counting-register distribution after the inverse QFT (a = ${d.a})`} className="lg:col-span-3"
-            icon={<Zap className="w-4 h-4 text-quantum-neon" />}>
-            <Plot
-              data={[{
-                type: 'bar', x: d.peaks.map(p => p.y), y: d.peaks.map(p => p.probability),
-                marker: { color: COLORS.neon }, hovertemplate: 'y = %{x}<br>P = %{y:.4f}<extra></extra>',
-              }]}
-              layout={darkLayout({
-                xaxis: { title: { text: `Measured value y (0 … ${2 ** (d.counting_qubits ?? 0) - 1})` },
-                         range: [-0.5, 2 ** (d.counting_qubits ?? 0)] },
-                yaxis: { title: { text: 'Probability' } },
-                showlegend: false,
-                bargap: 0.1,
-              })}
-              config={PLOT_CONFIG}
-              style={{ width: '100%', height: 260 }}
-            />
-            <p className="text-gray-400 text-xs mt-1">
-              Peaks sit at multiples of 2^{d.counting_qubits}/r = {(2 ** (d.counting_qubits ?? 0) / (d.true_period || 1)).toFixed(2)}
-              {' '}— the period r = {d.true_period} of {d.a}^x mod {result.input.N} is encoded in their spacing.
+          <Card title={`What the counting register shows after the inverse QFT (a = ${d.a})`} className="lg:col-span-3"
+            icon={<Zap className="w-4 h-4 text-quantum-neon" aria-hidden="true" />}>
+            <ShorPeaksChart d={d} />
+            <p className="text-gray-300 text-xs mt-1 leading-relaxed">
+              The peaks sit at multiples of 2<sup>{d.counting_qubits}</sup>/r = {(2 ** (d.counting_qubits ?? 0) / (d.true_period || 1)).toFixed(2)}:
+              their spacing encodes the period r = {d.true_period} of {d.a}<sup>x</sup> mod {result.input.N}.
               Circuit: {d.qubits} qubits ({d.counting_qubits} counting + {d.work_qubits} work), {num(d.gates)} gates, depth {num(d.depth)}.
             </p>
           </Card>
-          <Card title="Classical post-processing (continued fractions)" className="lg:col-span-2">
+          <Card title="Reading the period: continued fractions" className="lg:col-span-2">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-gray-400 text-left">
-                    <th className="py-1 pr-2">y</th><th className="pr-2">shots</th><th className="pr-2">y/2^t</th>
-                    <th className="pr-2">≈ s/r</th><th>period?</th>
+                    <th scope="col" className="py-1 pr-2 font-medium">y</th><th scope="col" className="pr-2 font-medium">shots</th>
+                    <th scope="col" className="pr-2 font-medium">y/2<sup>t</sup></th>
+                    <th scope="col" className="pr-2 font-medium">≈ s/r</th><th scope="col" className="font-medium">period?</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -331,16 +408,16 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
                       <td className="pr-2">{pp.count}</td>
                       <td className="pr-2">{pp.phase.toFixed(4)}</td>
                       <td className="pr-2">{pp.fraction}</td>
-                      <td className={pp.period ? 'text-quantum-neon' : 'text-gray-400'}>{pp.period ?? '✗'}</td>
+                      <td className={pp.period ? 'text-quantum-neon' : 'text-gray-400'}>{pp.period ?? 'no'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {q.period && (
-              <p className="text-xs text-gray-400 mt-3 leading-relaxed">
-                r = {q.period} is even, so gcd({q.a}<sup>{q.period / 2}</sup> ± 1, {result.input.N}) gives the factors
-                {' '}<span className="text-quantum-neon font-mono">{(q.answer.factors as number[] | null)?.join(' × ')}</span>.
+            {q.from_period && q.period != null && q.answer.factors && (
+              <p className="text-xs text-gray-300 mt-3 leading-relaxed">
+                r = {q.period} is even, so gcd({q.a}<sup>{q.period / 2}</sup> ± 1, {result.input.N}) gives the factors{' '}
+                <span className="text-quantum-neon font-mono">{q.answer.factors.join(' × ')}</span>.
               </p>
             )}
           </Card>
@@ -348,66 +425,91 @@ export function ShorViews({ result }: { result: ComparisonResult<ShorQuantum> })
       )}
       {q.attempts.length > 1 && (
         <Card title="Attempts (Shor's algorithm is probabilistic)" className="mb-5">
-          <div className="flex flex-wrap gap-2">
+          <ul className="flex flex-wrap gap-2">
             {q.attempts.map((a, i) => (
-              <span key={i} className={`text-xs font-mono px-2 py-1 rounded-lg border ${a.success ? 'border-emerald-600/50 text-emerald-300' : 'border-quantum-600 text-gray-400'}`}>
-                a={a.a} · r={a.true_period ?? '?'} → {a.success ? 'factors ✓' : 'retry'}
-              </span>
+              <li key={i} className={`text-xs font-mono px-2 py-1 rounded-lg border ${a.success ? 'border-emerald-600/50 text-emerald-300' : 'border-quantum-600 text-gray-400'}`}>
+                a = {a.a} · r = {a.true_period ?? '?'} → {a.success ? 'factors found' : 'try another a'}
+              </li>
             ))}
-          </div>
+          </ul>
         </Card>
       )}
-      {table && (
-        <Card title="Cryptographic implications — factoring RSA-size numbers" className="mb-5">
-          <Plot
-            data={[
-              { type: 'scatter', mode: 'lines+markers', name: 'Classical (number field sieve) operations',
-                x: table.map(r => r.bits), y: table.map(r => r.classical_gnfs_ops), line: { color: COLORS.classical } },
-              { type: 'scatter', mode: 'lines+markers', name: "Shor's algorithm gates (~4n³)",
-                x: table.map(r => r.bits), y: table.map(r => r.quantum_gates), line: { color: COLORS.neon } },
-            ]}
-            layout={darkLayout({
-              xaxis: { title: { text: 'Key size (bits)' }, type: 'log', tickvals: table.map(r => r.bits) },
-              yaxis: { title: { text: 'Operations (log scale)' }, type: 'log' },
-            })}
-            config={PLOT_CONFIG}
-            style={{ width: '100%', height: 260 }}
-          />
-          <p className="text-gray-400 text-xs mt-1">
-            RSA-2048 would need ≈ {num(table[table.length - 1].logical_qubits)} error-corrected logical qubits (2n+3) —
-            far beyond today's hardware, but only polynomial effort, which is why post-quantum cryptography is being standardised.
-          </p>
-        </Card>
-      )}
+      <Card title="What it means for encryption: factoring RSA-size numbers" className="mb-5">
+        <Plot
+          data={[
+            { type: 'scatter', mode: 'lines+markers', name: 'Best classical method (number field sieve), operations',
+              x: table.map(r => r.bits), y: table.map(r => r.classical_gnfs_ops), line: { color: COLORS.classical } },
+            { type: 'scatter', mode: 'lines+markers', name: "Shor's algorithm, gates (about 4n³)",
+              x: table.map(r => r.bits), y: table.map(r => r.quantum_gates), line: { color: COLORS.neon } },
+          ]}
+          layout={darkLayout({
+            xaxis: { title: { text: 'Key size (bits)' }, type: 'log', tickvals: table.map(r => r.bits) },
+            yaxis: { title: { text: 'Operations (log scale)' }, type: 'log', dtick: 5, exponentformat: 'power' },
+          })}
+          config={PLOT_CONFIG}
+          style={{ width: '100%', height: 260 }}
+        />
+        <p className="text-gray-300 text-xs mt-1 leading-relaxed">
+          RSA-{last.bits} would need about {num(last.logical_qubits)} error-corrected qubits (2n + 3): far beyond today's hardware,
+          but only polynomial effort. That is why post-quantum encryption is being standardised now.
+        </p>
+      </Card>
     </>
   );
 }
 
 // ── QAOA / TSP ───────────────────────────────────────────────────────────────
 
-export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) {
+export function QaoaTraceChart({ q, height = 300 }: { q: QaoaQuantum; height?: number }) {
+  return (
+    <Plot
+      data={[
+        { type: 'scatter', mode: 'lines', name: 'Energy of each try', x: q.trace.map(t => t.evaluation),
+          y: q.trace.map(t => t.value), line: { color: '#8888cc', width: 1 } },
+        { type: 'scatter', mode: 'lines', name: 'Best so far', x: q.trace.map(t => t.evaluation),
+          y: q.trace.map(t => t.best), line: { color: COLORS.neon, width: 2 } },
+      ]}
+      layout={darkLayout({
+        xaxis: { title: { text: 'Circuit run' } },
+        yaxis: { title: { text: 'Energy (lower = shorter route)' } },
+      })}
+      config={PLOT_CONFIG}
+      style={{ width: '100%', height }}
+    />
+  );
+}
+
+export function TspViews({ result }: { result: OptimizationResult }) {
   const q = result.quantum;
-  const names: string[] = result.input.cities;
-  const coords: [number, number][] = result.input.coords;
+  const names = result.input.cities;
+  const coords = result.input.coords;
   const path = (tour: number[] | null | undefined) => (tour ?? []).map(i => coords[i]);
-  const opt = path(result.classical.tour as number[]);
-  const best = path(q.best_sampled.tour ?? undefined);
-  const greedy = path(result.classical.greedy?.tour as number[]);
+  const opt = path(result.classical.tour);
+  const best = path(q.best_sampled.tour);
+  const greedy = path(result.classical.greedy.tour);
+  const cityTrace = (pick: number, position: 'top center' | 'bottom center', show: boolean) => {
+    const idx = names.map((_, i) => i).filter(i => i % 2 === pick);
+    return {
+      type: 'scatter' as const, mode: 'text+markers' as const, name: 'Cities', legendgroup: 'cities', showlegend: show,
+      x: idx.map(i => coords[i][1]), y: idx.map(i => coords[i][0]), text: idx.map(i => names[i]),
+      textposition: position, marker: { size: 10, color: '#ffffff' }, textfont: { color: '#dddddd' },
+      hovertemplate: '%{text}<extra></extra>',
+    };
+  };
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        <Card title="Routes on real coordinates (longitude / latitude)">
+        <Card title="The routes on the map (longitude, latitude)">
           <Plot
             data={[
               { type: 'scatter', mode: 'lines', name: 'Greedy', x: greedy.map(c => c[1]), y: greedy.map(c => c[0]),
-                line: { color: COLORS.amber, width: 1.5, dash: 'dot' } },
-              { type: 'scatter', mode: 'lines', name: 'Classical optimum', x: opt.map(c => c[1]), y: opt.map(c => c[0]),
-                line: { color: COLORS.classical, width: 5 }, opacity: 0.5 },
-              { type: 'scatter', mode: 'lines', name: 'QAOA best sample', x: best.map(c => c[1]), y: best.map(c => c[0]),
-                line: { color: COLORS.neon, width: 2 } },
-              { type: 'scatter', mode: 'text+markers', name: 'Cities', x: coords.map(c => c[1]), y: coords.map(c => c[0]),
-                text: names, textposition: names.map((_, i) => (i % 2 ? 'bottom center' : 'top center')) as any,
-                marker: { size: 10, color: '#ffffff' }, textfont: { color: '#ddd' } },
+                line: { color: COLORS.amber, width: 1.5, dash: 'dot' }, hoverinfo: 'skip' },
+              { type: 'scatter', mode: 'lines', name: 'Shortest (classical)', x: opt.map(c => c[1]), y: opt.map(c => c[0]),
+                line: { color: COLORS.classical, width: 6 }, opacity: 0.5, hoverinfo: 'skip' },
+              { type: 'scatter', mode: 'lines', name: 'QAOA best measured', x: best.map(c => c[1]), y: best.map(c => c[0]),
+                line: { color: COLORS.neon, width: 2 }, hoverinfo: 'skip' },
+              cityTrace(0, 'top center', true),
+              cityTrace(1, 'bottom center', false),
             ]}
             layout={darkLayout({
               xaxis: { title: { text: 'Longitude' } },
@@ -417,33 +519,21 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
             style={{ width: '100%', height: 300 }}
           />
         </Card>
-        <Card title="QAOA training — classical optimiser tuning γ, β">
-          <Plot
-            data={[
-              { type: 'scatter', mode: 'lines', name: 'Objective (CVaR energy)', x: q.trace.map(t => t.evaluation),
-                y: q.trace.map(t => t.value), line: { color: '#6666aa', width: 1 } },
-              { type: 'scatter', mode: 'lines', name: 'Best so far', x: q.trace.map(t => t.evaluation),
-                y: q.trace.map(t => t.best), line: { color: COLORS.neon, width: 2 } },
-            ]}
-            layout={darkLayout({
-              xaxis: { title: { text: 'Circuit evaluation' } },
-              yaxis: { title: { text: 'Energy (lower = shorter route)' } },
-            })}
-            config={PLOT_CONFIG}
-            style={{ width: '100%', height: 300 }}
-          />
-          <p className="text-gray-400 text-xs mt-1 font-mono">
+        <Card title="Training QAOA: a classical optimiser tunes the angles γ and β">
+          <QaoaTraceChart q={q} />
+          <p className="text-gray-300 text-xs mt-1 font-mono break-words">
             γ = [{q.gammas.map(g => g.toFixed(3)).join(', ')}] · β = [{q.betas.map(b => b.toFixed(3)).join(', ')}]
           </p>
         </Card>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        <Card title="Most frequently measured bit-strings">
+        <Card title="The most frequently measured bit-strings">
           <div className="overflow-x-auto max-h-64">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-400 text-left">
-                  <th className="py-1 pr-2">bits</th><th className="pr-2">shots</th><th className="pr-2">valid?</th><th>route</th>
+                  <th scope="col" className="py-1 pr-2 font-medium">bits</th><th scope="col" className="pr-2 font-medium">shots</th>
+                  <th scope="col" className="pr-2 font-medium">valid?</th><th scope="col" className="font-medium">route</th>
                 </tr>
               </thead>
               <tbody>
@@ -451,26 +541,26 @@ export function TspViews({ result }: { result: ComparisonResult<QaoaQuantum> }) 
                   <tr key={s.bits} className="border-t border-quantum-700/50 font-mono">
                     <td className={`py-1 pr-2 ${s.optimal ? 'text-quantum-neon' : 'text-gray-400'}`}>{s.bits}</td>
                     <td className="pr-2 text-gray-300">{s.count}</td>
-                    <td className="pr-2">{s.feasible ? '✓' : '✗'}</td>
+                    <td className="pr-2 text-gray-300">{s.feasible ? 'yes' : 'no'}</td>
                     <td className="text-gray-300">{s.tour_names ? `${s.tour_names.join('→')} (${Math.round(Number(s.length))} km)` : '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-gray-400 text-xs mt-2">
-            Valid tours: {pct(q.p_feasible)} of the probability (random guessing: {pct(q.random_p_feasible, 2)}). Highlighted rows are optimal.
+          <p className="text-gray-300 text-xs mt-2">
+            Valid routes: {pct(q.p_feasible)} of the chance (random bit-strings: {pct(q.random_p_feasible, 2)}). Highlighted bits are a shortest route.
           </p>
         </Card>
-        <Card title="The Bridge — route problem → Ising Hamiltonian">
-          <ul className="space-y-1 mb-3">
-            {q.bridge.steps.map((s, i) => <li key={i} className="text-gray-400 text-xs leading-relaxed">{i + 1}. {s}</li>)}
-          </ul>
+        <Card title="The Bridge: route problem → Ising Hamiltonian">
+          <ol className="space-y-1 mb-3 list-decimal pl-5">
+            {q.bridge.steps.map((s, i) => <li key={i} className="text-gray-300 text-xs leading-relaxed">{s}</li>)}
+          </ol>
           <p className="text-xs font-mono text-quantum-neon/80 bg-quantum-900/60 rounded-lg p-2 max-h-24 overflow-y-auto break-words">
             {q.bridge.ising.hamiltonian}
           </p>
-          <p className="text-gray-400 text-xs mt-2">
-            {q.bridge.qubo.n} qubits · {q.bridge.qubo.nonzero_terms} QUBO terms · {q.layers} QAOA layer(s) · {num(q.circuit.gates)} gates
+          <p className="text-gray-300 text-xs mt-2">
+            {q.bridge.qubo.n} qubits · {q.bridge.qubo.nonzero_terms} QUBO terms · {plural(q.layers, 'QAOA layer')} · {num(q.circuit.gates)} gates
           </p>
         </Card>
       </div>

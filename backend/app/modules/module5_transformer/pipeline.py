@@ -142,12 +142,15 @@ def execute(spec: Dict[str, Any], layers: int = 2, shots: int = 1024, seed: Opti
                                  f"oracle O|x⟩ = −|x⟩ on the {r['input']['n_marked']} matching state(s)."),
                 _stage("Circuit", f"H on every qubit, then {q['iterations']} × (oracle + diffuser): "
                                   f"{q['circuit']['gates']} gates, depth {q['circuit']['depth']}."),
-                _stage("Run", f"Success probability {q['success_probability']:.1%}; the most frequent measurement "
-                              f"was item #{q['answer']['measured_index']}."),
+                _stage("Run", f"Success probability {q['success_probability']:.1%} per run. "
+                              + (f"Run {q['runs']['runs']} measured item #{q['answer']['index']}, which passed the "
+                                 f"oracle check: {q['runs']['queries']} oracle queries in all."
+                                 if q["answer"]["index"] is not None else r["comparison"]["notes"][1])),
             ],
             "verification": {"match": bool(q["correct"] and r["classical"]["correct"]),
-                             "detail": "Grover's answer equals the linear search result." if q["correct"] else
-                                       "The measured item did not pass the oracle check."},
+                             "detail": ("Grover's answer equals the linear search result." if q["answer"]["index"] is not None
+                                        else "Both agree the target isn't there.") if q["correct"] else
+                                       "No measured item passed the oracle check."},
             "qiskit": r["qiskit"],
         })
     elif kind == "database":
@@ -163,8 +166,8 @@ def execute(spec: Dict[str, Any], layers: int = 2, shots: int = 1024, seed: Opti
                 _stage("Bridge", f"The filter '{query}' becomes an oracle marking {r['input']['n_matches']} of "
                                  f"{r['input']['n_records']} records ({r['input']['qubits']} qubits)."),
                 _stage("Circuit", f"{q['iterations']} amplitude-amplification round(s), {q['circuit']['gates']} gates."),
-                _stage("Run", f"A match is measured with probability {q['success_probability']:.1%}; "
-                              f"{len(q['retrieved'])} distinct matching record(s) seen in {q['shots']} shots."),
+                _stage("Run", f"A match is measured with probability {q['success_probability']:.1%} per run; "
+                              f"{q['answer']['matches_seen']} distinct matching record(s) came up in {q['shots']} runs."),
             ],
             "verification": {"match": bool(match), "detail": "Every retrieved record satisfies the query "
                                                              "(checked against the classical full scan)."

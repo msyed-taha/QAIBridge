@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 
 // Every tool in the app, under the plain name used everywhere a user sees it:
 // the Tools menu, the app home page and the browser tab. `module` is the
-// Scope document's module number, still shown at the top of each tool's page.
+// Scope document's module number, for the code only: users never see it.
 
 export type ToolGroup = 'solve' | 'build' | 'research' | 'results';
 

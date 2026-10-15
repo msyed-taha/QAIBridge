@@ -2,12 +2,14 @@ import Plot from 'react-plotly.js';
 import { CheckCircle2, Cpu, Sigma, XCircle, Zap } from 'lucide-react';
 import { Card } from '../module2/SfodResultViews';
 import { COLORS, PLOT_CONFIG, darkLayout } from '../shared/plotTheme';
+import type { DecodedAnswer } from '../../api/sfod';
+import type { LogicDetails, QaoaProblemDetails } from '../../api/transformer';
 
 const pct = (x: number | null | undefined, d = 1) => (x == null ? '—' : `${(x * 100).toFixed(d)}%`);
 
 // ── Solutions in plain words ─────────────────────────────────────────────────
 
-export function describeSolution(kind: string, s: Record<string, any> | null | undefined): string {
+export function describeSolution(kind: string, s: DecodedAnswer | null | undefined): string {
   if (!s) return '—';
   switch (kind) {
     case 'knapsack':
@@ -21,7 +23,7 @@ export function describeSolution(kind: string, s: Record<string, any> | null | u
     case 'portfolio':
       return s.feasible === false
         ? `${(s.selected ?? []).join(', ') || 'nothing'} — wrong number of assets`
-        : `hold ${(s.selected ?? []).join(', ')} — return ${(s.expected_return * 100).toFixed(1)}%, risk ${(s.volatility * 100).toFixed(1)}%`;
+        : `hold ${(s.selected ?? []).join(', ')} — return ${((s.expected_return ?? 0) * 100).toFixed(1)}%, risk ${((s.volatility ?? 0) * 100).toFixed(1)}%`;
     default:
       return JSON.stringify(s);
   }
@@ -33,17 +35,18 @@ export function QuboHeatmap({ matrix, variables }: { matrix: number[][]; variabl
   const n = matrix.length;
   const full = matrix.map((row, i) => row.map((v, j) => (j >= i ? v : matrix[j][i])));   // show symmetric view
   const labels = variables.map((v, i) => (v.length > 12 ? `x${i}` : v));
+  const edge = Math.max(1e-9, ...full.flat().map(Math.abs));
   return (
     <Plot
       data={[{
         type: 'heatmap', z: full, x: labels, y: labels,
-        colorscale: [[0, '#cc44ff'], [0.5, '#12122b'], [1, '#00ffcc']], zmid: 0,
+        colorscale: [[0, '#cc44ff'], [0.5, '#12122b'], [1, '#00ffcc']], zmin: -edge, zmax: edge,   // centred on 0
         hovertemplate: 'Q[%{y}, %{x}] = %{z:.3f}<extra></extra>', showscale: n <= 12,
-      } as any]}
+      }]}
       layout={darkLayout({
-        margin: { t: 10, r: 10, b: 70, l: 80 },
-        xaxis: { tickangle: -45, tickfont: { size: 9 } },
-        yaxis: { autorange: 'reversed', tickfont: { size: 9 } },
+        margin: { t: 10, r: 10, b: 80, l: 90 },
+        xaxis: { tickangle: -45, tickfont: { size: 12 } },
+        yaxis: { autorange: 'reversed', tickfont: { size: 12 } },
       })}
       config={PLOT_CONFIG}
       style={{ width: '100%', height: Math.min(380, 140 + n * 18) }}
@@ -53,7 +56,7 @@ export function QuboHeatmap({ matrix, variables }: { matrix: number[][]; variabl
 
 // ── Optimisation problems solved through the Bridge + QAOA ───────────────────
 
-export function QaoaProblemView({ kind, details }: { kind: string; details: any }) {
+export function QaoaProblemView({ kind, details }: { kind: string; details: QaoaProblemDetails }) {
   const { bridge, exact, qaoa } = details;
   const best = qaoa.best_sampled;
   return (
@@ -90,17 +93,17 @@ export function QaoaProblemView({ kind, details }: { kind: string; details: any 
         <Card title="QAOA training — the classical optimiser tunes γ, β">
           <Plot
             data={[
-              { type: 'scatter', mode: 'lines', name: 'Objective', x: qaoa.trace.map((t: any) => t.evaluation),
-                y: qaoa.trace.map((t: any) => t.value), line: { color: '#6666aa', width: 1 } },
-              { type: 'scatter', mode: 'lines', name: 'Best so far', x: qaoa.trace.map((t: any) => t.evaluation),
-                y: qaoa.trace.map((t: any) => t.best), line: { color: COLORS.neon, width: 2 } },
+              { type: 'scatter', mode: 'lines', name: 'Objective', x: qaoa.trace.map(t => t.evaluation),
+                y: qaoa.trace.map(t => t.value), line: { color: '#6666aa', width: 1 } },
+              { type: 'scatter', mode: 'lines', name: 'Best so far', x: qaoa.trace.map(t => t.evaluation),
+                y: qaoa.trace.map(t => t.best), line: { color: COLORS.neon, width: 2 } },
             ]}
             layout={darkLayout({ xaxis: { title: { text: 'Circuit evaluation' } }, yaxis: { title: { text: 'Energy' } } })}
             config={PLOT_CONFIG}
             style={{ width: '100%', height: 260 }}
           />
           <p className="text-gray-400 text-xs mt-1 font-mono">
-            γ = [{qaoa.gammas.map((g: number) => g.toFixed(3)).join(', ')}] · β = [{qaoa.betas.map((b: number) => b.toFixed(3)).join(', ')}]
+            γ = [{qaoa.gammas.map(g => g.toFixed(3)).join(', ')}] · β = [{qaoa.betas.map(b => b.toFixed(3)).join(', ')}]
           </p>
         </Card>
       </div>
@@ -111,7 +114,7 @@ export function QaoaProblemView({ kind, details }: { kind: string; details: any 
             {bridge.ising.hamiltonian}
           </p>
           <ul className="mt-3 space-y-1">
-            {bridge.steps.map((s: string, i: number) => <li key={i} className="text-gray-400 text-xs leading-relaxed">{i + 1}. {s}</li>)}
+            {bridge.steps.map((s, i) => <li key={i} className="text-gray-400 text-xs leading-relaxed">{i + 1}. {s}</li>)}
           </ul>
         </Card>
         <Card title="Most frequently measured answers">
@@ -121,7 +124,7 @@ export function QaoaProblemView({ kind, details }: { kind: string; details: any 
                 <tr className="text-gray-400 text-left"><th className="py-1 pr-2">bits</th><th className="pr-2">shots</th><th>meaning</th></tr>
               </thead>
               <tbody>
-                {qaoa.solutions.slice(0, 12).map((s: any) => (
+                {qaoa.solutions.slice(0, 12).map(s => (
                   <tr key={s.bits} className="border-t border-quantum-700/50 font-mono">
                     <td className={`py-1 pr-2 ${s.optimal ? 'text-quantum-neon' : 'text-gray-400'}`}>{s.bits}</td>
                     <td className="pr-2 text-gray-300">{s.count}</td>
@@ -140,10 +143,10 @@ export function QaoaProblemView({ kind, details }: { kind: string; details: any 
 
 // ── Boolean logic ────────────────────────────────────────────────────────────
 
-export function LogicView({ details }: { details: any }) {
+export function LogicView({ details }: { details: LogicDetails }) {
   const d = details;
   const g = d.grover;
-  const solSet = new Set((d.solutions ?? []).map((s: any) => s.index));
+  const solSet = new Set(d.solutions.map(s => s.index));
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
@@ -153,14 +156,14 @@ export function LogicView({ details }: { details: any }) {
             <table className="w-full text-xs font-mono">
               <thead>
                 <tr className="text-gray-400 text-left">
-                  {d.variables.map((v: string) => <th key={v} className="pr-2 py-1">{v}</th>)}
+                  {d.variables.map(v => <th key={v} className="pr-2 py-1">{v}</th>)}
                   <th>f</th>
                 </tr>
               </thead>
               <tbody>
-                {d.truth_table.map((r: any) => (
+                {d.truth_table.map(r => (
                   <tr key={r.index} className={`border-t border-quantum-700/40 ${r.value ? 'text-quantum-neon' : 'text-gray-400'}`}>
-                    {r.bits.split('').map((b: string, i: number) => <td key={i} className="pr-2">{b}</td>)}
+                    {r.bits.split('').map((b, i) => <td key={i} className="pr-2">{b}</td>)}
                     <td>{r.value}</td>
                   </tr>
                 ))}
@@ -209,10 +212,10 @@ export function LogicView({ details }: { details: any }) {
             {g.curve.length > 1 ? (
               <Plot
                 data={[
-                  { type: 'scatter', mode: 'lines', name: 'Theory', x: g.curve.map((p: any) => p.iteration),
-                    y: g.curve.map((p: any) => p.theory), line: { color: COLORS.purple, dash: 'dot' } },
-                  { type: 'scatter', mode: 'lines+markers', name: 'Kernel', x: g.curve.map((p: any) => p.iteration),
-                    y: g.curve.map((p: any) => p.success_probability), line: { color: COLORS.neon } },
+                  { type: 'scatter', mode: 'lines', name: 'Theory', x: g.curve.map(p => p.iteration),
+                    y: g.curve.map(p => p.theory), line: { color: COLORS.purple, dash: 'dot' } },
+                  { type: 'scatter', mode: 'lines+markers', name: 'Kernel', x: g.curve.map(p => p.iteration),
+                    y: g.curve.map(p => p.success_probability), line: { color: COLORS.neon } },
                 ]}
                 layout={darkLayout({ xaxis: { title: { text: 'Iteration' }, dtick: 1 }, yaxis: { title: { text: 'P(satisfying)' }, range: [0, 1.05] } })}
                 config={PLOT_CONFIG}
@@ -230,11 +233,11 @@ export function LogicView({ details }: { details: any }) {
           </Card>
           <Card title={`Measured assignments (${g.shots} shots)`}>
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {g.measured.map((m: any) => (
+              {g.measured.map(m => (
                 <div key={m.index} className="flex items-center gap-2 text-xs font-mono">
                   <span className={m.satisfies ? 'text-quantum-neon' : 'text-gray-400'}>{m.bits}</span>
                   <span className="text-gray-400">
-                    {d.variables.map((v: string, i: number) => `${v}=${m.bits[i]}`).join(' ')}
+                    {d.variables.map((v, i) => `${v}=${m.bits[i]}`).join(' ')}
                   </span>
                   <span className="ml-auto text-gray-400">{m.count}×</span>
                   {m.satisfies ? <CheckCircle2 className="w-3.5 h-3.5 text-quantum-neon" /> : <XCircle className="w-3.5 h-3.5 text-gray-400" />}

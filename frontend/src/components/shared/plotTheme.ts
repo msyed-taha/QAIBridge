@@ -1,4 +1,5 @@
 // Shared Plotly styling so every chart matches the dark QAIBridge theme.
+import type { Layout } from 'plotly.js';
 
 export const COLORS = {
   neon: '#00ffcc',
@@ -11,7 +12,7 @@ export const COLORS = {
   blue: '#60a5fa',
 };
 
-export function darkLayout(overrides: Record<string, any> = {}): Record<string, any> {
+export function darkLayout(overrides: Partial<Layout> = {}): Partial<Layout> {
   const { xaxis, yaxis, ...rest } = overrides;
   return {
     paper_bgcolor: 'transparent',
