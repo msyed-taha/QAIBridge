@@ -49,7 +49,8 @@ How to fill it in:
   (colouring, cuts, cliques); cryptography = encryption, keys, hashes, signatures.
 - data_size: how many items the problem works over (records, cities, stores, assets, nodes, variables), as
   written in the text ("10 million" = 10000000). null if the text doesn't say.
-- unstructured_data: the data is unsorted or has no index. needs_exact_answer: an exact answer is required
+- unstructured_data: the data is unsorted or has no index, or the task is a brute-force search over possible
+  keys, passwords or inputs (false for breaking RSA, elliptic-curve or Diffie-Hellman keys, which have structure). needs_exact_answer: an exact answer is required
   (false when an approximate or good-enough answer is fine). has_graph_structure: routes, maps, networks or
   connections. is_security_related: encryption, keys, passwords or hashes. continuous_vars: real-valued
   quantities such as energies or probabilities. periodic_structure: periods, cycles, frequencies, phases or
@@ -96,7 +97,6 @@ def _read_answer(answer: ai.Answer) -> Dict[str, Any]:
     features: Dict[str, Any] = {
         "problem_category": CATEGORIES.index(category),
         "data_size": min(max(size, 2), 10 ** 12) if size else None,     # None: the caller uses the usual default
-        "speedup_priority": 1,
     }
     for flag in FLAGS:
         features[flag] = data.get(flag) is True

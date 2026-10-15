@@ -9,6 +9,8 @@ it, and is scored against its answer key:
              built-in check warn? Off-topic requests: turned away?
   advisor    AI Advisor, read by the AI and by the built-in keyword reader: right
              problem category? A sound quantum algorithm? Off-topic: turned away?
+             Also on the 24 held-out problems the Advisor's model was never tuned on
+             (app/modules/module4_recommender/held_out_problems.json).
   code       Code to Quantum, read by the AI and by the built-in reader: right
              problem type (and number, for factoring)? Then the circuit is run and
              its answer checked against the classical one.
@@ -50,7 +52,13 @@ IDS: List[str] = []                        # when set, only these items run
 
 
 def _load(name: str) -> List[Dict[str, Any]]:
-    items = json.loads((HERE / "sets" / f"{name}.json").read_text())["items"]
+    if name == "advisor_held_out":
+        from app.modules.module4_recommender.model import held_out_problems
+        from app.routers.recommender import CATEGORY_LABELS
+        items = [{"id": p["id"], "text": p["text"], "quantum": p["answers"],
+                  "categories": [CATEGORY_LABELS[p["features"]["problem_category"]]]} for p in held_out_problems()]
+    else:
+        items = json.loads((HERE / "sets" / f"{name}.json").read_text())["items"]
     return [i for i in items if i["id"] in IDS] if IDS else items
 
 
@@ -179,12 +187,13 @@ def run(only: List[str], limit: Optional[int], fake: bool) -> Dict[str, Any]:
             results["describe"] = parallel(items, one)
 
         if "advisor" in only:
-            items = _load("advisor")[:limit]
-            for mode in ("auto", "local"):
-                def one(item, mode=mode):
-                    r = client.post("/api/module4/advise", headers=headers, json={"problem_text": item["text"], "mode": mode})
-                    return score_advisor(item, r.status_code, r.json())
-                results[f"advisor_{mode}"] = parallel(items, one)
+            for name in ("advisor", "advisor_held_out"):
+                items = _load(name)[:limit]
+                for mode in ("auto", "local"):
+                    def one(item, mode=mode):
+                        r = client.post("/api/module4/advise", headers=headers, json={"problem_text": item["text"], "mode": mode})
+                        return score_advisor(item, r.status_code, r.json())
+                    results[f"{name}_{mode}"] = parallel(items, one)
 
         if "code" in only:
             items = _load("code")[:limit]
@@ -245,9 +254,11 @@ def report(run_: Dict[str, Any]) -> str:
             detail = r.get("outcome") or f"off by {r['gap']}, got {r['got']}"
             lines.append(f"  - wrong: `{r['id']}` ({detail})")
         lines.append("")
-    for mode, name in (("auto", "AI reader"), ("local", "built-in keyword reader")):
-        if f"advisor_{mode}" in R:
-            a = R[f"advisor_{mode}"]
+    for key, mode, name in (("advisor", "auto", "AI reader"), ("advisor", "local", "built-in keyword reader"),
+                            ("advisor_held_out", "auto", "AI reader, 24 held-out problems"),
+                            ("advisor_held_out", "local", "built-in keyword reader, 24 held-out problems")):
+        if f"{key}_{mode}" in R:
+            a = R[f"{key}_{mode}"]
             lines += [f"## AI Advisor, {name}", "",
                       f"- Right category and a sound quantum algorithm: **{_share(a, where=circuits)}**",
                       f"- Right category: {_share(a, 'category_right', circuits)}",

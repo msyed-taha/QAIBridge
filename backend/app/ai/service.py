@@ -323,7 +323,8 @@ def _send(model: str, system: str, user: str, max_tokens: int, think: bool = Fal
             # Thinking first makes answers slower and longer (its tokens are paid for); only some tasks need it.
             **({} if think else {"thinking": {"type": "disabled"}}),
         },
-        timeout=TIMEOUT_SECONDS,
+        # a long answer gets the time it needs: Claude writes well over 150 tokens a second
+        timeout=max(TIMEOUT_SECONDS, max_tokens / 150),
     )
     if r.status_code != 200:
         raise AIServiceError(f"HTTP {r.status_code} {_error_kind(r)}".strip())

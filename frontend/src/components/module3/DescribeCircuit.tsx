@@ -87,7 +87,7 @@ export function DescribeCircuit({ qasm, hasGates, onBuild }: {
       </form>
 
       {busy && (
-        <p role="status" className="text-xs text-gray-300 mt-2">The AI is working out the circuit and its chances. This can take up to half a minute.</p>
+        <p role="status" className="text-xs text-gray-300 mt-2">The AI is working out the circuit and its chances. This can take up to a minute.</p>
       )}
 
       {!busy && !off && !shown && !note && (

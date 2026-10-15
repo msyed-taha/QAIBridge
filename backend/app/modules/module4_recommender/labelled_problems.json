@@ -1,0 +1,881 @@
+{
+ "about": "Real problem descriptions for testing the Advisor's model (never used to train it). features: what a careful reader fills in, following the AI reader's own definitions; answers: the quantum algorithms that genuinely fit.",
+ "items": [
+  {
+   "id": "phone_owner",
+   "text": "Find the owner of one phone number in an unsorted list of 50 million phone records.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 50000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "faulty_sensor",
+   "text": "Locate the single faulty sensor reading among 2 million unsorted log lines.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 2000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "valid_config",
+   "text": "Find any one of the few valid settings among a billion possible switch configurations.",
+   "answers": [
+    "amplitude_amp",
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 1000000000,
+    "unstructured_data": true,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "array_value",
+   "text": "Search an unsorted array of 10,000 integers for the value 4217.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 10000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "tagged_photos",
+   "text": "Find every photo in an unindexed archive of 1 million files that carries a given tag.",
+   "answers": [
+    "amplitude_amp",
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 1000000,
+    "unstructured_data": true,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "black_box",
+   "text": "Find the input that makes a black-box function return true, out of 1 million possible inputs.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 1000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "factor_15_digit",
+   "text": "Factor the 15-digit number 999999000001.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 999999000001,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "toy_rsa",
+   "text": "Find the prime factors of 3,233, the modulus of a toy RSA key.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 3233,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "is_prime",
+   "text": "Is 1,000,003 a prime number? If not, find its factors.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 1000003,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "rsa_2048",
+   "text": "Split a 2048-bit RSA modulus into its two prime factors.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 2048,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "factor_15",
+   "text": "Find the factors of 15 on a quantum computer.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 15,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "semiprime",
+   "text": "Factor a 512-bit semiprime from a cryptography challenge.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 512,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "projects",
+   "text": "Choose which of 25 projects to fund within a $10 million budget to get the most total value.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 25,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "trucks",
+   "text": "Plan routes for 12 delivery trucks visiting 150 stores, keeping the total distance as low as possible.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 150,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "nurses",
+   "text": "Assign 60 nurses to shifts over a month while meeting everyone's constraints.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 60,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "assets",
+   "text": "Pick 8 of 40 assets for a portfolio that balances expected return and risk.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 40,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "bin_packing",
+   "text": "Pack 30 boxes of different sizes into as few shipping containers as possible.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 30,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "machines",
+   "text": "Find the cheapest way to schedule 20 jobs on 4 machines.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 20,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "lahore_balance",
+   "text": "Return all customer records from a 2-million-row table where the city is Lahore and the balance is over 5,000.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 2000000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "transaction_id",
+   "text": "Find the one record with transaction ID 88213 in an unindexed table of 500,000 rows.",
+   "answers": [
+    "grovers",
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 500000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "out_of_stock",
+   "text": "Query a product database of 40,000 items for every item that is out of stock.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 40000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "symptoms",
+   "text": "Find which patient records in a hospital database of 80,000 patients match a list of three symptoms.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 80000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "count_orders",
+   "text": "Count how many of 10 million logged orders match several conditions.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 10000000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "hired_after",
+   "text": "Retrieve all employees hired after 2020 from an HR database of 12,000 people.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 12000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "hydrogen",
+   "text": "Compute the ground-state energy of the hydrogen molecule.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 2,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "cathode",
+   "text": "Simulate the electronic structure of a lithium-ion battery cathode material.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 50,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "nitrogenase",
+   "text": "Find the energy levels of the active site of the nitrogenase enzyme.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 100,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "hamiltonian",
+   "text": "Estimate the eigenvalues of a 1,000 by 1,000 Hamiltonian matrix to high precision.",
+   "answers": [
+    "qpe",
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 1000,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": true,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "drug_binding",
+   "text": "Model how strongly a drug molecule binds to a protein.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 200,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "phase",
+   "text": "Find the phase of an eigenvector of a unitary operator to 10 bits of precision.",
+   "answers": [
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 10,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": true,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "spam",
+   "text": "Classify emails as spam or not spam, learning from 100,000 labelled examples.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 100000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "house_prices",
+   "text": "Predict house prices from 20 features of each house.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 5000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "cluster_customers",
+   "text": "Group 50,000 customers into clusters with similar shopping habits.",
+   "answers": [
+    "vqe",
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 50000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "fraud",
+   "text": "Detect fraudulent credit card transactions among 1 million payments.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 1000000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "cats",
+   "text": "Train a model to recognise cats in photos.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 10000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "songs",
+   "text": "Recommend songs to users from their listening history.",
+   "answers": [
+    "vqe",
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 100000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "map_colouring",
+   "text": "Colour the 500 regions of a map with as few colours as possible so that neighbours always differ.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 500,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "max_cut",
+   "text": "Find the maximum cut of a 100-node network.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 100,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "clique",
+   "text": "Find the largest group of people who all know each other in a social network of 2,000 people.",
+   "answers": [
+    "qaoa",
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 2000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "independent",
+   "text": "Find the largest set of nodes in a 300-node graph where no two chosen nodes are connected.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 300,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "grid_zones",
+   "text": "Split a power grid of 1,000 substations into two balanced zones with the fewest lines between them.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 1000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "hamiltonian_cycle",
+   "text": "Check whether a 50-node graph has a cycle that visits every node exactly once.",
+   "answers": [
+    "qaoa",
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 50,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "rsa_signing",
+   "text": "Break the 2048-bit RSA key used to sign software updates.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 2048,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "bitcoin",
+   "text": "Recover the private key of an elliptic-curve (secp256k1) Bitcoin wallet from its public key.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 256,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "diffie_hellman",
+   "text": "Break a Diffie-Hellman key exchange by computing a discrete logarithm.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 2048,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "aes",
+   "text": "Find the 128-bit AES key used to encrypt a file, given one plaintext and its ciphertext.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 340282366920938463463374607431768211456,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "password_hash",
+   "text": "Find a password whose SHA-256 hash matches a leaked hash, among 10 billion candidates.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 10000000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "preimage",
+   "text": "Find an input that gives a chosen 64-bit hash value.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 18446744073709551616,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  }
+ ]
+}

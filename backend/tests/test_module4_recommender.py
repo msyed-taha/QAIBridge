@@ -205,3 +205,37 @@ def test_a_file_is_read_by_the_ai_too(client, auth, fake_ai):
                     files={"file": ("bakery.txt", io.BytesIO(BAKERY.encode()), "text/plain")})
     body = r.json()
     assert r.status_code == 200 and body["engine"] == "ai" and body["filename"] == "bakery.txt"
+
+
+# ── The model itself (module4_recommender/model.py) ─────────────────────────────
+
+def _facts(category, size, **flags):
+    from app.modules.module4_recommender.model import FLAGS
+    return {"problem_category": category, "data_size": size, **{k: flags.get(k, False) for k in FLAGS}}
+
+
+def test_public_keys_fall_to_shor_and_brute_force_to_grover():
+    from app.modules.module4_recommender import model
+    from app.routers.recommender import _clf
+    for size in (256, 2048, 10 ** 6):                  # key bits or a key space: the kind of attack decides
+        assert model.rank(_clf, _facts(7, size, is_security_related=True, needs_exact_answer=True))[0][0] == "shors"
+        assert model.rank(_clf, _facts(7, size, is_security_related=True, needs_exact_answer=True,
+                                       unstructured_data=True))[0][0] == "grovers"
+
+
+def test_the_confidence_is_the_models_own_probability():
+    from app.modules.module4_recommender import model
+    from app.routers.recommender import _clf
+    ranked = model.rank(_clf, _facts(0, 10 ** 6, unstructured_data=True, multi_solution=True))
+    allowed = model.CATEGORY_ALLOWED[0]
+    assert ranked[0][0] in allowed and sum(c for a, c in ranked if a in allowed) == pytest.approx(100, abs=0.5)
+
+
+def test_it_is_tested_on_problems_it_never_tuned_on(client):
+    from app.routers.recommender import MODEL_TEST
+    held = MODEL_TEST["held_out"]
+    assert held["facts"]["total"] == 24 and held["facts"]["right"] >= 23
+    assert held["built_in_reader"]["right"] >= 17          # the keyword reader is the fallback, and less exact
+    assert MODEL_TEST["labelled"]["facts"]["total"] == 48
+    info = client.get("/api/module4/model-info").json()
+    assert info["test"]["held_out"]["facts"]["pct"] == held["facts"]["pct"] and "speedup_priority" not in info["features"]

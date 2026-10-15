@@ -4,7 +4,7 @@ import {
   AlertCircle, AlertTriangle, ArrowRight, Atom, Brain, CheckCircle, ChevronDown, Cpu, FileText, Gauge, Info,
   MessageCircleQuestion, Play, Upload, X,
 } from 'lucide-react';
-import { advisorApi, type Advice, type AdvisorMode } from '../api/advisor';
+import { advisorApi, type Advice, type AdvisorMode, type ModelInfo } from '../api/advisor';
 import { aiApi, type AIStatus } from '../api/ai';
 import { getApiErrorMessage } from '../api/client';
 import { AIStatusLine, WrittenByAI } from '../components/ai/AIStatus';
@@ -83,12 +83,17 @@ export function Module4Page() {
   const [expanded, setExpanded]         = useState<string | null>(null);
   const [showFeatures, setShowFeatures] = useState(false);
   const [revealResult, setRevealResult] = useState(false);
+  const [modelInfo, setModelInfo]       = useState<ModelInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const handledKey = useRef<string | null>(null);
   const ids = { text: useId(), mode: useId(), hint: useId() };
 
   const ACCEPTED = '.pdf,.docx,.doc,.csv,.txt,.md,.json,.tex,.rtf';
+
+  useEffect(() => {
+    advisorApi.modelInfo().then(setModelInfo).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     aiApi.status().then(setAiStatus).catch(() => undefined);
@@ -481,7 +486,14 @@ export function Module4Page() {
           {/* The model's ranking of the quantum algorithms */}
           <div>
             <h3 className="text-xs text-gray-300 uppercase tracking-wide font-medium mb-1 px-1">How the model ranked the quantum algorithms</h3>
-            <p className="text-xs text-gray-400 mb-3 px-1">How well each quantum algorithm fits this kind of problem, not whether it beats classical methods today.</p>
+            <p className="text-xs text-gray-400 mb-1 px-1">How well each quantum algorithm fits this kind of problem, not whether it beats classical methods today.</p>
+            {modelInfo && (
+              <p className="text-xs text-gray-400 mb-3 px-1">
+                Tested on {modelInfo.test.held_out.facts.total} real problems it never learned from or was tuned on: with their facts
+                read correctly it picks a fitting algorithm for {modelInfo.test.held_out.facts.right} of them, and when the built-in
+                keyword reader reads them, for {modelInfo.test.held_out.built_in_reader.right}.
+              </p>
+            )}
             <div className="space-y-2">
               {result.recommendations.map(rec => {
                 const isTop  = rec.rank === 1;

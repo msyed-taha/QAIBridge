@@ -26,5 +26,5 @@ export type DescribeReply =
 export const builderApi = {
   /** Describe a circuit in words (or a change to the one on the canvas): the AI writes it, the simulator checks it. */
   describe: async (text: string, current_qasm: string): Promise<DescribeReply> =>
-    (await apiClient.post('/api/module3/describe', { text, current_qasm }, { timeout: 90_000 })).data,
+    (await apiClient.post('/api/module3/describe', { text, current_qasm }, { timeout: 100_000 })).data,
 };

@@ -21,20 +21,15 @@ from __future__ import annotations
 import io
 import re
 import csv
-import math
 import json
-import random
 import numpy as np
 from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel, Field
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
 from ..ai import service as ai
 from ..models.user import User
-from ..modules.module4_recommender import ai_reader, reality
+from ..modules.module4_recommender import ai_reader, model, reality
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/module4", tags=["AI Advisor"])
@@ -315,59 +310,10 @@ ALGO_MAP    = {a["id"]: a for a in ALGORITHMS}
 QUANTUM_IDS = [a["id"] for a in QUANTUM_ALGORITHMS]
 CLASSICAL_IDS = [a["id"] for a in CLASSICAL_ALGORITHMS]
 
-# ── Synthetic training data ───────────────────────────────────────────────────
+# ── The model (module4_recommender/model.py) ─────────────────────────────────
 
-FEATURE_NAMES = [
-    "problem_category",      # 0-7
-    "data_size_log",         # log10(N)
-    "unstructured_data",
-    "needs_exact_answer",
-    "has_graph_structure",
-    "is_security_related",
-    "continuous_vars",
-    "periodic_structure",
-    "multi_solution",
-    "speedup_priority",
-]
-
-def _make_sample(rng, algo_id: str, noise: float = 0.15):
-    n = 10 ** rng.uniform(2, 9)
-    templates = {
-        "grovers":      [0, math.log10(n), 1, 1, 0, 0, 0, 0, 0, 1],
-        "shors":        [1, math.log10(n), 0, 1, 0, 1, 0, 1, 0, 0],
-        "qaoa":         [2, math.log10(min(n, 1000)), 0, 0, 1, 0, 0, 0, 1, 1],
-        "amplitude_amp":[3, math.log10(n), 1, 0, 0, 0, 0, 0, 1, 1],
-        "vqe":          [4, math.log10(min(n, 100)), 0, 0, 0, 0, 1, 0, 0, 0],
-        "qpe":          [5, math.log10(min(n, 1000)), 0, 1, 0, 0, 1, 1, 0, 0],
-    }
-    feats = templates[algo_id][:]
-    for i in range(len(feats)):
-        if i == 1:
-            feats[i] = max(1.0, min(10.0, feats[i] + rng.gauss(0, 0.5)))
-        elif i in (0, 9):
-            if rng.random() < noise:
-                feats[i] = rng.randint(0, 7 if i == 0 else 2)
-        else:
-            if rng.random() < noise:
-                feats[i] = 1 - feats[i]
-    return feats
-
-def _build_dataset(n_samples: int = 3000, seed: int = 42):
-    rng = random.Random(seed)
-    X, y = [], []
-    per_class = n_samples // len(QUANTUM_IDS)
-    for algo_id in QUANTUM_IDS:
-        for _ in range(per_class):
-            X.append(_make_sample(rng, algo_id))
-            y.append(algo_id)
-    return np.array(X, dtype=float), np.array(y)
-
-_X, _y = _build_dataset(3000)
-_X_train, _X_test, _y_train, _y_test = train_test_split(_X, _y, test_size=0.2, random_state=42, stratify=_y)
-_clf = RandomForestClassifier(n_estimators=200, max_depth=12, min_samples_split=4, random_state=42, n_jobs=-1)
-_clf.fit(_X_train, _y_train)
-_train_acc = round(accuracy_score(_y_train, _clf.predict(_X_train)) * 100, 2)
-_test_acc  = round(accuracy_score(_y_test,  _clf.predict(_X_test))  * 100, 2)
+FEATURE_NAMES = model.FEATURE_NAMES
+_clf = model.train()
 _feature_importances = {FEATURE_NAMES[i]: round(float(v) * 100, 2) for i, v in enumerate(_clf.feature_importances_)}
 
 # ── NLP: extract problem features from free text ──────────────────────────────
@@ -375,17 +321,21 @@ _feature_importances = {FEATURE_NAMES[i]: round(float(v) * 100, 2) for i, v in e
 CATEGORY_KEYWORDS = {
     0: ['search', 'find', 'locate', 'look up', 'lookup', 'retrieve', 'discover', 'detect'],
     1: ['factor', 'factoring', 'factorization', 'prime', 'rsa', 'integer decompos'],
-    2: ['optim', 'minimize', 'maximise', 'maximize', 'shortest path', 'route', 'tsp',
-        'traveling salesman', 'travelling salesman', 'schedule', 'portfolio', 'allocat'],
+    2: ['optim', 'minimize', 'minimise', 'maximise', 'maximize', 'shortest path', 'route', 'tsp',
+        'traveling salesman', 'travelling salesman', 'schedule', 'portfolio', 'allocat', 'budget', 'assign',
+        'shift', 'pack', 'container', 'cheapest', 'as few', 'as low as possible', 'most total'],
     3: ['database', 'query', 'record', 'sql', 'table', 'row', 'column', 'data entry', 'lookup table'],
     4: ['simulat', 'molecule', 'molecular', 'chemistry', 'hamiltonian', 'energy level',
-        'protein', 'drug discovery', 'material', 'quantum system', 'eigenvalue'],
+        'protein', 'drug discovery', 'material', 'quantum system', 'eigenvalue', 'eigenvector', 'unitary',
+        'enzyme', 'electronic structure', 'binds'],
     5: ['machine learning', 'neural network', 'deep learning', 'classif', 'regression',
-        'cluster', 'feature map', 'kernel', 'training data', 'model'],
+        'cluster', 'feature map', 'kernel', 'training data', 'model', 'predict', 'recommend', 'fraud',
+        'recognis', 'recogniz', 'labelled examples', 'labeled examples'],
     6: ['graph', 'network flow', 'node', 'edge', 'vertex', 'colou', 'color', 'clique',
-        'shortest path', 'spanning tree', 'network'],
+        'shortest path', 'spanning tree', 'network', 'power grid', 'substation', 'max cut', 'maximum cut'],
     7: ['encrypt', 'decrypt', 'cryptograph', 'cipher', 'rsa', 'aes', 'key exchange',
-        'hash', 'password', 'secure communication', 'digital signature'],
+        'hash', 'password', 'secure communication', 'digital signature', 'private key', 'public key',
+        'elliptic', 'bitcoin', 'wallet', 'discrete log', 'diffie'],
 }
 
 # ── Input validation: reject gibberish / off-topic text before classifying ────
@@ -523,8 +473,12 @@ def _extract_features_from_text(text: str) -> dict:
     # Use explicit category if detected, otherwise use keyword-based detection
     if explicit_category is not None:
         best_cat = explicit_category
+    elif max(category_scores) > 0:
+        # "find" makes almost anything a search, so a tie goes to the more specific category
+        top = max(category_scores)
+        best_cat = next((c for c in range(1, 8) if category_scores[c] == top), 0)
     else:
-        best_cat = category_scores.index(max(category_scores)) if max(category_scores) > 0 else 0
+        best_cat = 0
 
     # ── Boolean characteristic detection ─────────────────────────────────────
     unstructured  = any(w in t for w in ['unstructured', 'unsorted', 'random order', 'no index', 'unordered', 'scattered'])
@@ -535,9 +489,15 @@ def _extract_features_from_text(text: str) -> dict:
     continuous    = any(w in t for w in ['continuous', 'real-valued', 'float', 'decimal', 'probability amplitude', 'wave',
                                          'frequency', 'analog', 'energy', 'hamiltonian', 'molecul', 'eigen'])
     periodic      = any(w in t for w in ['periodic', 'period', 'cycle', 'fourier', 'frequency', 'oscillat', 'repeating pattern',
-                                         'eigenvalue', 'phase estimation', 'spectrum', 'spectral'])
+                                         'eigenvalue', 'eigenvector', 'phase', 'spectrum', 'spectral'])
     multi_sol     = any(w in t for w in ['multiple solution', 'many solution', 'several solution', 'all solution', 'satisf',
                                          'any valid', 'all records', 'matching', 'several conditions'])
+    # looking for every match (or counting them) rather than one item
+    if best_cat in (0, 3) and re.search(r'\b(all|every|each|which|how many|count)\b', t):
+        multi_sol = True
+    # breaking a cipher by trying keys or passwords is an unstructured search; public-key systems have structure
+    if best_cat == 7:
+        unstructured = any(w in t for w in ['password', 'hash', 'aes', 'brute', 'candidate', 'symmetric', 'guess'])
     # Combinatorial optimisation: many good candidate solutions, approximate answers are acceptable
     if best_cat in (2, 6):
         multi_sol = True
@@ -577,27 +537,12 @@ def _extract_features_from_text(text: str) -> dict:
         "continuous_vars":     continuous,
         "periodic_structure":  periodic,
         "multi_solution":      multi_sol,
-        "speedup_priority":    1,
     }
 
 def _default_size(category: int) -> int:
     """The problem size assumed when the description doesn't give one."""
     return {2: 100, 4: 50, 6: 1_000}.get(category, 1_000_000)
 
-
-def _features_to_vector(f: dict) -> np.ndarray:
-    return np.array([[
-        f["problem_category"],
-        math.log10(max(2, f["data_size"])),
-        int(f["unstructured_data"]),
-        int(f["needs_exact_answer"]),
-        int(f["has_graph_structure"]),
-        int(f["is_security_related"]),
-        int(f["continuous_vars"]),
-        int(f["periodic_structure"]),
-        int(f["multi_solution"]),
-        f["speedup_priority"],
-    ]], dtype=float)
 
 REASON_TEMPLATES = {
     # Quantum algorithms
@@ -622,53 +567,9 @@ REASON_TEMPLATES = {
     "eigensolver":         "Iterative classical eigensolvers find the eigenvalues you need from very large, sparse matrices.",
 }
 
-# Quantum algorithms that genuinely apply to each detected problem category.
-# The Random Forest ranks the algorithms; this domain-knowledge gate keeps the
-# final choice consistent with the problem (a hybrid rules + ML design), so e.g.
-# a route-planning problem can never be answered with a search algorithm.
-CATEGORY_ALLOWED = {
-    0: ["grovers", "amplitude_amp"],          # search
-    1: ["shors", "qpe"],                      # factoring
-    2: ["qaoa", "vqe"],                       # optimisation
-    3: ["amplitude_amp", "grovers"],          # database
-    4: ["vqe", "qpe"],                        # simulation
-    6: ["qaoa", "grovers"],                   # graph
-    7: ["shors", "grovers", "qpe"],           # cryptography
-}
-KEYWORD_PREFERENCE = {                        # strong phrases that single out one algorithm
-    "qpe": ["eigenvalue", "phase estimation", "spectrum", "spectral"],
-    "vqe": ["ground state", "molecul", "chemistry", "binding energy"],
-    "amplitude_amp": ["all records", "matching", "several conditions", "multiple matches"],
-}
-
-
-def _rank_quantum(features: dict, text: str = "") -> List[tuple]:
-    """The Random Forest's ranking of the quantum algorithms, kept consistent with the problem type."""
-    vec = _features_to_vector(features)
-    proba = _clf.predict_proba(vec)[0]
-    classes = list(_clf.classes_)
-    rf_scores = {classes[i]: float(p) for i, p in enumerate(proba)}
-
-    # category gate + keyword preference, then renormalise the RF confidence
-    allowed = CATEGORY_ALLOWED.get(features["problem_category"], classes)
-    t = text.lower()
-    preferred = [a for a, kws in KEYWORD_PREFERENCE.items() if a in allowed and any(k in t for k in kws)]
-    allowed_mass = sum(rf_scores[a] for a in allowed) or 1e-9
-
-    def rank_key(algo: str):
-        return (algo in preferred, algo in allowed, rf_scores[algo])
-
-    ordered = sorted(classes, key=rank_key, reverse=True)
-    scored = []
-    for algo in ordered:
-        if algo in allowed:
-            conf = max(rf_scores[algo] / allowed_mass, 0.0) * 100
-            if algo == ordered[0]:
-                conf = max(conf, 60.0)                    # the gate itself is strong evidence
-        else:
-            conf = rf_scores[algo] * 100 * 0.5            # out-of-category algorithms are demoted
-        scored.append((algo, round(min(conf, 99.0), 1)))
-    return scored
+def _rank_quantum(features: dict) -> List[tuple]:
+    """The model's ranking of the quantum algorithms, kept consistent with the problem type (model.rank)."""
+    return model.rank(_clf, features)
 
 
 def _card(algo_id: str, rank: int, confidence: Optional[float] = None) -> dict:
@@ -691,7 +592,7 @@ def _recommend(features: dict, text: str = "") -> dict:
     The model picks the quantum algorithm that fits; the reality check then says what to use today
     (and why), what a future error-corrected quantum computer could offer, and the limits right now.
     """
-    ranked = _rank_quantum(features, text)
+    ranked = _rank_quantum(features)
     qid, qconf = ranked[0]
     q = ALGO_MAP[qid]
     check = reality.assess(qid, q["name"], features, text)
@@ -886,16 +787,26 @@ async def advise_file(file: UploadFile = File(...), mode: Mode = Form("auto"), u
 def get_algorithms():
     return {"algorithms": ALGORITHMS}
 
+# How well the model does on real problems it never trained on: with the facts filled in correctly, and with the
+# built-in keyword reader filling them in from the text. "held_out" was never used to tune the model or the reader;
+# "labelled" was used while building them, so it flatters them.
+MODEL_TEST = {
+    name: {"facts": model.accuracy(_clf, lambda item: item["features"], items),
+           "built_in_reader": model.accuracy(_clf, lambda item: _extract_features_from_text(item["text"]), items)}
+    for name, items in (("held_out", model.held_out_problems()), ("labelled", model.labelled_problems()))
+}
+
+
 @router.get("/model-info")
 def model_info():
     return {
         "model":               "Random Forest Classifier",
-        "n_estimators":        200,
-        "training_samples":    len(_X_train),
-        "test_samples":        len(_X_test),
-        "train_accuracy_pct":  _train_acc,
-        "test_accuracy_pct":   _test_acc,
+        "n_estimators":        _clf.n_estimators,
+        "trained_on":          f"{len(model.PROFILES) * 400} generated examples of {len(model.PROFILES)} problem profiles",
+        "tested_on":           "real problem descriptions labelled by hand, never used for training (held_out: never used "
+                               "to tune anything either)",
+        "test":                MODEL_TEST,
         "features":            FEATURE_NAMES,
         "feature_importances": _feature_importances,
-        "classes":             ALGO_IDS,
+        "classes":             QUANTUM_IDS,
     }

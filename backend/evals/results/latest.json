@@ -1,10 +1,10 @@
 {
- "when": "2026-10-13T12:05:10+00:00",
+ "when": "2026-10-13T12:53:43+00:00",
  "model": "claude-haiku-5-5",
  "fake": false,
- "seconds": 60.0,
- "requests": 90,
- "cost_usd": 0.0175,
+ "seconds": 82.8,
+ "requests": 138,
+ "cost_usd": 0.0242,
  "results": {
   "describe": [
    {
@@ -101,14 +101,14 @@
    {
     "id": "w3",
     "off_topic": false,
-    "right": true,
-    "gap": 0.0,
-    "self_check": true,
-    "gates": 11,
+    "right": false,
+    "gap": 0.3333,
+    "self_check": false,
+    "gates": 10,
     "qubits": 3,
     "got": {
-     "001": 0.3333,
      "010": 0.3333,
+     "011": 0.3333,
      "100": 0.3333
     }
    },
@@ -286,7 +286,7 @@
     "right": true,
     "gap": 0.0,
     "self_check": true,
-    "gates": 2,
+    "gates": 3,
     "qubits": 2,
     "got": {
      "00": 0.25,
@@ -392,7 +392,7 @@
     "right": true,
     "gap": 0.0,
     "self_check": true,
-    "gates": 1,
+    "gates": 3,
     "qubits": 2,
     "got": {
      "00": 0.5,
@@ -427,13 +427,13 @@
    {
     "id": "rsa",
     "off_topic": false,
-    "category": "Cryptography",
-    "quantum": "qpe",
+    "category": "Factoring",
+    "quantum": "shors",
     "engine": "ai",
     "fell_back": false,
     "category_right": true,
-    "quantum_right": false,
-    "right": false
+    "quantum_right": true,
+    "right": true
    },
    {
     "id": "vrp",
@@ -450,7 +450,7 @@
     "id": "caffeine",
     "off_topic": false,
     "category": "Simulation",
-    "quantum": "vqe",
+    "quantum": "qpe",
     "engine": "ai",
     "fell_back": false,
     "category_right": true,
@@ -494,7 +494,7 @@
     "id": "digits",
     "off_topic": false,
     "category": "Machine Learning",
-    "quantum": "amplitude_amp",
+    "quantum": "vqe",
     "engine": "ai",
     "fell_back": false,
     "category_right": true,
@@ -516,12 +516,12 @@
     "id": "ecc",
     "off_topic": false,
     "category": "Cryptography",
-    "quantum": "grovers",
+    "quantum": "shors",
     "engine": "ai",
     "fell_back": false,
     "category_right": true,
-    "quantum_right": false,
-    "right": false
+    "quantum_right": true,
+    "right": true
    },
    {
     "id": "portfolio",
@@ -615,7 +615,7 @@
     "id": "movies",
     "off_topic": false,
     "category": "Machine Learning",
-    "quantum": "amplitude_amp",
+    "quantum": "vqe",
     "engine": "ai",
     "fell_back": false,
     "category_right": true,
@@ -650,7 +650,7 @@
    {
     "id": "unsorted_lookup",
     "off_topic": false,
-    "category": "Search",
+    "category": "Database",
     "quantum": "grovers",
     "engine": "built-in",
     "fell_back": false,
@@ -705,7 +705,7 @@
    {
     "id": "communities",
     "off_topic": false,
-    "category": "Graph",
+    "category": "Optimisation",
     "quantum": "qaoa",
     "engine": "built-in",
     "fell_back": false,
@@ -728,7 +728,7 @@
     "id": "digits",
     "off_topic": false,
     "category": "Machine Learning",
-    "quantum": "grovers",
+    "quantum": "vqe",
     "engine": "built-in",
     "fell_back": false,
     "category_right": true,
@@ -749,10 +749,13 @@
    {
     "id": "ecc",
     "off_topic": false,
-    "right": false,
-    "category_right": false,
-    "quantum_right": false,
-    "outcome": "turned away"
+    "category": "Cryptography",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
    },
    {
     "id": "portfolio",
@@ -801,13 +804,13 @@
    {
     "id": "bridge",
     "off_topic": false,
-    "category": "Search",
-    "quantum": "grovers",
+    "category": "Simulation",
+    "quantum": "qpe",
     "engine": "built-in",
     "fell_back": false,
-    "category_right": false,
-    "quantum_right": false,
-    "right": false
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
    },
    {
     "id": "battery",
@@ -834,32 +837,35 @@
    {
     "id": "knapsack",
     "off_topic": false,
-    "category": "Search",
-    "quantum": "grovers",
-    "engine": "built-in",
-    "fell_back": false,
-    "category_right": false,
-    "quantum_right": false,
-    "right": false
-   },
-   {
-    "id": "movies",
-    "off_topic": false,
-    "right": false,
-    "category_right": false,
-    "quantum_right": false,
-    "outcome": "turned away"
-   },
-   {
-    "id": "sat",
-    "off_topic": false,
-    "category": "Search",
-    "quantum": "grovers",
+    "category": "Optimisation",
+    "quantum": "qaoa",
     "engine": "built-in",
     "fell_back": false,
     "category_right": true,
     "quantum_right": true,
     "right": true
+   },
+   {
+    "id": "movies",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "vqe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "sat",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": false,
+    "right": false
    },
    {
     "id": "off_pasta",
@@ -872,6 +878,532 @@
     "off_topic": true,
     "right": true,
     "outcome": "turned away"
+   }
+  ],
+  "advisor_held_out_auto": [
+   {
+    "id": "h_needle",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_winning_ticket",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_any_solution",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "h_semiprime_91",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_big_number",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_rsa_toy",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_school_timetable",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_warehouse",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_airline",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_inventory_query",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_overdue",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_one_account",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_ammonia",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_superconductor",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "qpe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_spectrum",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "qpe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_churn",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_xray",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_segments",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "vqe",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_frequencies",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_community",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_vertex_cover",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_ssh_key",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_wifi",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": true,
+    "right": false
+   },
+   {
+    "id": "h_ecdsa",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "shors",
+    "engine": "ai",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   }
+  ],
+  "advisor_held_out_local": [
+   {
+    "id": "h_needle",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_winning_ticket",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_any_solution",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_semiprime_91",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_big_number",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_rsa_toy",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_school_timetable",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "h_warehouse",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "h_airline",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_inventory_query",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_overdue",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "amplitude_amp",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_one_account",
+    "off_topic": false,
+    "category": "Database",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_ammonia",
+    "off_topic": false,
+    "right": false,
+    "category_right": false,
+    "quantum_right": false,
+    "outcome": "turned away"
+   },
+   {
+    "id": "h_superconductor",
+    "off_topic": false,
+    "category": "Simulation",
+    "quantum": "vqe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_spectrum",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "h_churn",
+    "off_topic": false,
+    "category": "Machine Learning",
+    "quantum": "vqe",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_xray",
+    "off_topic": false,
+    "right": false,
+    "category_right": false,
+    "quantum_right": false,
+    "outcome": "turned away"
+   },
+   {
+    "id": "h_segments",
+    "off_topic": false,
+    "category": "Search",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": false,
+    "right": false
+   },
+   {
+    "id": "h_frequencies",
+    "off_topic": false,
+    "category": "Optimisation",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": true,
+    "right": false
+   },
+   {
+    "id": "h_community",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_vertex_cover",
+    "off_topic": false,
+    "category": "Graph",
+    "quantum": "qaoa",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_ssh_key",
+    "off_topic": false,
+    "category": "Factoring",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": false,
+    "quantum_right": true,
+    "right": false
+   },
+   {
+    "id": "h_wifi",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "grovers",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
+   },
+   {
+    "id": "h_ecdsa",
+    "off_topic": false,
+    "category": "Cryptography",
+    "quantum": "shors",
+    "engine": "built-in",
+    "fell_back": false,
+    "category_right": true,
+    "quantum_right": true,
+    "right": true
    }
   ],
   "code_llm": [

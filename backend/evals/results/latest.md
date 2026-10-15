@@ -1,38 +1,60 @@
 # QAIbridge AI evaluation
 
-2026-10-13T12:05:10+00:00 · model claude-haiku-5-5 · 90 AI requests · $0.0175 · 60.0 s
+2026-10-13T12:53:43+00:00 · model claude-haiku-5-5 · 138 AI requests · $0.0242 · 82.8 s
 
 ## Describe a circuit
 
-- Right circuit (the simulator gives the asked-for chances): **30 of 30 (100%)**
-- Its own expected chances agreed with the simulator: 30 of 30 (100%)
-- When the circuit was wrong, the check warned: 0 of 0
+- Right circuit (the simulator gives the asked-for chances): **29 of 30 (97%)**
+- Its own expected chances agreed with the simulator: 29 of 30 (97%)
+- When the circuit was wrong, the check warned: 1 of 1
 - Off-topic requests turned away: 2 of 2 (100%)
 
+  - wrong: `w3` (off by 0.3333, got {'010': 0.3333, '011': 0.3333, '100': 0.3333})
 
 ## AI Advisor, AI reader
 
-- Right category and a sound quantum algorithm: **18 of 20 (90%)**
+- Right category and a sound quantum algorithm: **20 of 20 (100%)**
 - Right category: 20 of 20 (100%)
-- Sound quantum algorithm: 18 of 20 (90%)
+- Sound quantum algorithm: 20 of 20 (100%)
 - Off-topic requests turned away: 2 of 2 (100%)
 
-  - wrong: `rsa` (Cryptography, qpe)
-  - wrong: `ecc` (Cryptography, grovers)
 
 ## AI Advisor, built-in keyword reader
 
-- Right category and a sound quantum algorithm: **14 of 20 (70%)**
-- Right category: 14 of 20 (70%)
-- Sound quantum algorithm: 14 of 20 (70%)
+- Right category and a sound quantum algorithm: **17 of 20 (85%)**
+- Right category: 18 of 20 (90%)
+- Sound quantum algorithm: 17 of 20 (85%)
 - Off-topic requests turned away: 2 of 2 (100%)
 
-  - wrong: `ecc` (turned away, —)
   - wrong: `portfolio` (Search, grovers)
   - wrong: `tour` (Search, grovers)
-  - wrong: `bridge` (Search, grovers)
-  - wrong: `knapsack` (Search, grovers)
-  - wrong: `movies` (turned away, —)
+  - wrong: `sat` (Search, amplitude_amp)
+
+## AI Advisor, AI reader, 24 held-out problems
+
+- Right category and a sound quantum algorithm: **22 of 24 (92%)**
+- Right category: 22 of 24 (92%)
+- Sound quantum algorithm: 23 of 24 (96%)
+- Off-topic requests turned away: 0 of 0 (0%)
+
+  - wrong: `h_any_solution` (Optimisation, qaoa)
+  - wrong: `h_wifi` (Search, grovers)
+
+## AI Advisor, built-in keyword reader, 24 held-out problems
+
+- Right category and a sound quantum algorithm: **16 of 24 (67%)**
+- Right category: 16 of 24 (67%)
+- Sound quantum algorithm: 18 of 24 (75%)
+- Off-topic requests turned away: 0 of 0 (0%)
+
+  - wrong: `h_school_timetable` (Database, grovers)
+  - wrong: `h_warehouse` (Search, amplitude_amp)
+  - wrong: `h_ammonia` (turned away, —)
+  - wrong: `h_spectrum` (Search, grovers)
+  - wrong: `h_xray` (turned away, —)
+  - wrong: `h_segments` (Search, grovers)
+  - wrong: `h_frequencies` (Optimisation, qaoa)
+  - wrong: `h_ssh_key` (Factoring, shors)
 
 ## Code to Quantum, AI reader
 

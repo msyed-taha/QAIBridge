@@ -1,0 +1,443 @@
+{
+ "about": "A held-out test set, written after the model and the keyword reader were tuned and never used to tune them. Same labelling rules as labelled_problems.json.",
+ "items": [
+  {
+   "id": "h_needle",
+   "text": "Somewhere in 300 million shuffled barcodes is the one that was scanned twice; find it.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 300000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_winning_ticket",
+   "text": "Identify the winning lottery ticket among 8 million unsorted tickets.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 8000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_any_solution",
+   "text": "Get me any arrangement of 12 queens on a board where none attack each other; many arrangements work.",
+   "answers": [
+    "amplitude_amp",
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 0,
+    "data_size": 1000000,
+    "unstructured_data": true,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_semiprime_91",
+   "text": "What two primes multiply to give 91?",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 91,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_big_number",
+   "text": "Decompose a 300-digit integer into primes.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 300,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_rsa_toy",
+   "text": "My toy RSA uses n = 187. Recover p and q.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 1,
+    "data_size": 187,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_school_timetable",
+   "text": "Build a school timetable for 40 teachers and 30 classrooms with no double bookings.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 40,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_warehouse",
+   "text": "Decide which 10 of 50 possible sites should get a warehouse to keep delivery costs lowest.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 50,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_airline",
+   "text": "Allocate 200 aircraft to flight routes to minimise fuel costs.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 2,
+    "data_size": 200,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_inventory_query",
+   "text": "From an inventory table of 3 million rows, list every item below its reorder level.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 3000000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_overdue",
+   "text": "Show all library loans that are more than 30 days overdue, from 900,000 loan records.",
+   "answers": [
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 900000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_one_account",
+   "text": "Look up the single account with IBAN PK36SCBL0000001123456702 in a 40-million-row table with no index.",
+   "answers": [
+    "grovers",
+    "amplitude_amp"
+   ],
+   "features": {
+    "problem_category": 3,
+    "data_size": 40000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_ammonia",
+   "text": "Work out the reaction energy for making ammonia with a new catalyst.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 30,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_superconductor",
+   "text": "Simulate the electrons in a high-temperature superconductor to find its lowest-energy state.",
+   "answers": [
+    "vqe",
+    "qpe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 100,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_spectrum",
+   "text": "Measure the energy spectrum of a spin chain with 40 spins precisely.",
+   "answers": [
+    "qpe",
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 4,
+    "data_size": 40,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": true,
+    "periodic_structure": true,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_churn",
+   "text": "Predict which of our 200,000 subscribers will cancel next month.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 200000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_xray",
+   "text": "Learn to spot pneumonia in chest X-ray images.",
+   "answers": [
+    "vqe"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 20000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_segments",
+   "text": "Divide 1 million shoppers into segments with similar behaviour.",
+   "answers": [
+    "vqe",
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 5,
+    "data_size": 1000000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": false,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_frequencies",
+   "text": "Assign radio frequencies to 400 towers so that neighbouring towers never share one.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 400,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_community",
+   "text": "Partition a 10,000-node citation network into two halves with the fewest edges between them.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 10000,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_vertex_cover",
+   "text": "Pick the fewest servers in a 600-machine network so that every link touches a chosen server.",
+   "answers": [
+    "qaoa"
+   ],
+   "features": {
+    "problem_category": 6,
+    "data_size": 600,
+    "unstructured_data": false,
+    "needs_exact_answer": false,
+    "has_graph_structure": true,
+    "is_security_related": false,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": true
+   }
+  },
+  {
+   "id": "h_ssh_key",
+   "text": "An attacker wants to derive someone's private SSH key, which uses RSA-4096, from the public key.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 4096,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_wifi",
+   "text": "Crack an 8-character Wi-Fi password by trying every possible combination.",
+   "answers": [
+    "grovers"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 200000000000000,
+    "unstructured_data": true,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  },
+  {
+   "id": "h_ecdsa",
+   "text": "Forge an ECDSA signature by recovering the signer's elliptic-curve private key.",
+   "answers": [
+    "shors"
+   ],
+   "features": {
+    "problem_category": 7,
+    "data_size": 256,
+    "unstructured_data": false,
+    "needs_exact_answer": true,
+    "has_graph_structure": false,
+    "is_security_related": true,
+    "continuous_vars": false,
+    "periodic_structure": false,
+    "multi_solution": false
+   }
+  }
+ ]
+}

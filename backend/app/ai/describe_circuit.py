@@ -232,8 +232,9 @@ def describe(text: str, current_qasm: str, *, user_id: Optional[int]) -> Dict[st
     """The AI's circuit for this description, checked. Raises ai.AIUnavailable when the AI can't give a usable one."""
     if ai.looks_like_gibberish(text):
         raise ai.AIUnavailable("rejected", "That doesn't look like a description. Try a few words, such as “a Bell pair”.")
-    # Thinking first: without it, circuits such as a W state or a QFT came out wrong or cut off.
-    answer = ai.ask(FEATURE, SYSTEM_PROMPT, _material(text, current_qasm), user_id=user_id, max_tokens=8000, think=True)
+    # Thinking first: without it, circuits such as a W state or a QFT came out wrong or cut off. A W state can take
+    # 8,400 tokens of thinking (measured), so 12,000 leaves room; the service allows the time that takes.
+    answer = ai.ask(FEATURE, SYSTEM_PROMPT, _material(text, current_qasm), user_id=user_id, max_tokens=12000, think=True)
     try:
         return read_circuit(answer.text)
     except ValueError as e:

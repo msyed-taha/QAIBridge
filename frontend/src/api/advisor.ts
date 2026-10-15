@@ -76,9 +76,19 @@ export interface OffTopic { off_topic: true; message: string; ai_status: AIStatu
 
 export type AdvisorMode = 'auto' | 'local';
 
+/** How many hand-labelled test problems got a fitting algorithm. */
+export interface ModelScore { right: number; total: number; pct: number }
+
+/** The model, and how it does on real problems it never trained on ("held_out": never used to tune it either). */
+export interface ModelInfo {
+  trained_on: string;
+  test: Record<'held_out' | 'labelled', { facts: ModelScore; built_in_reader: ModelScore }>;
+}
+
 const TIMEOUT = 90_000;
 
 export const advisorApi = {
+  modelInfo: async (): Promise<ModelInfo> => (await apiClient.get('/api/module4/model-info')).data,
   advise: async (problem_text: string, mode: AdvisorMode): Promise<Advice | OffTopic> =>
     (await apiClient.post('/api/module4/advise', { problem_text, mode }, { timeout: TIMEOUT })).data,
   adviseFile: async (file: File, mode: AdvisorMode): Promise<Advice | OffTopic> => {
